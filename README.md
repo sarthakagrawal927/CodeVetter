@@ -113,3 +113,16 @@ This project follows the standard TypeScript GitHub Action structure:
 - `npm init` for Node.js setup.
 - `@actions/core` and `@actions/github` for the toolkit.
 - `@vercel/ncc` for bundling the action into a single file.
+
+
+## Notes
+Main components of the project:
+
+- Interaction with git and git clients
+  - getting the diff, history, PR, files etc. Adding comments, CI/CD etc.
+  - Setting up github actions
+
+- Code Review
+  - Actual code review logic
+  - ability to set custom high amounts of rules repo and org level  
+  - indexing the code, making sense of things
