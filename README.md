@@ -1,5 +1,8 @@
 # AI Code Reviewer GitHub Action
 
+![AI Generated](https://ai-percentage-pin.vercel.app/api/ai-percentage?value=50)
+![AI PRs Welcome](https://ai-percentage-pin.vercel.app/api/ai-prs?welcome=yes)
+
 A GitHub Action that uses OpenAI to review Pull Requests.
 
 **Current Status**: Test Version (Comments "Hi" on the first file of the PR).
