@@ -29968,15 +29968,19 @@ class GitHubClient {
         this.octokit = github.getOctokit(token);
         this.context = github.context;
     }
-    async getPRDiff() {
+    getPullRequestContext() {
         const { owner, repo, number } = this.context.issue;
         if (!number) {
             throw new Error('No PR number found in context');
         }
+        return { owner, repo, pullNumber: number };
+    }
+    async getPRDiff() {
+        const { owner, repo, pullNumber } = this.getPullRequestContext();
         const response = await this.octokit.rest.pulls.get({
             owner,
             repo,
-            pull_number: number,
+            pull_number: pullNumber,
             mediaType: {
                 format: 'diff'
             }
@@ -29984,64 +29988,49 @@ class GitHubClient {
         return response.data;
     }
     async postComment(body) {
-        const { owner, repo, number } = this.context.issue;
-        if (!number) {
-            throw new Error('No PR number found in context');
-        }
+        const { owner, repo, pullNumber } = this.getPullRequestContext();
         await this.octokit.rest.issues.createComment({
             owner,
             repo,
-            issue_number: number,
+            issue_number: pullNumber,
             body
         });
     }
     async getPRFiles() {
-        const { owner, repo, number } = this.context.issue;
-        if (!number) {
-            throw new Error('No PR number found in context');
-        }
+        const { owner, repo, pullNumber } = this.getPullRequestContext();
         const { data: files } = await this.octokit.rest.pulls.listFiles({
             owner,
             repo,
-            pull_number: number
+            pull_number: pullNumber
         });
         return files.map(file => ({
             filename: file.filename,
-            sha: file.sha
+            sha: file.sha,
+            patch: file.patch ?? undefined
         }));
     }
-    async createReviewComment(path, body) {
-        const { owner, repo, number } = this.context.issue;
-        if (!number) {
-            throw new Error('No PR number found in context');
+    async createReviewComments(comments) {
+        if (comments.length === 0) {
+            return;
         }
-        // For a simple test, we'll try to comment on the PR itself or a general review comment
-        // Review comments usually require a position or line. 
-        // However, creating a general PR review with a comment is safer for "just testing" if we don't have a specific line.
-        // But the user asked to comment on the *first file*.
-        // To comment on a file, we usually need a commit_id and path.
+        const { owner, repo, pullNumber } = this.getPullRequestContext();
         const pr = await this.octokit.rest.pulls.get({
             owner,
             repo,
-            pull_number: number
+            pull_number: pullNumber
         });
         await this.octokit.rest.pulls.createReview({
             owner,
             repo,
-            pull_number: number,
+            pull_number: pullNumber,
             commit_id: pr.data.head.sha,
             event: 'COMMENT',
-            comments: [
-                {
-                    path,
-                    body,
-                    // If we don't specify line/position, it might fail or be a file-level comment if supported.
-                    // File-level comments are not standard in the API without a position in the diff.
-                    // Let's try to comment on line 1 if possible, or just use the createReview API which allows file comments in some contexts?
-                    // Actually, the safest way for a "Hi" test on a file is to pick line 1.
-                    line: 1
-                }
-            ]
+            comments: comments.map(comment => ({
+                path: comment.path,
+                body: comment.body,
+                line: comment.line,
+                side: comment.side
+            }))
         });
     }
 }
@@ -30091,49 +30080,133 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(7484));
 const github_1 = __nccwpck_require__(9248);
+const MAX_COMMENTS_PER_REVIEW = 40;
+const MAX_LINE_PREVIEW_LENGTH = 160;
+function truncate(text, maxLength) {
+    if (text.length <= maxLength) {
+        return text;
+    }
+    return `${text.slice(0, maxLength - 3)}...`;
+}
+function extractChangedLinesFromPatch(patch) {
+    const lines = patch.split('\n');
+    const changedLines = [];
+    let oldLine = 0;
+    let newLine = 0;
+    let inHunk = false;
+    for (const line of lines) {
+        if (line.startsWith('@@')) {
+            const hunkMatch = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
+            if (!hunkMatch) {
+                inHunk = false;
+                continue;
+            }
+            oldLine = Number(hunkMatch[1]);
+            newLine = Number(hunkMatch[2]);
+            inHunk = true;
+            continue;
+        }
+        if (!inHunk) {
+            continue;
+        }
+        if (line.startsWith('+') && !line.startsWith('+++')) {
+            changedLines.push({
+                line: newLine,
+                side: 'RIGHT',
+                text: line.slice(1)
+            });
+            newLine += 1;
+            continue;
+        }
+        if (line.startsWith('-') && !line.startsWith('---')) {
+            changedLines.push({
+                line: oldLine,
+                side: 'LEFT',
+                text: line.slice(1)
+            });
+            oldLine += 1;
+            continue;
+        }
+        if (line.startsWith(' ')) {
+            oldLine += 1;
+            newLine += 1;
+            continue;
+        }
+        if (line.startsWith('\\')) {
+            continue;
+        }
+    }
+    return changedLines;
+}
+function buildReviewComment(path, change, index, total) {
+    const changeType = change.side === 'RIGHT' ? 'added' : 'removed';
+    const cleanText = change.text.trim().length > 0 ? change.text.trim() : '(blank line)';
+    const preview = truncate(cleanText, MAX_LINE_PREVIEW_LENGTH);
+    return {
+        path,
+        line: change.line,
+        side: change.side,
+        body: `Test change ${index}/${total} (${changeType} line): ${preview}`
+    };
+}
 async function run() {
     try {
-        const openaiApiKey = core.getInput('openai_api_key');
         const githubToken = core.getInput('github_token');
-        const model = core.getInput('model') || 'gpt-4-turbo';
-        // if (!openaiApiKey) {
-        //   throw new Error('OpenAI API Key is required');
-        // }
         const githubClient = new github_1.GitHubClient(githubToken);
-        // const aiClient = new AIClient(openaiApiKey, model);
         core.info('Fetching PR files...');
         const files = await githubClient.getPRFiles();
         if (files.length === 0) {
             core.info('No files found in PR.');
             return;
         }
-        const firstFile = files[0];
-        core.info(`Found file: ${firstFile.filename}`);
-        core.info('Posting "Hi" comment...');
-        try {
-            await githubClient.createReviewComment(firstFile.filename, 'Hi');
-            core.info('Comment posted successfully.');
+        const collectedChanges = [];
+        for (const file of files) {
+            if (!file.patch) {
+                core.info(`Skipping ${file.filename} (no patch available).`);
+                continue;
+            }
+            const fileChanges = extractChangedLinesFromPatch(file.patch);
+            core.info(`Found ${fileChanges.length} changed lines in ${file.filename}.`);
+            for (const change of fileChanges) {
+                collectedChanges.push({ path: file.filename, change });
+            }
         }
-        catch (e) {
-            core.warning(`Failed to post review comment: ${e}`);
-            // Fallback to general comment if review comment fails (e.g. line 1 not in diff)
-            await githubClient.postComment(`Hi (General Comment - could not comment on ${firstFile.filename})`);
+        if (collectedChanges.length === 0) {
+            core.info('No inline-commentable changed lines found.');
+            await githubClient.postComment('No inline-commentable changes found in this PR for testing.');
+            return;
         }
-        /*
-        core.info('Fetching PR diff...');
-        const diff = await githubClient.getPRDiff();
-    
-        if (!diff) {
-          core.info('No diff found, skipping review.');
-          return;
+        const comments = collectedChanges.map(({ path, change }, idx) => buildReviewComment(path, change, idx + 1, collectedChanges.length));
+        core.info(`Posting ${comments.length} inline comments in batches...`);
+        let postedComments = 0;
+        for (let i = 0; i < comments.length; i += MAX_COMMENTS_PER_REVIEW) {
+            const batch = comments.slice(i, i + MAX_COMMENTS_PER_REVIEW);
+            const batchNumber = Math.floor(i / MAX_COMMENTS_PER_REVIEW) + 1;
+            core.info(`Posting batch ${batchNumber} (${batch.length} comments).`);
+            try {
+                await githubClient.createReviewComments(batch);
+                postedComments += batch.length;
+            }
+            catch (error) {
+                core.warning(`Batch ${batchNumber} failed, retrying comment-by-comment: ${String(error)}`);
+                for (const comment of batch) {
+                    try {
+                        await githubClient.createReviewComments([comment]);
+                        postedComments += 1;
+                    }
+                    catch (singleCommentError) {
+                        core.warning(`Skipping ${comment.path}:${comment.line} (${comment.side}) due to error: ${String(singleCommentError)}`);
+                    }
+                }
+            }
         }
-    
-        core.info('Sending diff to AI for review...');
-        const review = await aiClient.reviewDiff(diff);
-    
-        core.info('Posting review comments...');
-        await githubClient.postComment(review);
-        */
+        if (postedComments === 0) {
+            await githubClient.postComment('Failed to post inline test comments for this PR.');
+            throw new Error('All inline comments failed to post.');
+        }
+        if (postedComments < comments.length) {
+            await githubClient.postComment(`Posted ${postedComments}/${comments.length} inline test comments. Some comments were skipped due to API validation errors.`);
+        }
         core.info('Review completed successfully.');
     }
     catch (error) {

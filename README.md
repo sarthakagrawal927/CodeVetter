@@ -5,7 +5,23 @@
 
 A GitHub Action that uses OpenAI to review Pull Requests.
 
-**Current Status**: Test Version (Comments "Hi" on the first file of the PR).
+**Current Status**: Test Version (posts inline comments on each changed diff line in the PR).
+
+## Landing Page
+
+This repo now includes a landing page template as a git submodule:
+
+- `landing-page` -> [Start Bootstrap Landing Page](https://github.com/StartBootstrap/startbootstrap-landing-page)
+- Customized file: `landing-page/dist/index.html`
+
+### Preview Locally
+
+```bash
+git submodule update --init --recursive
+python3 -m http.server 4173 --directory landing-page/dist
+```
+
+Open `http://localhost:4173`.
 
 ## Usage
 
