@@ -3,8 +3,17 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "workers/*"
+  ],
   "scripts": {
-    "build": "ncc build src/main.ts -o dist",
+    "build:types": "npm run -w packages/shared-types build",
+    "build:review-core": "npm run -w packages/review-core build",
+    "build:gateway": "npm run -w packages/ai-gateway-client build",
+    "build:packages": "npm run build:types && npm run build:review-core && npm run build:gateway",
+    "build": "npm run build:packages && ncc build src/main.ts -o dist",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -12,7 +21,11 @@
   "license": "ISC",
   "dependencies": {
     "@actions/core": "^1.11.1",
-    "@actions/github": "^6.0.1",
-    "openai": "^6.9.1"
+    "@actions/github": "^6.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "@vercel/ncc": "^0.38.4",
+    "typescript": "^5.9.3"
   }
 }

@@ -39,8 +39,7 @@ jobs:
 | --- | --- | --- | --- |
 | `github_token` | Yes | `${{ github.token }}` | GitHub token for PR read/comment APIs |
 | `ai_base_url` | No | `https://api.openai.com/v1` | OpenAI-compatible gateway base URL |
-| `ai_api_key` | No | N/A | Preferred gateway key |
-| `openai_api_key` | No | N/A | Legacy fallback key input |
+| `ai_api_key` | Yes | N/A | Gateway key |
 | `model` | No | `gpt-4o-mini` | Model id exposed by your gateway |
 | `max_inline_findings` | No | `5` | Upper limit for inline comments |
 | `min_inline_severity` | No | `medium` | `low|medium|high|critical` |

@@ -1,0 +1,8 @@
+{
+  "name": "@code-reviewer/worker-review",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "echo \"Worker review build placeholder\""
+  }
+}

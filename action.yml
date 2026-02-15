@@ -1,24 +1,39 @@
 name: 'Sarthak AI Code Reviewer'
-description: 'Reviews Pull Requests using OpenAI API'
+description: 'Reviews Pull Requests using AI gateways (v0 Lite)'
 author: 'Antigravity'
 inputs:
-  openai_api_key:
-    description: 'OpenAI API Key'
-    required: false
   github_token:
     description: 'GitHub Token'
     required: true
     default: ${{ github.token }}
-  model:
-    description: 'OpenAI Model to use'
+  ai_base_url:
+    description: 'OpenAI-compatible gateway base URL (e.g. https://api.openai.com/v1)'
     required: false
-    default: 'gpt-4-turbo'
+  ai_api_key:
+    description: 'Gateway API key'
+    required: false
+  model:
+    description: 'Model to use at the gateway'
+    required: false
+    default: 'gpt-4o-mini'
+  max_inline_findings:
+    description: 'Maximum number of inline findings to post'
+    required: false
+    default: '5'
+  min_inline_severity:
+    description: 'Minimum severity for inline comments (low|medium|high|critical)'
+    required: false
+    default: 'medium'
+  review_tone:
+    description: 'Review tone (strict|balanced|friendly)'
+    required: false
+    default: 'balanced'
   fail_on_findings:
-    description: 'Fail the workflow if AI finds issues at or above the severity threshold'
+    description: 'Fail the workflow if findings at or above threshold exist'
     required: false
     default: 'false'
   fail_on_severity:
-    description: 'Severity threshold used when fail_on_findings is true (low|medium|high|critical)'
+    description: 'Severity threshold for fail_on_findings (low|medium|high|critical)'
     required: false
     default: 'high'
 runs:

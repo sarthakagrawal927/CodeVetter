@@ -1,0 +1,8 @@
+{
+  "name": "@code-reviewer/worker-api",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "echo \"Worker API build placeholder\""
+  }
+}

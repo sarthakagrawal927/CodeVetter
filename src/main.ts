@@ -1,276 +1,220 @@
 import * as core from '@actions/core';
-import { GitHubClient, ReviewCommentInput } from './github';
-import { AIClient, ReviewFinding, ReviewSeverity } from './ai';
-
-type DiffLine = {
-  line: number;
-  side: 'LEFT' | 'RIGHT';
-  text: string;
-};
+import { AIGatewayClient } from '../packages/ai-gateway-client/src';
+import {
+  GatewayConfig,
+  GatewayReviewFile,
+  REVIEW_SEVERITIES,
+  ReviewFinding,
+  ReviewSeverity
+} from '../packages/shared-types/src';
+import {
+  buildSummaryComment,
+  calculateScore,
+  meetsSeverityThreshold,
+  normalizeFindings,
+  parseDiffFiles,
+  selectInlineComments
+} from '../packages/review-core/src';
+import { GitHubClient } from './github';
 
 const MAX_COMMENTS_PER_REVIEW = 40;
-const MAX_LINE_PREVIEW_LENGTH = 160;
-const VALID_SEVERITIES: ReviewSeverity[] = ['low', 'medium', 'high', 'critical'];
-const SEVERITY_RANK: Record<ReviewSeverity, number> = {
-  low: 0,
-  medium: 1,
-  high: 2,
-  critical: 3
-};
-
-function truncate(text: string, maxLength: number): string {
-  if (text.length <= maxLength) {
-    return text;
-  }
-
-  return `${text.slice(0, maxLength - 3)}...`;
-}
-
-function extractChangedLinesFromPatch(patch: string): DiffLine[] {
-  const lines = patch.split('\n');
-  const changedLines: DiffLine[] = [];
-
-  let oldLine = 0;
-  let newLine = 0;
-  let inHunk = false;
-
-  for (const line of lines) {
-    if (line.startsWith('@@')) {
-      const hunkMatch = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
-      if (!hunkMatch) {
-        inHunk = false;
-        continue;
-      }
-
-      oldLine = Number(hunkMatch[1]);
-      newLine = Number(hunkMatch[2]);
-      inHunk = true;
-      continue;
-    }
-
-    if (!inHunk) {
-      continue;
-    }
-
-    if (line.startsWith('+') && !line.startsWith('+++')) {
-      changedLines.push({
-        line: newLine,
-        side: 'RIGHT',
-        text: line.slice(1)
-      });
-      newLine += 1;
-      continue;
-    }
-
-    if (line.startsWith('-') && !line.startsWith('---')) {
-      changedLines.push({
-        line: oldLine,
-        side: 'LEFT',
-        text: line.slice(1)
-      });
-      oldLine += 1;
-      continue;
-    }
-
-    if (line.startsWith(' ')) {
-      oldLine += 1;
-      newLine += 1;
-      continue;
-    }
-
-    if (line.startsWith('\\')) {
-      continue;
-    }
-  }
-
-  return changedLines;
-}
-
-function buildReviewComment(
-  path: string,
-  change: DiffLine,
-  index: number,
-  total: number
-): ReviewCommentInput {
-  const changeType = change.side === 'RIGHT' ? 'added' : 'removed';
-  const cleanText = change.text.trim().length > 0 ? change.text.trim() : '(blank line)';
-  const preview = truncate(cleanText, MAX_LINE_PREVIEW_LENGTH);
-
-  return {
-    path,
-    line: change.line,
-    side: change.side,
-    body: `Test change ${index}/${total} (${changeType} line): ${preview}`
-  };
-}
+const DEFAULT_OPENAI_BASE_URL = 'https://api.openai.com/v1';
 
 function parseBooleanInput(value: string): boolean {
   const normalized = value.trim().toLowerCase();
   return ['1', 'true', 'yes', 'on'].includes(normalized);
 }
 
-function parseSeverityInput(value: string): ReviewSeverity {
+function parseIntegerInput(value: string, fallback: number, min: number, max: number): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) {
+    return fallback;
+  }
+
+  return Math.max(min, Math.min(max, parsed));
+}
+
+function parseSeverityInput(inputName: string, value: string, fallback: ReviewSeverity): ReviewSeverity {
   const normalized = value.trim().toLowerCase();
-  if (!VALID_SEVERITIES.includes(normalized as ReviewSeverity)) {
-    throw new Error(`Invalid fail_on_severity "${value}". Use one of: ${VALID_SEVERITIES.join(', ')}`);
+  if (!normalized) {
+    return fallback;
+  }
+
+  if (!REVIEW_SEVERITIES.includes(normalized as ReviewSeverity)) {
+    throw new Error(
+      `Invalid ${inputName}: "${value}". Use one of ${REVIEW_SEVERITIES.join(', ')}.`
+    );
   }
 
   return normalized as ReviewSeverity;
 }
 
-function meetsSeverityThreshold(severity: ReviewSeverity, threshold: ReviewSeverity): boolean {
-  return SEVERITY_RANK[severity] >= SEVERITY_RANK[threshold];
-}
+function resolveGatewayConfig(): GatewayConfig {
+  const model = core.getInput('model') || 'gpt-4o-mini';
+  const reviewTone = core.getInput('review_tone') || 'balanced';
+  const aiApiKey = core.getInput('ai_api_key');
 
-function formatFindingLocation(finding: ReviewFinding): string {
-  if (finding.file && finding.line) {
-    return `${finding.file}:${finding.line}`;
+  if (!aiApiKey) {
+    throw new Error('Missing AI key. Provide ai_api_key.');
   }
 
-  if (finding.file) {
-    return finding.file;
+  const aiBaseUrlInput = core.getInput('ai_base_url');
+  const baseUrl = aiBaseUrlInput.trim() || DEFAULT_OPENAI_BASE_URL;
+
+  try {
+    const parsed = new URL(baseUrl);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error('invalid protocol');
+    }
+  } catch {
+    throw new Error(
+      `Invalid ai_base_url: "${baseUrl}". Provide an OpenAI-compatible URL such as https://api.openai.com/v1.`
+    );
   }
 
-  return 'unknown location';
+  return {
+    baseUrl,
+    apiKey: aiApiKey,
+    model,
+    reviewTone
+  };
 }
 
-function buildBlockingFindingsComment(
+function toGatewayFiles(files: Awaited<ReturnType<GitHubClient['getPRFiles']>>): GatewayReviewFile[] {
+  return files.map(file => ({
+    path: file.filename,
+    patch: file.patch,
+    status: file.status,
+    additions: file.additions,
+    deletions: file.deletions,
+    changes: file.changes
+  }));
+}
+
+async function postInlineCommentsBestEffort(
+  githubClient: GitHubClient,
+  comments: Array<{ path: string; line: number; side: 'LEFT' | 'RIGHT'; body: string }>
+): Promise<number> {
+  if (comments.length === 0) {
+    return 0;
+  }
+
+  let posted = 0;
+
+  for (let i = 0; i < comments.length; i += MAX_COMMENTS_PER_REVIEW) {
+    const batch = comments.slice(i, i + MAX_COMMENTS_PER_REVIEW);
+    const batchNumber = Math.floor(i / MAX_COMMENTS_PER_REVIEW) + 1;
+
+    try {
+      await githubClient.createReviewComments(batch);
+      posted += batch.length;
+      continue;
+    } catch (error) {
+      core.warning(`Inline comment batch ${batchNumber} failed: ${String(error)}`);
+    }
+
+    for (const comment of batch) {
+      try {
+        await githubClient.createReviewComments([comment]);
+        posted += 1;
+      } catch (error) {
+        core.warning(
+          `Skipping inline comment ${comment.path}:${comment.line} (${comment.side}) due to error: ${String(error)}`
+        );
+      }
+    }
+  }
+
+  return posted;
+}
+
+function hasBlockingFindings(
   findings: ReviewFinding[],
-  threshold: ReviewSeverity,
-  totalFindings: number
-): string {
-  const maxItems = 20;
-  const visibleFindings = findings.slice(0, maxItems);
-  const lines = visibleFindings.map(
-    (finding, index) =>
-      `${index + 1}. [${finding.severity.toUpperCase()}] ${finding.title} (${formatFindingLocation(finding)}) - ${finding.summary}`
-  );
+  failOnFindings: boolean,
+  failOnSeverity: ReviewSeverity
+): boolean {
+  if (!failOnFindings) {
+    return false;
+  }
 
-  const overflow =
-    findings.length > maxItems ? `\n...and ${findings.length - maxItems} more blocking findings.` : '';
-
-  return [
-    '### Blocking Findings Detected',
-    `Threshold: \`${threshold}\``,
-    `Blocking findings: ${findings.length}/${totalFindings}`,
-    '',
-    ...lines,
-    overflow
-  ].join('\n');
+  return findings.some(finding => meetsSeverityThreshold(finding.severity, failOnSeverity));
 }
 
 async function run() {
   try {
-    const openaiApiKey = core.getInput('openai_api_key');
     const githubToken = core.getInput('github_token');
-    const model = core.getInput('model') || 'gpt-4-turbo';
+    if (!githubToken) {
+      throw new Error('github_token is required.');
+    }
+
+    const gatewayConfig = resolveGatewayConfig();
+    const maxInlineFindings = parseIntegerInput(core.getInput('max_inline_findings') || '5', 5, 0, 20);
+    const minInlineSeverity = parseSeverityInput(
+      'min_inline_severity',
+      core.getInput('min_inline_severity') || 'medium',
+      'medium'
+    );
     const failOnFindings = parseBooleanInput(core.getInput('fail_on_findings') || 'false');
-    const failOnSeverity = parseSeverityInput(core.getInput('fail_on_severity') || 'high');
+    const failOnSeverity = parseSeverityInput(
+      'fail_on_severity',
+      core.getInput('fail_on_severity') || 'high',
+      'high'
+    );
 
     const githubClient = new GitHubClient(githubToken);
 
     core.info('Fetching PR files...');
     const files = await githubClient.getPRFiles();
+    const gatewayFiles = toGatewayFiles(files);
 
-    if (files.length === 0) {
-      core.info('No files found in PR.');
+    core.info('Fetching PR diff...');
+    const diff = await githubClient.getPRDiff();
+
+    if (!diff.trim()) {
+      await githubClient.postComment('## AI Review Lite Summary\n\nNo reviewable diff content was found in this PR.');
+      core.info('No diff content found, finished early.');
       return;
     }
 
-    const collectedChanges: Array<{ path: string; change: DiffLine }> = [];
+    const gatewayClient = new AIGatewayClient(gatewayConfig);
+    core.info(`Running gateway review with model ${gatewayConfig.model}...`);
 
-    for (const file of files) {
-      if (!file.patch) {
-        core.info(`Skipping ${file.filename} (no patch available).`);
-        continue;
+    const gatewayResponse = await gatewayClient.reviewDiff({
+      diff,
+      files: gatewayFiles,
+      context: {
+        repoFullName: process.env.GITHUB_REPOSITORY,
+        reviewTone: gatewayConfig.reviewTone
       }
+    });
 
-      const fileChanges = extractChangedLinesFromPatch(file.patch);
-      core.info(`Found ${fileChanges.length} changed lines in ${file.filename}.`);
+    const findings = normalizeFindings(gatewayResponse.findings);
+    const parsedDiff = parseDiffFiles(gatewayFiles);
+    const score = calculateScore(gatewayFiles, findings);
 
-      for (const change of fileChanges) {
-        collectedChanges.push({ path: file.filename, change });
-      }
-    }
+    core.info(`Found ${findings.length} normalized findings.`);
 
-    if (collectedChanges.length === 0) {
-      core.info('No inline-commentable changed lines found.');
-      await githubClient.postComment('No inline-commentable changes found in this PR for testing.');
-      return;
-    }
+    const summaryComment = buildSummaryComment(findings, score, {
+      reviewTone: gatewayConfig.reviewTone
+    });
 
-    const comments = collectedChanges.map(({ path, change }, idx) =>
-      buildReviewComment(path, change, idx + 1, collectedChanges.length)
-    );
+    await githubClient.postComment(summaryComment);
 
-    core.info(`Posting ${comments.length} inline comments in batches...`);
-    let postedComments = 0;
-    for (let i = 0; i < comments.length; i += MAX_COMMENTS_PER_REVIEW) {
-      const batch = comments.slice(i, i + MAX_COMMENTS_PER_REVIEW);
-      const batchNumber = Math.floor(i / MAX_COMMENTS_PER_REVIEW) + 1;
-      core.info(`Posting batch ${batchNumber} (${batch.length} comments).`);
+    const inlineComments = selectInlineComments(findings, parsedDiff, {
+      maxInlineFindings,
+      minInlineSeverity
+    });
 
-      try {
-        await githubClient.createReviewComments(batch);
-        postedComments += batch.length;
-      } catch (error) {
-        core.warning(`Batch ${batchNumber} failed, retrying comment-by-comment: ${String(error)}`);
+    const postedInline = await postInlineCommentsBestEffort(githubClient, inlineComments);
+    core.info(`Posted ${postedInline}/${inlineComments.length} inline findings.`);
 
-        for (const comment of batch) {
-          try {
-            await githubClient.createReviewComments([comment]);
-            postedComments += 1;
-          } catch (singleCommentError) {
-            core.warning(
-              `Skipping ${comment.path}:${comment.line} (${comment.side}) due to error: ${String(singleCommentError)}`
-            );
-          }
-        }
-      }
-    }
-
-    if (postedComments === 0) {
-      await githubClient.postComment('Failed to post inline test comments for this PR.');
-      throw new Error('All inline comments failed to post.');
-    }
-
-    if (postedComments < comments.length) {
-      await githubClient.postComment(
-        `Posted ${postedComments}/${comments.length} inline test comments. Some comments were skipped due to API validation errors.`
+    if (hasBlockingFindings(findings, failOnFindings, failOnSeverity)) {
+      throw new Error(
+        `Blocking findings detected at severity \"${failOnSeverity}\" or above. Set fail_on_findings=false to keep advisory mode.`
       );
     }
 
-    if (failOnFindings) {
-      if (!openaiApiKey) {
-        throw new Error('fail_on_findings is enabled but openai_api_key is not set.');
-      }
-
-      const aiClient = new AIClient(openaiApiKey, model);
-      core.info(`Running AI findings analysis (threshold: ${failOnSeverity})...`);
-      const diff = await githubClient.getPRDiff();
-
-      if (!diff.trim()) {
-        core.info('No diff found for findings analysis.');
-      } else {
-        const findings = await aiClient.extractFindings(diff);
-        const blockingFindings = findings.filter(finding => meetsSeverityThreshold(finding.severity, failOnSeverity));
-
-        core.info(
-          `AI findings analysis completed: ${findings.length} total findings, ${blockingFindings.length} blocking findings.`
-        );
-
-        if (blockingFindings.length > 0) {
-          await githubClient.postComment(
-            buildBlockingFindingsComment(blockingFindings, failOnSeverity, findings.length)
-          );
-          throw new Error(
-            `Blocking AI findings detected: ${blockingFindings.length} at severity "${failOnSeverity}" or higher.`
-          );
-        }
-      }
-    }
-
-    core.info('Review completed successfully.');
+    core.info('AI Review Lite completed successfully.');
   } catch (error) {
     if (error instanceof Error) {
       core.setFailed(error.message);

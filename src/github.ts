@@ -4,6 +4,10 @@ export type PRFile = {
   filename: string;
   sha: string;
   patch?: string;
+  status?: 'added' | 'modified' | 'removed' | 'renamed' | string;
+  additions?: number;
+  deletions?: number;
+  changes?: number;
 };
 
 export type ReviewCommentInput = {
@@ -64,13 +68,18 @@ export class GitHubClient {
     const { data: files } = await this.octokit.rest.pulls.listFiles({
       owner,
       repo,
-      pull_number: pullNumber
+      pull_number: pullNumber,
+      per_page: 100
     });
 
     return files.map(file => ({
       filename: file.filename,
       sha: file.sha,
-      patch: file.patch ?? undefined
+      patch: file.patch ?? undefined,
+      status: file.status,
+      additions: file.additions,
+      deletions: file.deletions,
+      changes: file.changes
     }));
   }
 
