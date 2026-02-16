@@ -53,6 +53,8 @@ jobs:
           min_inline_severity: "medium"
 ```
 
+Use `@v0` for rolling latest v0 updates, or pin an immutable release tag such as `@v0.0.1`.
+
 ## Inputs
 
 | Input | Required | Default | Notes |
