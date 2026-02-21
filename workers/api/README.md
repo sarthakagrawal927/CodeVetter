@@ -5,6 +5,10 @@ This worker is the hosted control-plane API skeleton for v1.
 ## Current Endpoints
 
 - `GET /health`
+- `GET /v1/orgs`
+- `POST /v1/orgs`
+- `GET /v1/orgs/:orgId/members`
+- `POST /v1/orgs/:orgId/members`
 - `GET /v1/repositories`
 - `POST /v1/repositories`
 - `GET /v1/rules/:repositoryId`

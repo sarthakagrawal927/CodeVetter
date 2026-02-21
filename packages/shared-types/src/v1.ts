@@ -1,5 +1,29 @@
 export type ProviderType = 'github';
 
+export type OrganizationRecord = {
+  id: string;
+  slug: string;
+  displayName: string;
+  githubOrgId?: string;
+  githubInstallationId?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type OrganizationMemberRole = 'owner' | 'admin' | 'member';
+export type OrganizationMemberStatus = 'active' | 'invited' | 'removed';
+
+export type OrganizationMemberRecord = {
+  id: string;
+  organizationId: string;
+  githubUserId: string;
+  githubLogin: string;
+  role: OrganizationMemberRole;
+  status: OrganizationMemberStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type RepositoryConnection = {
   id: string;
   workspaceId: string;

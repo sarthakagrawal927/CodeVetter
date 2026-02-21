@@ -1,5 +1,6 @@
 import {
   GitHubWebhookEnvelope,
+  OrganizationMemberRecord,
   RepositoryRuleConfig,
   ReviewRunRecord,
 } from '@code-reviewer/shared-types';
@@ -87,6 +88,40 @@ function parseRuleConfigInput(repositoryId: string, body: unknown): Omit<Reposit
   };
 }
 
+function parseOrganizationMemberInput(
+  organizationId: string,
+  body: unknown
+): Omit<OrganizationMemberRecord, 'id' | 'createdAt' | 'updatedAt'> {
+  if (!isObject(body)) {
+    throw new Error('Organization member body must be an object.');
+  }
+
+  if (typeof body.githubUserId !== 'string' || !body.githubUserId.trim()) {
+    throw new Error('githubUserId is required.');
+  }
+
+  if (typeof body.githubLogin !== 'string' || !body.githubLogin.trim()) {
+    throw new Error('githubLogin is required.');
+  }
+
+  const role =
+    body.role === 'owner' || body.role === 'admin' || body.role === 'member'
+      ? body.role
+      : 'member';
+  const status =
+    body.status === 'active' || body.status === 'invited' || body.status === 'removed'
+      ? body.status
+      : 'active';
+
+  return {
+    organizationId,
+    githubUserId: body.githubUserId.trim(),
+    githubLogin: body.githubLogin.trim(),
+    role,
+    status,
+  };
+}
+
 export async function routeRequest(context: HttpContext, deps: RouterDeps): Promise<HttpResponse> {
   const unauthorized = requireAuth(context, deps.authToken);
   if (unauthorized) {
@@ -111,6 +146,82 @@ export async function routeRequest(context: HttpContext, deps: RouterDeps): Prom
         repositories: deps.store.listRepositories(),
       },
     };
+  }
+
+  if (context.method === 'GET' && context.pathname === '/v1/orgs') {
+    return {
+      status: 200,
+      body: {
+        organizations: deps.store.listOrganizations(),
+      },
+    };
+  }
+
+  if (context.method === 'POST' && context.pathname === '/v1/orgs') {
+    if (!isObject(context.body)) {
+      return {
+        status: 400,
+        body: { error: 'invalid_request', message: 'Body must be JSON object.' },
+      };
+    }
+
+    if (typeof context.body.slug !== 'string' || !context.body.slug.trim()) {
+      return {
+        status: 400,
+        body: { error: 'invalid_org', message: 'slug is required.' },
+      };
+    }
+
+    const organization = deps.store.upsertOrganization({
+      slug: context.body.slug.trim(),
+      displayName:
+        typeof context.body.displayName === 'string' && context.body.displayName.trim()
+          ? context.body.displayName.trim()
+          : context.body.slug.trim(),
+      githubOrgId:
+        typeof context.body.githubOrgId === 'string' ? context.body.githubOrgId.trim() : undefined,
+      githubInstallationId:
+        typeof context.body.githubInstallationId === 'string'
+          ? context.body.githubInstallationId.trim()
+          : undefined,
+    });
+
+    return {
+      status: 201,
+      body: { organization },
+    };
+  }
+
+  const orgMembersMatch = /^\/v1\/orgs\/([^/]+)\/members$/.exec(context.pathname);
+  if (orgMembersMatch && context.method === 'GET') {
+    const organizationId = orgMembersMatch[1];
+    return {
+      status: 200,
+      body: {
+        members: deps.store.listOrganizationMembers(organizationId),
+      },
+    };
+  }
+
+  if (orgMembersMatch && context.method === 'POST') {
+    const organizationId = orgMembersMatch[1];
+    try {
+      const member = deps.store.upsertOrganizationMember(
+        parseOrganizationMemberInput(organizationId, context.body)
+      );
+      return {
+        status: 201,
+        body: { member },
+      };
+    } catch (error) {
+      return {
+        status: 400,
+        body: {
+          error: 'invalid_member_payload',
+          message: error instanceof Error ? error.message : 'Unknown validation error.',
+        },
+      };
+    }
   }
 
   if (context.method === 'POST' && context.pathname === '/v1/repositories') {
