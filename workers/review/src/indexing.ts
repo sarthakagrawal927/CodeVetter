@@ -38,8 +38,8 @@ type TreeSitterGrammar = unknown;
 const parser = new Parser();
 
 const NODE_TYPES_BY_LANGUAGE: Partial<Record<IndexedCodeLanguage, string[]>> = {
-  javascript: ['function_declaration', 'class_declaration', 'method_definition'],
-  jsx: ['function_declaration', 'class_declaration', 'method_definition'],
+  javascript: ['function_declaration', 'class_declaration', 'method_definition', 'variable_declarator'],
+  jsx: ['function_declaration', 'class_declaration', 'method_definition', 'variable_declarator'],
   typescript: [
     'function_declaration',
     'class_declaration',
@@ -47,6 +47,7 @@ const NODE_TYPES_BY_LANGUAGE: Partial<Record<IndexedCodeLanguage, string[]>> = {
     'type_alias_declaration',
     'enum_declaration',
     'method_definition',
+    'variable_declarator',
   ],
   tsx: [
     'function_declaration',
@@ -55,6 +56,7 @@ const NODE_TYPES_BY_LANGUAGE: Partial<Record<IndexedCodeLanguage, string[]>> = {
     'type_alias_declaration',
     'enum_declaration',
     'method_definition',
+    'variable_declarator',
   ],
   python: ['function_definition', 'class_definition'],
 };
@@ -121,6 +123,8 @@ function extractSymbolKind(node: Parser.SyntaxNode): IndexedSymbolKind | null {
       return node.parent?.type === 'class_definition' ? 'method' : 'function';
     case 'function_declaration':
       return 'function';
+    case 'variable_declarator':
+      return 'const';
     default:
       return null;
   }
@@ -134,6 +138,42 @@ function extractSymbolName(node: Parser.SyntaxNode): string | undefined {
 
   const text = nameNode.text.trim();
   return text || undefined;
+}
+
+function isTopLevelConstFunctionDeclarator(node: Parser.SyntaxNode): boolean {
+  if (node.type !== 'variable_declarator') {
+    return false;
+  }
+
+  const declaration = node.parent;
+  if (!declaration || declaration.type !== 'lexical_declaration') {
+    return false;
+  }
+
+  if (declaration.firstChild?.type !== 'const') {
+    return false;
+  }
+
+  const valueNode = node.childForFieldName('value');
+  if (!valueNode || (valueNode.type !== 'arrow_function' && valueNode.type !== 'function_expression')) {
+    return false;
+  }
+
+  const container = declaration.parent;
+  if (!container) {
+    return false;
+  }
+
+  if (container.type === 'program' || container.type === 'module') {
+    return true;
+  }
+
+  if (container.type === 'export_statement') {
+    const root = container.parent;
+    return Boolean(root && (root.type === 'program' || root.type === 'module'));
+  }
+
+  return false;
 }
 
 function computeNodeEndLine(node: Parser.SyntaxNode, lineCount: number): number {
@@ -208,6 +248,10 @@ function findTreeSitterCandidates(content: string, language: IndexedCodeLanguage
     for (const node of nodes) {
       const symbolKind = extractSymbolKind(node);
       if (!symbolKind) {
+        continue;
+      }
+
+      if (node.type === 'variable_declarator' && !isTopLevelConstFunctionDeclarator(node)) {
         continue;
       }
 

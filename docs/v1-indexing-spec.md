@@ -10,6 +10,7 @@ Ship a deterministic indexing pipeline for review context in v1, while keeping a
 - File guardrail: max `10MB` file size.
 - Chunking mode: `tree-sitter`.
   - Primary boundaries: function/class/interface/module-like declarations.
+  - Includes top-level function-valued `const` declarations (for example `const foo = () => {}`).
   - Fallback: module-level chunk when no symbols are detected.
   - Oversized symbol blocks are split by line windows.
 
