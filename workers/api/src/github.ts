@@ -22,6 +22,15 @@ export type GitHubOrganizationSnapshot = {
   installationIds: string[];
 };
 
+export type GitHubRepository = {
+  id: string;
+  owner: string;
+  name: string;
+  fullName: string;
+  defaultBranch: string;
+  isPrivate: boolean;
+};
+
 type GitHubRequestResult<T> = {
   statusCode: number;
   body: T;
@@ -57,6 +66,43 @@ export class GitHubClient {
       repositoryCount,
       memberCount,
       installationIds,
+    };
+  }
+
+  async getCurrentInstallationId(): Promise<string> {
+    const result = await this.requestJson<unknown>('/installation');
+    if (!isObject(result.body) || typeof result.body.id !== 'number') {
+      throw new GitHubApiError('Unable to resolve current installation from token.');
+    }
+
+    return String(result.body.id);
+  }
+
+  async getRepository(owner: string, name: string): Promise<GitHubRepository> {
+    const result = await this.requestJson<unknown>(
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`
+    );
+
+    if (!isObject(result.body)) {
+      throw new GitHubApiError('Unexpected repository payload from GitHub.');
+    }
+
+    const repoOwner = isObject(result.body.owner) && typeof result.body.owner.login === 'string'
+      ? result.body.owner.login
+      : owner;
+    const repoName = typeof result.body.name === 'string' ? result.body.name : name;
+    const fullName = typeof result.body.full_name === 'string' ? result.body.full_name : `${repoOwner}/${repoName}`;
+    const defaultBranch = typeof result.body.default_branch === 'string' ? result.body.default_branch : 'main';
+    const id = typeof result.body.id === 'number' ? String(result.body.id) : `${repoOwner}/${repoName}`;
+    const isPrivate = typeof result.body.private === 'boolean' ? result.body.private : false;
+
+    return {
+      id,
+      owner: repoOwner,
+      name: repoName,
+      fullName,
+      defaultBranch,
+      isPrivate,
     };
   }
 

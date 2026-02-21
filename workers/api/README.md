@@ -7,6 +7,7 @@ This worker is the hosted control-plane API skeleton for v1.
 - `GET /health`
 - `GET /v1/orgs`
 - `POST /v1/orgs`
+- `POST /v1/github/connect-repository` (proper GitHub App installation-token repository connect)
 - `GET /v1/orgs/:orgId/members`
 - `POST /v1/orgs/:orgId/members`
 - `GET /v1/orgs/:orgId/drift/check`

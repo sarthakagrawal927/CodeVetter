@@ -8,7 +8,7 @@ Current capabilities:
 - Configure optional GitHub App install URL and open install flow.
 - Create/list organizations.
 - Create/list org members.
-- One-click Quick Connect for GitHub repositories (`owner/repo` or GitHub URL).
+- Proper one-click GitHub App connect for repositories (`owner/repo` or GitHub URL) with installation ID validation.
 - Create/list repositories.
 - Load/update repository rules.
 - Trigger/list review runs.

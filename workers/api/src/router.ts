@@ -155,6 +155,52 @@ function parseDriftCheckInput(body: unknown): DriftCheckInput {
   };
 }
 
+function parseRepositoryReference(body: unknown): { owner: string; name: string } {
+  if (!isObject(body)) {
+    throw new Error('Body must be a JSON object.');
+  }
+
+  if (typeof body.owner === 'string' && typeof body.name === 'string') {
+    const owner = body.owner.trim();
+    const name = body.name.trim();
+    if (!owner || !name) {
+      throw new Error('owner and name are required.');
+    }
+
+    return { owner, name };
+  }
+
+  if (typeof body.repository !== 'string') {
+    throw new Error('repository string or owner/name fields are required.');
+  }
+
+  const raw = body.repository.trim();
+  if (!raw) {
+    throw new Error('repository input is required.');
+  }
+
+  let normalized = raw;
+  if (/^https?:\/\//i.test(raw)) {
+    const url = new URL(raw);
+    if (!/github\.com$/i.test(url.hostname)) {
+      throw new Error('Only github.com URLs are supported.');
+    }
+
+    normalized = url.pathname;
+  }
+
+  normalized = normalized.replace(/^\//, '').replace(/\.git$/i, '').replace(/\/$/, '');
+  const parts = normalized.split('/').filter(Boolean);
+  if (parts.length < 2) {
+    throw new Error('Use owner/repo format or full GitHub URL.');
+  }
+
+  return {
+    owner: parts[0],
+    name: parts[1],
+  };
+}
+
 function buildDriftSignals(
   input: DriftCheckInput,
   observed: {
@@ -266,6 +312,139 @@ export async function routeRequest(context: HttpContext, deps: RouterDeps): Prom
     return {
       status: 201,
       body: { organization },
+    };
+  }
+
+  if (context.method === 'POST' && context.pathname === '/v1/github/connect-repository') {
+    if (!deps.githubClient) {
+      return {
+        status: 503,
+        body: {
+          error: 'github_not_configured',
+          message:
+            'GitHub token is not configured. Set GITHUB_DRIFT_CHECK_TOKEN or GITHUB_APP_INSTALLATION_TOKEN.',
+        },
+      };
+    }
+
+    if (!isObject(context.body)) {
+      return {
+        status: 400,
+        body: {
+          error: 'invalid_request',
+          message: 'Body must be a JSON object.',
+        },
+      };
+    }
+
+    const organizationId =
+      typeof context.body.organizationId === 'string' ? context.body.organizationId.trim() : '';
+    const installationId =
+      typeof context.body.installationId === 'string' ? context.body.installationId.trim() : '';
+    if (!organizationId || !installationId) {
+      return {
+        status: 400,
+        body: {
+          error: 'invalid_connect_payload',
+          message: 'organizationId and installationId are required.',
+        },
+      };
+    }
+
+    const organization = deps.store.getOrganization(organizationId);
+    if (!organization) {
+      return {
+        status: 404,
+        body: {
+          error: 'organization_not_found',
+          message: `Unknown organization: ${organizationId}`,
+        },
+      };
+    }
+
+    const repositoryRef = (() => {
+      try {
+        return parseRepositoryReference(context.body);
+      } catch (error) {
+        return error instanceof Error ? error : new Error('Invalid repository reference.');
+      }
+    })();
+    if (repositoryRef instanceof Error) {
+      return {
+        status: 400,
+        body: {
+          error: 'invalid_repository_reference',
+          message: repositoryRef.message,
+        },
+      };
+    }
+
+    let tokenInstallationId: string;
+    try {
+      tokenInstallationId = await deps.githubClient.getCurrentInstallationId();
+    } catch (error) {
+      const statusCode = error instanceof GitHubApiError && error.statusCode ? error.statusCode : 502;
+      return {
+        status: statusCode,
+        body: {
+          error: 'github_installation_lookup_failed',
+          message: error instanceof Error ? error.message : 'Unable to validate installation token.',
+        },
+      };
+    }
+
+    if (tokenInstallationId !== installationId) {
+      return {
+        status: 409,
+        body: {
+          error: 'installation_mismatch',
+          message:
+            `Provided installationId=${installationId} does not match token installationId=${tokenInstallationId}. ` +
+            'Use token minted for the same installation.',
+        },
+      };
+    }
+
+    let remoteRepository: Awaited<ReturnType<GitHubClient['getRepository']>>;
+    try {
+      remoteRepository = await deps.githubClient.getRepository(repositoryRef.owner, repositoryRef.name);
+    } catch (error) {
+      const statusCode = error instanceof GitHubApiError && error.statusCode ? error.statusCode : 502;
+      return {
+        status: statusCode,
+        body: {
+          error: 'github_repository_lookup_failed',
+          message: error instanceof Error ? error.message : 'Unable to load repository from GitHub.',
+        },
+      };
+    }
+
+    const repository = deps.store.upsertRepository({
+      workspaceId: organizationId,
+      provider: 'github',
+      owner: remoteRepository.owner,
+      name: remoteRepository.name,
+      fullName: remoteRepository.fullName,
+      installationId,
+      defaultBranch: remoteRepository.defaultBranch,
+      isActive: true,
+    });
+
+    const updatedOrganization = deps.store.upsertOrganization({
+      id: organization.id,
+      slug: organization.slug,
+      displayName: organization.displayName,
+      githubOrgId: organization.githubOrgId,
+      githubInstallationId: installationId,
+    });
+
+    return {
+      status: 201,
+      body: {
+        organization: updatedOrganization,
+        repository,
+        source: 'github_app_installation',
+      },
     };
   }
 

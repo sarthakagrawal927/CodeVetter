@@ -500,6 +500,10 @@
               />
             </div>
             <div>
+              <label for="quick-connect-installation-id">Installation ID</label>
+              <input id="quick-connect-installation-id" type="text" placeholder="12345678" />
+            </div>
+            <div>
               <label for="quick-connect-branch">Default Branch</label>
               <input id="quick-connect-branch" type="text" value="main" />
             </div>
@@ -772,6 +776,7 @@
         repoDefaultBranch: document.getElementById('repo-default-branch'),
         quickConnectOrgId: document.getElementById('quick-connect-org-id'),
         quickConnectRepo: document.getElementById('quick-connect-repo'),
+        quickConnectInstallationId: document.getElementById('quick-connect-installation-id'),
         quickConnectBranch: document.getElementById('quick-connect-branch'),
         repoStatus: document.getElementById('repo-status'),
         reposTableBody: document.getElementById('repos-table-body'),
@@ -913,6 +918,14 @@
 
         if (!refs.repoWorkspaceId.value && refs.selectedOrgGlobal.value) {
           refs.repoWorkspaceId.value = refs.selectedOrgGlobal.value;
+        }
+
+        const activeOrgId = refs.quickConnectOrgId.value || refs.selectedOrgGlobal.value;
+        if (activeOrgId) {
+          const org = state.orgs.find(item => item.id === activeOrgId);
+          if (org && org.githubInstallationId && !refs.quickConnectInstallationId.value.trim()) {
+            refs.quickConnectInstallationId.value = org.githubInstallationId;
+          }
         }
       }
 
@@ -1074,31 +1087,38 @@
       }
 
       async function quickConnectRepo() {
-        let workspaceId = refs.quickConnectOrgId.value || refs.selectedOrgGlobal.value || refs.repoWorkspaceId.value.trim();
-        if (!workspaceId) {
-          workspaceId = 'org_local';
-          setRepoStatus('No org selected. Using fallback workspace "org_local".', 'warn');
-          log('Quick connect using fallback workspace.', { workspaceId });
+        const organizationId = refs.quickConnectOrgId.value || refs.selectedOrgGlobal.value;
+        if (!organizationId) {
+          throw new Error('Select an org before GitHub connect.');
         }
 
         const parsed = parseGitHubRepoInput(refs.quickConnectRepo.value);
+        const installationId = refs.quickConnectInstallationId.value.trim();
+        if (!installationId) {
+          throw new Error('Installation ID is required for proper GitHub connect.');
+        }
+
         const payload = {
-          workspaceId,
-          owner: parsed.owner,
-          name: parsed.name,
-          defaultBranch: refs.quickConnectBranch.value.trim() || 'main'
+          organizationId,
+          installationId,
+          repository: `${parsed.owner}/${parsed.name}`
         };
 
-        const data = await apiRequest('/v1/repositories', { method: 'POST', body: payload });
+        const data = await apiRequest('/v1/github/connect-repository', { method: 'POST', body: payload });
         log('Quick connected repository.', data);
-        setRepoStatus(`Connected ${parsed.owner}/${parsed.name} -> ${workspaceId}`, 'ok');
+        setRepoStatus(
+          `Connected ${parsed.owner}/${parsed.name} via installation ${installationId}`,
+          'ok'
+        );
 
-        refs.repoWorkspaceId.value = workspaceId;
+        refs.repoWorkspaceId.value = organizationId;
         refs.repoOwner.value = parsed.owner;
         refs.repoName.value = parsed.name;
-        refs.repoDefaultBranch.value = payload.defaultBranch;
+        refs.repoDefaultBranch.value = refs.quickConnectBranch.value.trim() || 'main';
+        refs.repoInstallationId.value = installationId;
 
         await loadRepos();
+        await loadOrgs();
       }
 
       function rulesPayload() {
@@ -1323,9 +1343,14 @@
         if (!url) {
           throw new Error('Set GitHub App Install URL first.');
         }
+        const parsed = new URL(url);
+        const orgId = refs.quickConnectOrgId.value || refs.selectedOrgGlobal.value;
+        if (orgId) {
+          parsed.searchParams.set('state', orgId);
+        }
 
-        window.open(url, '_blank', 'noopener,noreferrer');
-        log('Opened GitHub App install URL.', { url });
+        window.open(parsed.toString(), '_blank', 'noopener,noreferrer');
+        log('Opened GitHub App install URL.', { url: parsed.toString() });
       }
 
       function handleError(context, error) {
@@ -1378,9 +1403,28 @@
           const orgId = refs.selectedOrgGlobal.value;
           refs.membersOrgId.value = orgId;
           refs.driftOrgId.value = orgId;
+          refs.quickConnectOrgId.value = orgId;
           if (orgId) {
             refs.repoWorkspaceId.value = orgId;
+            const org = state.orgs.find(item => item.id === orgId);
+            if (org && org.githubInstallationId) {
+              refs.quickConnectInstallationId.value = org.githubInstallationId;
+            }
           }
+        });
+
+        refs.quickConnectOrgId.addEventListener('change', () => {
+          const orgId = refs.quickConnectOrgId.value;
+          if (!orgId) {
+            return;
+          }
+
+          refs.selectedOrgGlobal.value = orgId;
+          refs.membersOrgId.value = orgId;
+          refs.driftOrgId.value = orgId;
+          refs.repoWorkspaceId.value = orgId;
+          const org = state.orgs.find(item => item.id === orgId);
+          refs.quickConnectInstallationId.value = org?.githubInstallationId || '';
         });
 
         refs.orgsTableBody.addEventListener('click', event => {
@@ -1407,9 +1451,28 @@
         loadConnectionFromStorage();
         bindEvents();
 
+        const search = new URLSearchParams(window.location.search);
+        const installationIdFromCallback = search.get('installation_id');
+        const stateFromCallback = search.get('state');
+        if (installationIdFromCallback) {
+          refs.quickConnectInstallationId.value = installationIdFromCallback;
+          setRepoStatus(
+            `Detected installation callback installation_id=${installationIdFromCallback}. Select repo and connect.`,
+            'ok'
+          );
+          log('Captured installation_id from callback URL.', {
+            installationId: installationIdFromCallback,
+            state: stateFromCallback
+          });
+        }
+
         try {
           await loadHealth();
           await refreshAll();
+          if (stateFromCallback) {
+            refs.selectedOrgGlobal.value = stateFromCallback;
+            refs.quickConnectOrgId.value = stateFromCallback;
+          }
         } catch (error) {
           handleError('Boot', error);
         }
