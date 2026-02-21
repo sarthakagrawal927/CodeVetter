@@ -18,7 +18,8 @@ Use this file as the decision log for v1 implementation.
   - SQS + worker autoscaling
   - Redis Streams / BullMQ
   - NATS JetStream
-- Current status: open
+- Current status: decided
+- Decision: Cloudflare Queues for async review/indexing jobs.
 
 ## Q3. GitHub integration model
 
@@ -37,7 +38,9 @@ Use this file as the decision log for v1 implementation.
   - per-tenant schema/database
 - Current status: in progress
 - Working model: org -> repo and org -> member hierarchy.
-- Remaining choice: row-level tenancy vs per-tenant schema/database.
+- Remaining choices:
+  - whether to include team-level hierarchy in v1 (`org -> team -> repo/member`).
+  - row-level tenancy vs per-tenant schema/database.
 
 ## Q5. Rule schema and policy DSL scope
 
@@ -54,15 +57,18 @@ Use this file as the decision log for v1 implementation.
 - Options:
   - metadata + key files + embeddings subset (recommended)
   - full repo AST + embeddings for all files
-- Current status: open
+- Current status: decided
+- Decision: full indexing direction (with founder-in-the-loop controls and rollout guards).
 
 ## Q7. Secrets model for BYOK in hosted v1
 
 - Why it matters: compliance and support burden.
 - Options:
-  - per-workspace encrypted keys in platform
-  - external secret manager integration only
-- Current status: open
+  - BYOK only
+  - platform-managed key only
+  - hybrid (both)
+- Current status: in progress
+- Current preference: hybrid (BYOK + platform-managed), pending policy decisions.
 
 ## Q8. PR scoring versioning policy
 
