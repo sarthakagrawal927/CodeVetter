@@ -5,7 +5,7 @@ export type ReviewWorkerConfig = {
   retryBaseDelayMs: number;
   retryMaxDelayMs: number;
   maxIndexFileBytes: number;
-  indexChunkStrategy: 'syntax-aware';
+  indexChunkStrategy: 'tree-sitter';
   indexMaxChunkLines: number;
   reviewQueueName: string;
   indexingQueueName: string;
@@ -18,7 +18,7 @@ export function loadReviewWorkerConfig(): ReviewWorkerConfig {
   const retryBaseDelayRaw = process.env.REVIEW_WORKER_RETRY_BASE_MS?.trim() || '1000';
   const retryMaxDelayRaw = process.env.REVIEW_WORKER_RETRY_MAX_MS?.trim() || '30000';
   const maxIndexFileBytesRaw = process.env.INDEX_MAX_FILE_BYTES?.trim() || `${10 * 1024 * 1024}`;
-  const indexChunkStrategyRaw = process.env.INDEX_CHUNK_STRATEGY?.trim() || 'syntax-aware';
+  const indexChunkStrategyRaw = process.env.INDEX_CHUNK_STRATEGY?.trim() || 'tree-sitter';
   const indexMaxChunkLinesRaw = process.env.INDEX_MAX_CHUNK_LINES?.trim() || '220';
   const reviewQueueName = process.env.CF_REVIEW_QUEUE_NAME?.trim() || 'review-jobs';
   const indexingQueueName = process.env.CF_INDEXING_QUEUE_NAME?.trim() || 'indexing-jobs';
@@ -55,7 +55,7 @@ export function loadReviewWorkerConfig(): ReviewWorkerConfig {
     throw new Error(`Invalid INDEX_MAX_FILE_BYTES: "${maxIndexFileBytesRaw}".`);
   }
 
-  if (indexChunkStrategyRaw !== 'syntax-aware') {
+  if (indexChunkStrategyRaw !== 'tree-sitter') {
     throw new Error(`Invalid INDEX_CHUNK_STRATEGY: "${indexChunkStrategyRaw}".`);
   }
 
@@ -70,7 +70,7 @@ export function loadReviewWorkerConfig(): ReviewWorkerConfig {
     retryBaseDelayMs,
     retryMaxDelayMs,
     maxIndexFileBytes,
-    indexChunkStrategy: 'syntax-aware',
+    indexChunkStrategy: 'tree-sitter',
     indexMaxChunkLines,
     reviewQueueName,
     indexingQueueName,

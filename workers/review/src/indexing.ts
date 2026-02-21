@@ -1,4 +1,8 @@
 import { createHash } from 'crypto';
+import Parser = require('tree-sitter');
+import JavaScript from 'tree-sitter-javascript';
+import Python from 'tree-sitter-python';
+import { tsx as TypeScriptTsx, typescript as TypeScript } from 'tree-sitter-typescript';
 import {
   IndexedCodeLanguage,
   IndexedFileRecord,
@@ -14,16 +18,45 @@ export type SourceFileForIndexing = {
   content: string;
 };
 
-export type SyntaxChunkingConfig = {
+export type TreeSitterChunkingConfig = {
   maxFileBytes: number;
   maxChunkLines: number;
 };
+
+// Backward-compatible alias while we migrate callers.
+export type SyntaxChunkingConfig = TreeSitterChunkingConfig;
 
 type ChunkCandidate = {
   symbolKind: IndexedSymbolKind;
   symbolName?: string;
   startLine: number;
   endLine: number;
+};
+
+type TreeSitterGrammar = unknown;
+
+const parser = new Parser();
+
+const NODE_TYPES_BY_LANGUAGE: Partial<Record<IndexedCodeLanguage, string[]>> = {
+  javascript: ['function_declaration', 'class_declaration', 'method_definition'],
+  jsx: ['function_declaration', 'class_declaration', 'method_definition'],
+  typescript: [
+    'function_declaration',
+    'class_declaration',
+    'interface_declaration',
+    'type_alias_declaration',
+    'enum_declaration',
+    'method_definition',
+  ],
+  tsx: [
+    'function_declaration',
+    'class_declaration',
+    'interface_declaration',
+    'type_alias_declaration',
+    'enum_declaration',
+    'method_definition',
+  ],
+  python: ['function_definition', 'class_definition'],
 };
 
 function sha256(value: string): string {
@@ -55,95 +88,63 @@ function splitLines(content: string): string[] {
   return content.split(/\r?\n/);
 }
 
-function inferSymbolKind(rawType: string): IndexedSymbolKind {
-  if (rawType === 'class') return 'class';
-  if (rawType === 'interface') return 'interface';
-  if (rawType === 'type') return 'type';
-  if (rawType === 'enum') return 'enum';
-  if (rawType === 'const' || rawType === 'let' || rawType === 'var') return 'const';
-  return 'function';
+function grammarForLanguage(language: IndexedCodeLanguage): TreeSitterGrammar | null {
+  switch (language) {
+    case 'javascript':
+    case 'jsx':
+      return JavaScript;
+    case 'typescript':
+      return TypeScript;
+    case 'tsx':
+      return TypeScriptTsx;
+    case 'python':
+      return Python;
+    default:
+      return null;
+  }
 }
 
-function findCandidates(lines: string[], language: IndexedCodeLanguage): ChunkCandidate[] {
-  const candidates: ChunkCandidate[] = [];
-  const patterns: Array<{
-    pattern: RegExp;
-    resolve(match: RegExpExecArray): { symbolKind: IndexedSymbolKind; symbolName?: string };
-  }> = [];
+function extractSymbolKind(node: Parser.SyntaxNode): IndexedSymbolKind | null {
+  switch (node.type) {
+    case 'class_declaration':
+    case 'class_definition':
+      return 'class';
+    case 'interface_declaration':
+      return 'interface';
+    case 'type_alias_declaration':
+      return 'type';
+    case 'enum_declaration':
+      return 'enum';
+    case 'method_definition':
+      return 'method';
+    case 'function_definition':
+      return node.parent?.type === 'class_definition' ? 'method' : 'function';
+    case 'function_declaration':
+      return 'function';
+    default:
+      return null;
+  }
+}
 
-  if (language === 'typescript' || language === 'tsx' || language === 'javascript' || language === 'jsx') {
-    patterns.push({
-      pattern: /^\s*(?:export\s+)?(class|interface|type|enum|function|const|let|var)\s+([A-Za-z0-9_$]+)/,
-      resolve: match => ({
-        symbolKind: inferSymbolKind(match[1] || 'function'),
-        symbolName: match[2],
-      }),
-    });
-    patterns.push({
-      pattern: /^\s*(?:export\s+)?(?:async\s+)?function\s+([A-Za-z0-9_$]+)/,
-      resolve: match => ({
-        symbolKind: 'function',
-        symbolName: match[1],
-      }),
-    });
-    patterns.push({
-      pattern: /^\s*(?:export\s+)?const\s+([A-Za-z0-9_$]+)\s*=\s*(?:async\s*)?\(/,
-      resolve: match => ({
-        symbolKind: 'const',
-        symbolName: match[1],
-      }),
-    });
-  } else if (language === 'python') {
-    patterns.push({
-      pattern: /^\s*(class|def)\s+([A-Za-z_][A-Za-z0-9_]*)/,
-      resolve: match => ({
-        symbolKind: match[1] === 'class' ? 'class' : 'function',
-        symbolName: match[2],
-      }),
-    });
-  } else {
-    patterns.push({
-      pattern: /^\s*(class|interface|type|enum|function|def)\s+([A-Za-z_][A-Za-z0-9_]*)/,
-      resolve: match => ({
-        symbolKind: inferSymbolKind(match[1] || 'function'),
-        symbolName: match[2],
-      }),
-    });
+function extractSymbolName(node: Parser.SyntaxNode): string | undefined {
+  const nameNode = node.childForFieldName('name');
+  if (!nameNode) {
+    return undefined;
   }
 
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    for (const item of patterns) {
-      const match = item.pattern.exec(line);
-      if (!match) continue;
-      const resolved = item.resolve(match);
-      candidates.push({
-        symbolKind: resolved.symbolKind,
-        symbolName: resolved.symbolName,
-        startLine: index + 1,
-        endLine: lines.length,
-      });
-      break;
-    }
+  const text = nameNode.text.trim();
+  return text || undefined;
+}
+
+function computeNodeEndLine(node: Parser.SyntaxNode, lineCount: number): number {
+  let endLine = node.endPosition.row + 1;
+  if (node.endPosition.column === 0 && endLine > node.startPosition.row + 1) {
+    endLine -= 1;
   }
 
-  if (candidates.length === 0) {
-    candidates.push({
-      symbolKind: 'module',
-      startLine: 1,
-      endLine: lines.length,
-    });
-    return candidates;
-  }
-
-  for (let i = 0; i < candidates.length; i += 1) {
-    const next = candidates[i + 1];
-    if (next) {
-      candidates[i].endLine = Math.max(candidates[i].startLine, next.startLine - 1);
-    }
-  }
-
-  return candidates;
+  if (endLine < 1) return 1;
+  if (endLine > lineCount) return lineCount;
+  return endLine;
 }
 
 function clampCandidate(candidate: ChunkCandidate, maxChunkLines: number): ChunkCandidate[] {
@@ -169,9 +170,78 @@ function clampCandidate(candidate: ChunkCandidate, maxChunkLines: number): Chunk
   return slices;
 }
 
-export function buildSyntaxAwareIndexForFile(
+function uniqueCandidates(candidates: ChunkCandidate[]): ChunkCandidate[] {
+  const seen = new Set<string>();
+  const result: ChunkCandidate[] = [];
+
+  for (const candidate of candidates) {
+    const key = `${candidate.symbolKind}:${candidate.symbolName || ''}:${candidate.startLine}:${candidate.endLine}`;
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    result.push(candidate);
+  }
+
+  return result;
+}
+
+function findTreeSitterCandidates(content: string, language: IndexedCodeLanguage): ChunkCandidate[] {
+  const lines = splitLines(content);
+  const grammar = grammarForLanguage(language);
+  if (!grammar) {
+    return [];
+  }
+
+  const nodeTypes = NODE_TYPES_BY_LANGUAGE[language];
+  if (!nodeTypes || nodeTypes.length === 0) {
+    return [];
+  }
+
+  try {
+    parser.setLanguage(grammar);
+    const tree = parser.parse(content);
+    const nodes = tree.rootNode.descendantsOfType(nodeTypes as unknown as String[]);
+    const candidates: ChunkCandidate[] = [];
+
+    for (const node of nodes) {
+      const symbolKind = extractSymbolKind(node);
+      if (!symbolKind) {
+        continue;
+      }
+
+      const startLine = node.startPosition.row + 1;
+      const endLine = computeNodeEndLine(node, lines.length);
+      if (endLine < startLine) {
+        continue;
+      }
+
+      candidates.push({
+        symbolKind,
+        symbolName: extractSymbolName(node),
+        startLine,
+        endLine,
+      });
+    }
+
+    return uniqueCandidates(
+      candidates.sort((left, right) => {
+        if (left.startLine !== right.startLine) {
+          return left.startLine - right.startLine;
+        }
+
+        return left.endLine - right.endLine;
+      })
+    );
+  } catch {
+    return [];
+  }
+}
+
+export function buildTreeSitterIndexForFile(
   file: SourceFileForIndexing,
-  config: SyntaxChunkingConfig
+  config: TreeSitterChunkingConfig
 ): { fileRecord: IndexedFileRecord; chunks: SemanticChunkRecord[] } {
   const sizeBytes = Buffer.byteLength(file.content, 'utf8');
   if (sizeBytes > config.maxFileBytes) {
@@ -195,11 +265,21 @@ export function buildSyntaxAwareIndexForFile(
     language,
     sizeBytes,
     indexedAt,
-    chunkStrategy: 'syntax-aware',
+    chunkStrategy: 'tree-sitter',
   };
 
-  const rawCandidates = findCandidates(lines, language);
-  const candidates = rawCandidates.flatMap(candidate =>
+  const rawCandidates = findTreeSitterCandidates(file.content, language);
+  const fallbackCandidates: ChunkCandidate[] =
+    rawCandidates.length > 0
+      ? rawCandidates
+      : [
+          {
+            symbolKind: 'module',
+            startLine: 1,
+            endLine: Math.max(1, lines.length),
+          },
+        ];
+  const candidates = fallbackCandidates.flatMap(candidate =>
     clampCandidate(candidate, Math.max(20, config.maxChunkLines))
   );
 
@@ -239,3 +319,6 @@ export function buildSyntaxAwareIndexForFile(
     chunks,
   };
 }
+
+// Backward-compatible alias while we migrate callers.
+export const buildSyntaxAwareIndexForFile = buildTreeSitterIndexForFile;

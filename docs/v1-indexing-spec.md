@@ -8,7 +8,7 @@ Ship a deterministic indexing pipeline for review context in v1, while keeping a
 
 - Full repository indexing from GitHub-tracked files.
 - File guardrail: max `10MB` file size.
-- Chunking mode: `syntax-aware`.
+- Chunking mode: `tree-sitter`.
   - Primary boundaries: function/class/interface/module-like declarations.
   - Fallback: module-level chunk when no symbols are detected.
   - Oversized symbol blocks are split by line windows.

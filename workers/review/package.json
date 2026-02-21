@@ -9,6 +9,10 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@code-reviewer/shared-types": "workspace:*"
+    "@code-reviewer/shared-types": "file:../../packages/shared-types",
+    "tree-sitter": "^0.21.1",
+    "tree-sitter-javascript": "^0.23.1",
+    "tree-sitter-python": "^0.25.0",
+    "tree-sitter-typescript": "^0.23.2"
   }
 }

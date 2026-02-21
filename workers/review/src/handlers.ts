@@ -6,7 +6,7 @@ function now(): string {
 
 type HandlerConfig = {
   maxIndexFileBytes: number;
-  indexChunkStrategy: 'syntax-aware';
+  indexChunkStrategy: 'tree-sitter';
   indexMaxChunkLines: number;
 };
 

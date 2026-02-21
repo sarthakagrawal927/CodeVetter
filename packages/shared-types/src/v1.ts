@@ -85,7 +85,7 @@ export type IndexingJobRecord = {
   errorMessage?: string;
 };
 
-export type IndexingChunkStrategy = 'syntax-aware';
+export type IndexingChunkStrategy = 'tree-sitter';
 
 export type IndexedCodeLanguage =
   | 'typescript'

@@ -74,7 +74,7 @@ export type IndexingJobRecord = {
     completedAt?: string;
     errorMessage?: string;
 };
-export type IndexingChunkStrategy = 'syntax-aware';
+export type IndexingChunkStrategy = 'tree-sitter';
 export type IndexedCodeLanguage = 'typescript' | 'javascript' | 'tsx' | 'jsx' | 'python' | 'go' | 'java' | 'csharp' | 'ruby' | 'php' | 'rust' | 'kotlin' | 'swift' | 'sql' | 'yaml' | 'json' | 'markdown' | 'other';
 export type IndexedSymbolKind = 'module' | 'class' | 'interface' | 'type' | 'enum' | 'function' | 'method' | 'const' | 'block';
 export type IndexedFileRecord = {

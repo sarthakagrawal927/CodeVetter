@@ -8,7 +8,7 @@ This worker is the asynchronous execution-plane skeleton for v1.
 - Handles two job kinds:
   - `indexing`
   - `review`
-- Indexing strategy in v1 is syntax-aware chunking (functions/classes/modules), not vector retrieval.
+- Indexing strategy in v1 is Tree-sitter syntax chunking (functions/classes/modules), not vector retrieval.
 - Applies retry budget per job with exponential backoff before final failure.
 - Logs job execution only (no external side effects yet).
 
@@ -27,7 +27,7 @@ Optional env vars:
 - `REVIEW_WORKER_RETRY_BASE_MS` (default `1000`)
 - `REVIEW_WORKER_RETRY_MAX_MS` (default `30000`)
 - `INDEX_MAX_FILE_BYTES` (default `10485760`, i.e. `10MB`)
-- `INDEX_CHUNK_STRATEGY` (default `syntax-aware`, only supported value in v1)
+- `INDEX_CHUNK_STRATEGY` (default `tree-sitter`, only supported value in v1)
 - `INDEX_MAX_CHUNK_LINES` (default `220`)
 - `CF_REVIEW_QUEUE_NAME` (default `review-jobs`)
 - `CF_INDEXING_QUEUE_NAME` (default `indexing-jobs`)

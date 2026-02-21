@@ -15,7 +15,7 @@ async function processJobWithRetry(
   job: Parameters<typeof handleJob>[0],
   maxRetries: number,
   maxIndexFileBytes: number,
-  indexChunkStrategy: 'syntax-aware',
+  indexChunkStrategy: 'tree-sitter',
   indexMaxChunkLines: number,
   retryBaseDelayMs: number,
   retryMaxDelayMs: number
