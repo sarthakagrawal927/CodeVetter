@@ -57,11 +57,13 @@ Use this file as the decision log for v1 implementation.
 
 - Why it matters: cost/latency tradeoff.
 - Options:
-  - metadata + key files + embeddings subset (recommended)
-  - full repo AST + embeddings for all files
+  - semantic-first indexing without vector store (metadata + chunked text + symbols/imports)
+  - embeddings + vector indexing in v1
 - Current status: decided
 - Decision: full indexing for all repository-tracked files available via GitHub, relying on repository hygiene (for example `.gitignore`) for noise control.
 - Guardrail: max file size `10MB` for indexing in v1.
+- Retrieval in v1: semantic signals from chunked text + structural context, without vector DB.
+- Vector indexing + embedding retrieval is deferred to v1.1.
 
 ## Q7. Secrets model for BYOK in hosted v1
 
