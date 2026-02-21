@@ -36,11 +36,11 @@ Use this file as the decision log for v1 implementation.
 - Options:
   - row-level tenancy (workspace_id column)
   - per-tenant schema/database
-- Current status: in progress
-- Working model: org -> repo and org -> member hierarchy.
-- Remaining choices:
-  - whether to include team-level hierarchy in v1 (`org -> team -> repo/member`).
-  - row-level tenancy vs per-tenant schema/database.
+- Current status: decided
+- Decision:
+  - v1 hierarchy: `org -> repo` and `org -> member`.
+  - team-level hierarchy deferred to v1.1.
+  - row-level tenancy on shared tables (`org_id` partition key).
 
 ## Q5. Rule schema and policy DSL scope
 
@@ -58,7 +58,7 @@ Use this file as the decision log for v1 implementation.
   - metadata + key files + embeddings subset (recommended)
   - full repo AST + embeddings for all files
 - Current status: decided
-- Decision: full indexing direction (with founder-in-the-loop controls and rollout guards).
+- Decision: full indexing for all repository-tracked files available via GitHub, relying on repository hygiene (for example `.gitignore`) for noise control.
 
 ## Q7. Secrets model for BYOK in hosted v1
 
@@ -67,8 +67,17 @@ Use this file as the decision log for v1 implementation.
   - BYOK only
   - platform-managed key only
   - hybrid (both)
-- Current status: in progress
-- Current preference: hybrid (BYOK + platform-managed), pending policy decisions.
+- Current status: deferred
+- Decision: defer managed-key policy discussion; prioritize BYOK path in v1 implementation.
+
+## Q11. Permission Freshness Model
+
+- Why it matters: authorization drift and correctness of org/member/repo access.
+- Options:
+  - webhook-driven updates + periodic reconcile
+  - webhook-only
+- Current status: deferred
+- Decision: defer to v1.1.
 
 ## Q8. PR scoring versioning policy
 
