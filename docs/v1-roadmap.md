@@ -8,6 +8,14 @@ v1 moves from standalone action setup to a hosted product with onboarding, repos
 2. Dashboard (auth, org/repo connection, settings)
 3. GitHub app + onboarding automation
 
+## Dashboard Scope
+
+- Repository connection and installation status
+- Rule configuration and severity thresholds
+- Review history and PR score timeline
+- Team/member views and ownership metrics
+- Standard account surfaces (workspace settings, members, notifications)
+
 ## v1 User Flow
 
 1. User signs in and connects GitHub repository.
@@ -25,10 +33,14 @@ v1 moves from standalone action setup to a hosted product with onboarding, repos
 - Rule management UI (severity thresholds, style/safety constraints)
 - Repository indexing pipeline
 - PR scoring in dashboard and PR comments
+- Combined policy engine:
+  - user-defined rules
+  - platform default rules
 - Team and author metrics
   - average PR quality
   - risk density
   - review pass/fail trend
+  - commit quality trend
 
 ## Data and Services
 
@@ -42,3 +54,4 @@ v1 moves from standalone action setup to a hosted product with onboarding, repos
 - Deterministic policy application from dashboard rules
 - Stable PR scoring and explainable finding traceability
 - Historical PR quality metrics visible per repo and author
+- Value-added score visible on each reviewed PR

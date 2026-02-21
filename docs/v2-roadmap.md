@@ -82,4 +82,15 @@ Composite:
   - drift timeline
   - PR quality velocity
 - Weekly health reports
+  - top-risk modules
 - Rule recommendation panel
+  - suggested threshold changes
+  - new pattern rules from observed regressions
+
+## v2 Testing Plan
+
+1. Evolution metrics update correctly across sequential PRs
+2. Hotspot ranking matches known synthetic churn patterns
+3. Regression linking maps incidents to prior PR windows correctly
+4. Rule recommendation engine is deterministic
+5. v1 and v2 scores coexist without dashboard regressions
