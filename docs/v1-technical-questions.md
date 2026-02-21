@@ -20,6 +20,8 @@ Use this file as the decision log for v1 implementation.
   - NATS JetStream
 - Current status: decided
 - Decision: Cloudflare Queues for async review/indexing jobs.
+- Topology: separate queues (`review-jobs`, `indexing-jobs`) in v1.
+- Retry policy: `3` retries before terminal failure / DLQ handoff.
 
 ## Q3. GitHub integration model
 
@@ -59,6 +61,7 @@ Use this file as the decision log for v1 implementation.
   - full repo AST + embeddings for all files
 - Current status: decided
 - Decision: full indexing for all repository-tracked files available via GitHub, relying on repository hygiene (for example `.gitignore`) for noise control.
+- Guardrail: max file size `10MB` for indexing in v1.
 
 ## Q7. Secrets model for BYOK in hosted v1
 

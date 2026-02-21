@@ -4,9 +4,16 @@ function now(): string {
   return new Date().toISOString();
 }
 
-async function handleIndexingJob(job: IndexingJob): Promise<void> {
+type HandlerConfig = {
+  maxIndexFileBytes: number;
+};
+
+async function handleIndexingJob(job: IndexingJob, config: HandlerConfig): Promise<void> {
   // Placeholder for repository ingestion + indexing pipeline.
-  console.log(`[worker-review] [${now()}] indexing repository=${job.payload.repositoryId} ref=${job.payload.sourceRef || 'default'}`);
+  console.log(
+    `[worker-review] [${now()}] indexing repository=${job.payload.repositoryId} ` +
+      `ref=${job.payload.sourceRef || 'default'} maxFileBytes=${config.maxIndexFileBytes}`
+  );
 }
 
 async function handleReviewJob(job: ReviewJob): Promise<void> {
@@ -17,10 +24,10 @@ async function handleReviewJob(job: ReviewJob): Promise<void> {
   );
 }
 
-export async function handleJob(job: WorkerJob): Promise<void> {
+export async function handleJob(job: WorkerJob, config: HandlerConfig): Promise<void> {
   switch (job.kind) {
     case 'indexing':
-      await handleIndexingJob(job);
+      await handleIndexingJob(job, config);
       break;
     case 'review':
       await handleReviewJob(job);
