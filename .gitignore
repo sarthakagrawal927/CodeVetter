@@ -1,2 +1,11 @@
 node_modules
+
+# Action runtime bundle must stay versioned.
+dist/*
+!dist/index.js
+
+# Generated build artifacts should not be tracked.
+packages/*/dist
 workers/*/dist
+workers/*/dist-cjs
+workers/*/.wrangler
