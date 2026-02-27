@@ -8,7 +8,8 @@ export function getPlatformApiBaseUrl(): string {
 }
 
 export async function platformFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const cookieHeader = cookies().toString();
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
   const response = await fetch(`${getPlatformApiBaseUrl()}${path}`, {
     ...init,
     headers: {
