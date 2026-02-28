@@ -9,6 +9,13 @@ export type ReviewWorkerConfig = {
   indexMaxChunkLines: number;
   reviewQueueName: string;
   indexingQueueName: string;
+  cockroachDatabaseUrl: string | undefined;
+  githubApiBaseUrl: string;
+  githubAppId: string | undefined;
+  githubAppPrivateKey: string | undefined;
+  aiGatewayBaseUrl: string | undefined;
+  aiGatewayApiKey: string | undefined;
+  aiGatewayModel: string;
 };
 
 export function loadReviewWorkerConfig(): ReviewWorkerConfig {
@@ -22,6 +29,15 @@ export function loadReviewWorkerConfig(): ReviewWorkerConfig {
   const indexMaxChunkLinesRaw = process.env.INDEX_MAX_CHUNK_LINES?.trim() || '220';
   const reviewQueueName = process.env.CF_REVIEW_QUEUE_NAME?.trim() || 'review-jobs';
   const indexingQueueName = process.env.CF_INDEXING_QUEUE_NAME?.trim() || 'indexing-jobs';
+
+  const cockroachDatabaseUrl = process.env.COCKROACH_DATABASE_URL?.trim() || undefined;
+  const githubApiBaseUrl = process.env.GITHUB_API_BASE_URL?.trim() || 'https://api.github.com';
+  const githubAppId = process.env.GITHUB_APP_ID?.trim() || undefined;
+  const githubAppPrivateKeyRaw = process.env.GITHUB_APP_PRIVATE_KEY?.trim() || undefined;
+  const githubAppPrivateKey = githubAppPrivateKeyRaw?.replace(/\\n/g, '\n');
+  const aiGatewayBaseUrl = process.env.AI_GATEWAY_BASE_URL?.trim() || undefined;
+  const aiGatewayApiKey = process.env.AI_GATEWAY_API_KEY?.trim() || undefined;
+  const aiGatewayModel = process.env.AI_GATEWAY_MODEL?.trim() || 'auto';
 
   const pollIntervalMs = Number(pollIntervalRaw);
   const maxIterations = Number(maxIterationsRaw);
@@ -74,5 +90,12 @@ export function loadReviewWorkerConfig(): ReviewWorkerConfig {
     indexMaxChunkLines,
     reviewQueueName,
     indexingQueueName,
+    cockroachDatabaseUrl,
+    githubApiBaseUrl,
+    githubAppId,
+    githubAppPrivateKey,
+    aiGatewayBaseUrl,
+    aiGatewayApiKey,
+    aiGatewayModel,
   };
 }

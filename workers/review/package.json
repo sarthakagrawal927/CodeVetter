@@ -9,10 +9,18 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@code-reviewer/ai-gateway-client": "file:../../packages/ai-gateway-client",
+    "@code-reviewer/db": "file:../../packages/db",
     "@code-reviewer/shared-types": "file:../../packages/shared-types",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.3",
     "tree-sitter": "^0.21.1",
     "tree-sitter-javascript": "^0.23.1",
     "tree-sitter-python": "^0.25.0",
     "tree-sitter-typescript": "^0.23.2"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/pg": "^8.11.13"
   }
 }
