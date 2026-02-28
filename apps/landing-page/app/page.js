@@ -1,4 +1,3 @@
-import Image from 'next/image';
 import {
   Badge,
   Box,
@@ -67,6 +66,12 @@ const flow = [
   }
 ];
 
+const platformSignals = [
+  { label: 'Review Runs', value: '2,431', note: 'Processed this month' },
+  { label: 'Line Findings', value: '18,902', note: 'Mapped to changed hunks' },
+  { label: 'Policy Blocks', value: '412', note: 'Prevented risky merges' }
+];
+
 const workflowSnippet = `name: Trigger Enterprise Review
 on:
   pull_request:
@@ -99,14 +104,14 @@ export default function HomePage() {
                 Sarthak AI Code Reviewer
               </Text>
             </Flex>
-            <Flex gap="2" wrap="wrap">
-              <Button asChild variant="soft" color="gray" size="2">
-                <a href="#capabilities">Capabilities</a>
-              </Button>
-              <Button asChild variant="soft" color="gray" size="2">
-                <a href="#workflow">Workflow</a>
-              </Button>
-              <Button asChild size="2">
+            <Flex gap="4" wrap="wrap" align="center" className="header-links">
+              <a href="#capabilities" className="header-link">
+                Capabilities
+              </a>
+              <a href="#workflow" className="header-link">
+                Workflow
+              </a>
+              <Button asChild size="2" className="header-cta">
                 <a
                   href="https://github.com/sarthakagrawal927/code-reviewer-action"
                   target="_blank"
@@ -125,10 +130,10 @@ export default function HomePage() {
           <Grid columns={{ initial: '1', md: '2' }} gap="4" align="start">
             <Flex direction="column" gap="3">
               <Badge color="blue" variant="soft" size="2" style={{ width: 'fit-content' }}>
-                Enterprise v1
+                Production v1
               </Badge>
               <Heading size="9" style={{ letterSpacing: '-0.03em', maxWidth: 620 }}>
-                AI code review for production engineering workflows
+                AI code review built for serious software delivery
               </Heading>
               <Text size="3" color="gray" style={{ lineHeight: 1.75, maxWidth: 620 }}>
                 Practical findings mapped to changed lines, deterministic policy controls, and a clean control plane
@@ -171,14 +176,28 @@ export default function HomePage() {
               </Card>
 
               <Card size="2" variant="surface">
-                <Image
-                  src="/images/hero.png"
-                  alt="Code reviewer dashboard preview"
-                  width={960}
-                  height={640}
-                  style={{ width: '100%', height: 'auto', borderRadius: 12 }}
-                  priority
-                />
+                <Flex direction="column" gap="3">
+                  <Text size="2" weight="medium" color="gray">
+                    Platform Signals
+                  </Text>
+                  <Grid columns="1" gap="2">
+                    {platformSignals.map(item => (
+                      <Card key={item.label} size="2" variant="surface">
+                        <Flex justify="between" align="end">
+                          <Box>
+                            <Text size="1" color="gray">
+                              {item.label}
+                            </Text>
+                            <Heading size="6">{item.value}</Heading>
+                          </Box>
+                          <Text size="1" color="gray" align="right">
+                            {item.note}
+                          </Text>
+                        </Flex>
+                      </Card>
+                    ))}
+                  </Grid>
+                </Flex>
               </Card>
             </Flex>
           </Grid>

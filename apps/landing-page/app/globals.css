@@ -17,9 +17,17 @@ body {
 body {
   font-family: var(--font-body), system-ui, -apple-system, Segoe UI, sans-serif;
   background:
-    radial-gradient(circle at 0% 0%, #e8eefc 0, transparent 34%),
-    radial-gradient(circle at 100% 0%, #e6f2ff 0, transparent 36%),
-    #f6f8fc;
+    radial-gradient(circle at 0% 0%, #121a2d 0, transparent 35%),
+    radial-gradient(circle at 100% 0%, #122338 0, transparent 38%),
+    radial-gradient(circle at 50% 100%, rgb(30 64 175 / 16%), transparent 42%),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent 59px,
+      rgb(148 163 184 / 4%) 60px,
+      rgb(148 163 184 / 4%) 61px
+    ),
+    #06080f;
 }
 
 .radix-shell {
@@ -31,20 +39,69 @@ body {
   top: 0;
   z-index: 40;
   backdrop-filter: blur(12px);
-  background: rgb(246 248 252 / 86%);
-  border-bottom: 1px solid rgb(15 23 42 / 8%);
+  background: rgb(6 8 15 / 82%);
+  border-bottom: 1px solid rgb(148 163 184 / 16%);
+}
+
+.radix-header .rt-Flex {
+  min-height: 66px;
 }
 
 .brand-mark {
   width: 1rem;
   height: 1rem;
   border-radius: 999px;
-  background: linear-gradient(135deg, #111827, #374151);
-  box-shadow: 0 0 0 5px rgb(17 24 39 / 10%);
+  background: linear-gradient(135deg, #dbeafe, #60a5fa);
+  box-shadow: 0 0 0 5px rgb(96 165 250 / 20%);
+}
+
+.radix-header .rt-Text {
+  font-family: var(--font-display), system-ui, sans-serif;
+  letter-spacing: -0.01em;
+}
+
+.radix-header .rt-Button {
+  border-radius: 10px;
+}
+
+.header-links .header-link {
+  color: #9fb0ca;
+  text-decoration: none;
+  font-size: 0.84rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  transition: color 150ms ease;
+}
+
+.header-links .header-link:hover {
+  color: #e2e8f0;
+}
+
+.header-links .header-cta {
+  border-radius: 10px;
+}
+
+.radix-header .rt-Button[data-variant='soft'] {
+  background: rgb(15 23 42 / 62%);
+  border: 1px solid rgb(148 163 184 / 25%);
 }
 
 .hero-card {
   border-radius: 20px;
+  background:
+    radial-gradient(circle at 100% 0%, rgb(59 130 246 / 18%), transparent 45%),
+    linear-gradient(180deg, rgb(15 23 42 / 84%), rgb(15 23 42 / 62%));
+  border: 1px solid rgb(148 163 184 / 20%);
+  box-shadow: 0 20px 44px rgb(2 8 23 / 42%);
+}
+
+.hero-card h1 {
+  font-family: var(--font-display), system-ui, sans-serif;
+  letter-spacing: -0.038em;
+}
+
+.hero-card .rt-Text {
+  color: #bcc8da;
 }
 
 .code-window pre,
@@ -55,7 +112,7 @@ body {
 .code-window pre {
   margin: 0;
   border-radius: 12px;
-  background: #0f172a;
+  background: #050913;
   color: #e2e8f0;
   padding: 0.95rem;
   font-size: 0.78rem;
@@ -66,5 +123,17 @@ body {
 
 .cta-card {
   border-radius: 20px;
-  background: linear-gradient(145deg, #0f172a, #1f2937);
+  background: linear-gradient(145deg, #0b1220, #1e293b);
+  border: 1px solid rgb(148 163 184 / 20%);
+}
+
+@media (max-width: 860px) {
+  .header-links {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .header-links .header-link {
+    font-size: 0.8rem;
+  }
 }

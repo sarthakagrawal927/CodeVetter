@@ -16,7 +16,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-        <Theme accentColor="blue" grayColor="slate" radius="large" scaling="100%">
+        <Theme appearance="dark" accentColor="blue" grayColor="slate" radius="large" scaling="100%">
           {children}
         </Theme>
       </body>
