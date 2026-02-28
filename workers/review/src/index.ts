@@ -62,42 +62,58 @@ async function run() {
       `githubApp=${config.githubAppId || 'unset'}`
   );
 
-  for (let iteration = 1; iteration <= config.maxIterations; iteration += 1) {
-    const [indexingJobs, reviewJobs] = await Promise.all([
-      queue.pullIndexingJobs(5),
-      queue.pullReviewJobs(5),
-    ]);
-    const jobs = [...indexingJobs, ...reviewJobs];
-
-    if (jobs.length === 0) {
-      console.log(`[worker-review] iteration=${iteration} queue empty`);
-      await delay(config.pollIntervalMs);
-      continue;
+  const shutdown = async () => {
+    console.log('[worker-review] shutting down...');
+    if ('end' in queue && typeof (queue as { end?: () => Promise<void> }).end === 'function') {
+      await (queue as { end: () => Promise<void> }).end();
     }
+    process.exit(0);
+  };
+  process.on('SIGTERM', () => { void shutdown(); });
+  process.on('SIGINT', () => { void shutdown(); });
 
-    console.log(`[worker-review] iteration=${iteration} pulled=${jobs.length}`);
+  try {
+    for (let iteration = 1; iteration <= config.maxIterations; iteration += 1) {
+      const [indexingJobs, reviewJobs] = await Promise.all([
+        queue.pullIndexingJobs(5),
+        queue.pullReviewJobs(5),
+      ]);
+      const jobs = [...indexingJobs, ...reviewJobs];
 
-    for (const job of jobs) {
-      try {
-        await processJobWithRetry(
-          job,
-          config.maxRetries,
-          config.maxIndexFileBytes,
-          config.indexChunkStrategy,
-          config.indexMaxChunkLines,
-          config.retryBaseDelayMs,
-          config.retryMaxDelayMs
-        );
-      } catch (error) {
-        console.error(
-          `[worker-review] job failed kind=${job.kind} error=${
-            error instanceof Error ? error.message : String(error)
-          }`
-        );
+      if (jobs.length === 0) {
+        console.log(`[worker-review] iteration=${iteration} queue empty`);
+        await delay(config.pollIntervalMs);
+        continue;
       }
-    }
 
-    await delay(config.pollIntervalMs);
+      console.log(`[worker-review] iteration=${iteration} pulled=${jobs.length}`);
+
+      for (const job of jobs) {
+        try {
+          await processJobWithRetry(
+            job,
+            config.maxRetries,
+            config.maxIndexFileBytes,
+            config.indexChunkStrategy,
+            config.indexMaxChunkLines,
+            config.retryBaseDelayMs,
+            config.retryMaxDelayMs
+          );
+        } catch (error) {
+          console.error(
+            `[worker-review] job failed kind=${job.kind} error=${
+              error instanceof Error ? error.message : String(error)
+            }`
+          );
+        }
+      }
+
+      await delay(config.pollIntervalMs);
+    }
+  } finally {
+    if ('end' in queue && typeof (queue as { end?: () => Promise<void> }).end === 'function') {
+      await (queue as { end: () => Promise<void> }).end();
+    }
   }
 
   console.log('[worker-review] max iterations reached, exiting.');

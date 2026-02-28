@@ -34,6 +34,8 @@ export class InMemoryQueueAdapter implements JobQueueAdapter {
 
 // ── Postgres / CockroachDB ────────────────────────────────────────────────────
 
+const knownTriggers: Array<ReviewJob['payload']['triggeredBy']> = ['webhook', 'manual', 'action'];
+
 export class PostgresQueueAdapter implements JobQueueAdapter {
   private pool: Pool;
 
@@ -55,23 +57,32 @@ export class PostgresQueueAdapter implements JobQueueAdapter {
        WHERE id IN (
          SELECT id FROM review_runs
          WHERE status = 'pending'
-         ORDER BY rowid
+         -- ORDER BY id gives consistent claim ordering; for strict FIFO
+         -- add a created_at column and ORDER BY created_at, id
+         ORDER BY id
          LIMIT $1
        )
        RETURNING id, repository_id, pr_number, head_sha, trigger_source`,
       [batchSize]
     );
 
-    return result.rows.map(row => ({
-      kind: 'review' as const,
-      payload: {
-        reviewRunId: row.id,
-        repositoryId: row.repository_id,
-        prNumber: row.pr_number,
-        headSha: row.head_sha || '',
-        triggeredBy: (row.trigger_source as ReviewJob['payload']['triggeredBy']) || 'webhook',
-      },
-    }));
+    return result.rows
+      .filter(row => row.head_sha)
+      .map(row => {
+        const triggeredBy = knownTriggers.includes(row.trigger_source as ReviewJob['payload']['triggeredBy'])
+          ? (row.trigger_source as ReviewJob['payload']['triggeredBy'])
+          : 'webhook';
+        return {
+          kind: 'review' as const,
+          payload: {
+            reviewRunId: row.id,
+            repositoryId: row.repository_id,
+            prNumber: row.pr_number,
+            headSha: row.head_sha as string,
+            triggeredBy,
+          },
+        };
+      });
   }
 
   async pullIndexingJobs(batchSize: number): Promise<IndexingJob[]> {
@@ -86,7 +97,9 @@ export class PostgresQueueAdapter implements JobQueueAdapter {
        WHERE id IN (
          SELECT id FROM indexing_runs
          WHERE status = 'pending'
-         ORDER BY rowid
+         -- ORDER BY id gives consistent claim ordering; for strict FIFO
+         -- add a created_at column and ORDER BY created_at, id
+         ORDER BY id
          LIMIT $1
        )
        RETURNING id, repository_id, source_ref`,
