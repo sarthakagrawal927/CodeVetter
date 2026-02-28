@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { Badge, Button, Card, Flex, Grid, Heading, Text } from '@radix-ui/themes';
 import { getPlatformApiBaseUrl, getSession } from '../../lib/platform';
 
 export default async function LoginPage() {
@@ -12,45 +13,49 @@ export default async function LoginPage() {
 
   return (
     <main className="shell">
-      <section className="hero">
-        <span className="eyebrow">Authentication</span>
-        <h1>Sign in with GitHub to open your review control plane.</h1>
-        <p>
-          Authenticate with GitHub OAuth, then manage workspaces, repositories, review rules, and PR operations from
-          one dashboard.
-        </p>
-        <div className="hero-actions">
-          <a href={startUrl}>Continue With GitHub</a>
-          <Link href="/">Home</Link>
-        </div>
-      </section>
+      <Card size="4" className="hero">
+        <Flex direction="column" gap="3">
+          <Badge color="blue" variant="soft" size="2" style={{ width: 'fit-content' }}>
+            Authentication
+          </Badge>
+          <Heading size="8" style={{ letterSpacing: '-0.02em' }}>
+            Sign in with GitHub
+          </Heading>
+          <Text size="3" color="gray" style={{ maxWidth: 820, lineHeight: 1.7 }}>
+            Authenticate once, then manage workspaces, repositories, rules, and review operations from a single control
+            plane.
+          </Text>
+          <Flex gap="2" wrap="wrap">
+            <Button asChild size="3">
+              <a href={startUrl}>Continue with GitHub</a>
+            </Button>
+            <Button asChild variant="soft" color="gray" size="3">
+              <Link href="/">Home</Link>
+            </Button>
+          </Flex>
+        </Flex>
+      </Card>
 
-      <section className="grid">
-        <article className="panel span-6">
-          <div className="section-head">
-            <h2>GitHub OAuth</h2>
-            <p>Secure sign-in flow</p>
-          </div>
-          <p className="muted">
-            Uses <code>/v1/auth/github/start</code> and <code>/v1/auth/github/callback</code> with signed state and secure
-            session cookies.
-          </p>
-        </article>
-        <article className="panel span-6">
-          <div className="section-head">
-            <h2>RBAC</h2>
-            <p>Least-privilege access</p>
-          </div>
-          <p className="muted">
-            Role-aware workspace access: <code>owner</code>, <code>admin</code>, <code>member</code>, <code>viewer</code>.
-          </p>
-          <div className="pill-list" style={{ marginTop: 10 }}>
-            <span className="pill">Workspace scoped</span>
-            <span className="pill">Session cookies</span>
-            <span className="pill">Server-rendered auth</span>
-          </div>
-        </article>
-      </section>
+      <Grid columns={{ initial: '1', md: '2' }} gap="3" mt="4">
+        <Card size="3">
+          <Flex direction="column" gap="2">
+            <Heading size="4">OAuth Flow</Heading>
+            <Text size="2" color="gray" style={{ lineHeight: 1.65 }}>
+              Uses <code>/v1/auth/github/start</code> and <code>/v1/auth/github/callback</code> with signed state and
+              secure session cookies.
+            </Text>
+          </Flex>
+        </Card>
+        <Card size="3">
+          <Flex direction="column" gap="2">
+            <Heading size="4">Role-Aware Access</Heading>
+            <Text size="2" color="gray" style={{ lineHeight: 1.65 }}>
+              Workspace roles supported: <code>owner</code>, <code>admin</code>, <code>member</code>,{' '}
+              <code>viewer</code>.
+            </Text>
+          </Flex>
+        </Card>
+      </Grid>
     </main>
   );
 }

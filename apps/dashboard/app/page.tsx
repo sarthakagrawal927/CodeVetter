@@ -1,69 +1,64 @@
 import Link from 'next/link';
+import { Badge, Box, Button, Card, Flex, Grid, Heading, Text } from '@radix-ui/themes';
+
+const routes = [
+  '/login',
+  '/onboarding',
+  '/w/[workspaceSlug]/overview',
+  '/w/[workspaceSlug]/repositories',
+  '/w/[workspaceSlug]/rules',
+  '/w/[workspaceSlug]/pull-requests',
+  '/w/[workspaceSlug]/settings/members',
+  '/w/[workspaceSlug]/settings/audit'
+];
 
 export default function HomePage() {
   return (
     <main className="shell">
-      <section className="hero">
-        <span className="eyebrow">Enterprise Control Plane</span>
-        <h1>Ship policy-aware AI code review without losing human context.</h1>
-        <p>
-          The dashboard gives your team a central control layer for auth, workspaces, repository operations, rule
-          management, and pull request review execution.
-        </p>
-        <div className="hero-actions">
-          <Link href="/login">Sign In</Link>
-          <Link href="/onboarding">Onboarding</Link>
-        </div>
-        <div className="metric-grid">
-          <article className="metric-card">
-            <b>8 routes</b>
-            <span>Core enterprise surface area</span>
-          </article>
-          <article className="metric-card">
-            <b>Role-aware</b>
-            <span>Owner, admin, member, viewer</span>
-          </article>
-          <article className="metric-card">
-            <b>Policy ready</b>
-            <span>Rules + review trigger workflow</span>
-          </article>
-        </div>
-      </section>
+      <Card size="4" className="hero">
+        <Flex direction="column" gap="3">
+          <Badge color="blue" variant="soft" size="2" style={{ width: 'fit-content' }}>
+            Enterprise Control Plane
+          </Badge>
+          <Heading size="8" style={{ letterSpacing: '-0.02em' }}>
+            Code Reviewer Dashboard
+          </Heading>
+          <Text size="3" color="gray" style={{ maxWidth: 840, lineHeight: 1.7 }}>
+            Manage authentication, workspace operations, repository sync, policy rules, and pull request review
+            lifecycle from one platform surface.
+          </Text>
+          <Flex gap="2" wrap="wrap">
+            <Button asChild size="3">
+              <Link href="/login">Sign In</Link>
+            </Button>
+            <Button asChild variant="soft" color="gray" size="3">
+              <Link href="/onboarding">Onboarding</Link>
+            </Button>
+          </Flex>
+        </Flex>
+      </Card>
 
-      <section className="grid">
-        <article className="panel span-12">
-          <div className="section-head">
-            <h2>Canonical Routes</h2>
-            <p>Server-rendered and ready for integration.</p>
-          </div>
-          <div className="route-list">
-            <div className="route-item">
-              <code>/login</code>
-            </div>
-            <div className="route-item">
-              <code>/onboarding</code>
-            </div>
-            <div className="route-item">
-              <code>/w/[workspaceSlug]/overview</code>
-            </div>
-            <div className="route-item">
-              <code>/w/[workspaceSlug]/repositories</code>
-            </div>
-            <div className="route-item">
-              <code>/w/[workspaceSlug]/rules</code>
-            </div>
-            <div className="route-item">
-              <code>/w/[workspaceSlug]/pull-requests</code>
-            </div>
-            <div className="route-item">
-              <code>/w/[workspaceSlug]/settings/members</code>
-            </div>
-            <div className="route-item">
-              <code>/w/[workspaceSlug]/settings/audit</code>
-            </div>
-          </div>
-        </article>
-      </section>
+      <Box mt="4">
+        <Card size="3">
+          <Flex direction="column" gap="3">
+            <Flex justify="between" align="center" wrap="wrap" gap="2">
+              <Heading size="5">Canonical Routes</Heading>
+              <Text size="2" color="gray">
+                Addressable and server-rendered
+              </Text>
+            </Flex>
+            <Grid columns={{ initial: '1', md: '2' }} gap="2">
+              {routes.map(route => (
+                <Card key={route} variant="surface" size="2">
+                  <Text size="2" style={{ fontFamily: 'var(--font-mono)' }}>
+                    {route}
+                  </Text>
+                </Card>
+              ))}
+            </Grid>
+          </Flex>
+        </Card>
+      </Box>
     </main>
   );
 }
