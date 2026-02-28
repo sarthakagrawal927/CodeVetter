@@ -1,149 +1,134 @@
 import Image from "next/image";
 
-const stats = [
+const highlights = [
   {
-    value: "Line-mapped",
-    title: "Grounded findings",
-    body: "Comments stay tied to changed lines and pull request context.",
+    label: "Context first",
+    value: "Diff + metadata",
+    body: "Every run starts with changed hunks, files, and PR thread context.",
   },
   {
-    value: "Policy-aware",
-    title: "Configurable gates",
-    body: "Fail CI on findings and severity thresholds defined by your rules.",
+    label: "Clear output",
+    value: "Line-level findings",
+    body: "Findings are mapped to exact lines with severity and practical fixes.",
   },
   {
-    value: "Enterprise v1",
-    title: "Control plane architecture",
-    body: "Action trigger, workspace rules, auditability, and operational controls.",
-  },
-];
-
-const features = [
-  {
-    id: "01",
-    tag: "Context",
-    title: "Git interaction layer",
-    body: "Pull request diffs, changed files, and thread metadata are assembled first so the model reviews with real scope.",
-  },
-  {
-    id: "02",
-    tag: "Intelligence",
-    title: "Actionable review output",
-    body: "AI returns line-level findings, severity, and practical remediation guidance for each issue.",
-  },
-  {
-    id: "03",
-    tag: "Control plane",
-    title: "Rules and indexing expansion",
-    body: "The next milestone extends org rule packs, deeper indexing, and dashboard-managed policy toggles.",
+    label: "Policy controls",
+    value: "Deterministic gates",
+    body: "Workspace defaults and repo overrides drive pass/fail behavior.",
   },
 ];
 
-const workflowSteps = [
+const pillars = [
   {
-    label: "Step 1",
-    title: "Ingest pull request context",
-    body: "Capture changed files, hunks, and commit metadata from GitHub before inference starts.",
+    title: "Operationally safe by default",
+    body: "Webhook signature checks, delivery idempotency, and audit logs are built into the control plane.",
   },
   {
-    label: "Step 2",
-    title: "Run review intelligence",
-    body: "Generate actionable findings per changed region with clear severity and fix guidance.",
+    title: "Enterprise-ready workflow",
+    body: "GitHub OAuth, workspace RBAC, repository connection management, and manual re-review triggers in one dashboard.",
   },
   {
-    label: "Step 3",
-    title: "Enforce release policy",
-    body: "Post inline comments and fail CI based on your threshold or severity gates.",
-  },
-];
-
-const reliabilityCards = [
-  {
-    title: "Webhook integrity",
-    body: "GitHub delivery IDs are tracked for idempotency, with signature validation for trusted ingestion.",
+    title: "Roadmap-aligned architecture",
+    body: "v1 ships deterministic policy controls now while keeping clean expansion paths for deeper indexing and analytics.",
   },
   {
-    title: "Auditable operations",
-    body: "Workspace actions are stored in audit logs for change traceability and operational review.",
-  },
-  {
-    title: "Policy determinism",
-    body: "Workspace defaults and repository overrides are versioned and applied consistently per run.",
-  },
-  {
-    title: "Flexible persistence",
-    body: "Cockroach/Postgres-backed control-plane storage with in-memory fallback for local development.",
+    title: "Practical developer experience",
+    body: "Action setup stays simple: configure platform URL/token once, then review feedback appears directly in pull requests.",
   },
 ];
 
-const workflowSnippet = `name: AI Code Review
-on: [pull_request]
+const flow = [
+  {
+    step: "01",
+    title: "Capture pull request context",
+    body: "Collect changed files, hunks, and metadata from GitHub event payloads.",
+  },
+  {
+    step: "02",
+    title: "Generate review findings",
+    body: "Run code analysis and produce line-level findings with severity and guidance.",
+  },
+  {
+    step: "03",
+    title: "Apply release policy",
+    body: "Post inline comments and enforce configured thresholds in CI.",
+  },
+];
+
+const workflowSnippet = `name: Trigger Enterprise Review
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 jobs:
   review:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
-      - name: AI Code Reviewer
-        uses: sarthakagrawal927/code-reviewer-action@v1
+      - uses: sarthakagrawal927/code-reviewer-action@v1
         with:
           platform_base_url: \${{ secrets.CODE_REVIEWER_PLATFORM_BASE_URL }}
           platform_token: \${{ secrets.CODE_REVIEWER_PLATFORM_TOKEN }}`;
 
 export default function HomePage() {
-  const currentYear = new Date().getFullYear();
+  const year = new Date().getFullYear();
 
   return (
     <>
-      <header className="top">
-        <div className="wrap nav">
+      <header className="site-header">
+        <div className="container top-nav">
           <a className="brand" href="#home">
-            <span className="brand-dot" />
+            <span className="brand-mark" />
             <span>Sarthak AI Code Reviewer</span>
           </a>
-          <div className="nav-links">
+          <nav className="top-links">
+            <a href="#capabilities">Capabilities</a>
+            <a href="#workflow">Workflow</a>
             <a
-              className="btn btn-secondary"
               href="https://github.com/sarthakagrawal927/code-reviewer-action#readme"
               target="_blank"
               rel="noopener noreferrer"
             >
               Docs
             </a>
+          </nav>
+          <div className="top-actions">
             <a
-              className="btn btn-primary"
+              className="btn btn-solid"
               href="https://github.com/sarthakagrawal927/code-reviewer-action"
               target="_blank"
               rel="noopener noreferrer"
             >
-              View on GitHub
+              GitHub
             </a>
           </div>
         </div>
       </header>
 
-      <main id="home" className="wrap page-shell">
+      <main id="home" className="container page">
         <section className="hero">
-          <div className="hero-copy">
-            <span className="kicker">GitHub Action + Enterprise Control Plane</span>
-            <h1>
-              Professional AI code review, designed for engineering teams.
-            </h1>
+          <div>
+            <span className="eyebrow">Enterprise v1</span>
+            <h1>AI code review that engineering teams can trust in production.</h1>
             <p>
-              Sarthak AI Code Reviewer is built around reliable diff context,
-              practical findings, and deterministic policy enforcement in CI.
+              Sarthak AI Code Reviewer combines practical line-level findings with
+              deterministic policy controls, so pull request quality checks are
+              both useful to developers and reliable for release gates.
             </p>
             <div className="hero-actions">
               <a
-                className="btn btn-primary"
+                className="btn btn-solid"
                 href="https://github.com/sarthakagrawal927/code-reviewer-action"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Start in 5 minutes
+                Get started
               </a>
               <a
-                className="btn btn-secondary"
+                className="btn btn-ghost"
                 href="https://github.com/sarthakagrawal927/code-reviewer-action/issues"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -151,158 +136,101 @@ export default function HomePage() {
                 Report issue
               </a>
             </div>
-            <div className="hero-pills">
-              <span>Line-level findings</span>
-              <span>Severity-aware checks</span>
-              <span>Workspace policy rules</span>
-            </div>
           </div>
 
           <div className="hero-stack">
-            <div className="panel">
-              <div className="snippet-head">
+            <article className="code-panel">
+              <div className="code-head">
                 <span>workflow.yml</span>
-                <span className="dot-row">
-                  <i className="dot" />
-                  <i className="dot" />
-                  <i className="dot" />
+                <span className="window-dots">
+                  <i />
+                  <i />
+                  <i />
                 </span>
               </div>
               <pre>
                 <code>{workflowSnippet}</code>
               </pre>
-              <div className="panel-footer">
-                <article>
-                  <strong>29 files</strong>
-                  <span>Diff context captured</span>
-                </article>
-                <article>
-                  <strong>6 findings</strong>
-                  <span>Posted inline in PR</span>
-                </article>
-              </div>
-            </div>
-
-            <div className="preview-card fade-up" style={{ "--delay": "140ms" }}>
+            </article>
+            <article className="preview-card">
               <div className="preview-head">
-                <span>Review snapshot</span>
-                <b>v1 rollout</b>
+                <span>Dashboard Preview</span>
+                <b>Control Plane</b>
               </div>
               <Image
                 src="/images/hero.png"
-                alt="Code review dashboard preview"
+                alt="Code Reviewer dashboard preview"
                 width={960}
                 height={640}
                 priority
               />
-            </div>
+            </article>
           </div>
         </section>
 
-        <section className="stats">
-          {stats.map((item, index) => (
-            <article
-              className="stat fade-up"
-              key={item.title}
-              style={{ "--delay": `${90 * index}ms` }}
-            >
-              <span className="stat-value">{item.value}</span>
-              <b>{item.title}</b>
+        <section className="highlight-grid">
+          {highlights.map((item) => (
+            <article className="highlight-card" key={item.label}>
+              <small>{item.label}</small>
+              <h3>{item.value}</h3>
               <p>{item.body}</p>
             </article>
           ))}
         </section>
 
-        <section className="section" id="features">
-          <h2>Built to mirror how real teams ship software.</h2>
-          <p className="section-lead">
-            The product is structured around operational sequence: context
-            capture, intelligent review output, then policy and indexing depth.
+        <section className="section" id="capabilities">
+          <h2>Built for modern delivery workflows, not marketing demos.</h2>
+          <p className="section-copy">
+            The platform is organized around real operational needs: trusted
+            ingestion, useful review output, policy enforcement, and auditable
+            changes.
           </p>
-
-          <div className="grid">
-            {features.map((feature, index) => (
-              <article
-                className="card fade-up"
-                key={feature.id}
-                style={{ "--delay": `${110 + index * 90}ms` }}
-              >
-                <div className="card-top">
-                  <div className="badge">{feature.id}</div>
-                  <span className="card-tag">{feature.tag}</span>
-                </div>
-                <h3>{feature.title}</h3>
-                <p>{feature.body}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="section" id="reliability">
-          <h2>Operational reliability for production workflows</h2>
-          <p className="section-lead">
-            Core platform behaviors are designed for trust: secure ingestion,
-            policy determinism, and audit-friendly operations.
-          </p>
-          <div className="reliability-grid">
-            {reliabilityCards.map((card, index) => (
-              <article
-                className="reliability-card fade-up"
-                key={card.title}
-                style={{ "--delay": `${100 + index * 90}ms` }}
-              >
-                <h3>{card.title}</h3>
-                <p>{card.body}</p>
+          <div className="pillar-grid">
+            {pillars.map((item) => (
+              <article className="pillar-card" key={item.title}>
+                <h3>{item.title}</h3>
+                <p>{item.body}</p>
               </article>
             ))}
           </div>
         </section>
 
         <section className="section" id="workflow">
-          <h2>Execution flow from event to enforcement</h2>
-          <p className="section-lead">
-            A clear sequence from pull request event to reviewer output and
-            policy gate decision.
+          <h2>Execution flow from event to release gate</h2>
+          <p className="section-copy">
+            A clear path from pull request event ingestion to actionable findings
+            and policy-driven CI decisions.
           </p>
-
-          <div className="workflow">
-            {workflowSteps.map((step, index) => (
-              <article
-                className="step fade-up"
-                key={step.title}
-                style={{ "--delay": `${120 + index * 90}ms` }}
-              >
-                <small>{step.label}</small>
-                <h4>{step.title}</h4>
-                <p>{step.body}</p>
+          <div className="flow-grid">
+            {flow.map((item) => (
+              <article className="flow-card" key={item.step}>
+                <span>{item.step}</span>
+                <h4>{item.title}</h4>
+                <p>{item.body}</p>
               </article>
             ))}
           </div>
         </section>
 
         <section className="cta">
-          <h3>Start with actionable review. Scale with policy control.</h3>
+          <h3>Start with reliable PR review. Scale into policy intelligence.</h3>
           <p>
-            This release gives your team high-quality pull request feedback in CI
-            today and sets up a clean path to broader policy controls in the
-            next milestone.
+            Deploy the action quickly today, then expand into richer workspace
+            policy and dashboard operations as your team grows.
           </p>
           <a
-            className="btn btn-primary"
+            className="btn btn-solid"
             href="https://github.com/sarthakagrawal927/code-reviewer-action"
             target="_blank"
             rel="noopener noreferrer"
           >
-            Open repository
+            Open GitHub Project
           </a>
         </section>
       </main>
 
-      <footer className="wrap footer">
-        <span>
-          (c) {currentYear} Sarthak AI Code Reviewer. Open-source design source:
-          Themesberg Landwind.
-        </span>
+      <footer className="container footer">
+        <span>© {year} Sarthak AI Code Reviewer</span>
       </footer>
     </>
   );
