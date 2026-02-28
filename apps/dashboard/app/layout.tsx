@@ -5,14 +5,18 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Code Reviewer Dashboard',
-  description: 'Enterprise control plane for GitHub review automation.'
+  description: 'Enterprise control plane for GitHub review automation.',
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/apple-touch-icon.png'
+  }
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <Theme accentColor="blue" grayColor="slate" radius="large" scaling="100%">
+        <Theme appearance="dark" accentColor="blue" grayColor="slate" radius="large" scaling="100%">
           {children}
         </Theme>
       </body>
