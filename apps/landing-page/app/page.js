@@ -1,58 +1,70 @@
-import Image from "next/image";
+import Image from 'next/image';
+import {
+  Badge,
+  Box,
+  Button,
+  Card,
+  Container,
+  Flex,
+  Grid,
+  Heading,
+  Section,
+  Text
+} from '@radix-ui/themes';
 
 const highlights = [
   {
-    label: "Context first",
-    value: "Diff + metadata",
-    body: "Every run starts with changed hunks, files, and PR thread context.",
+    label: 'Context',
+    value: 'Diff + metadata',
+    body: 'Every run starts with changed hunks, files, and pull request context.'
   },
   {
-    label: "Clear output",
-    value: "Line-level findings",
-    body: "Findings are mapped to exact lines with severity and practical fixes.",
+    label: 'Output',
+    value: 'Line-level findings',
+    body: 'Findings stay mapped to changed lines with severity and practical guidance.'
   },
   {
-    label: "Policy controls",
-    value: "Deterministic gates",
-    body: "Workspace defaults and repo overrides drive pass/fail behavior.",
-  },
+    label: 'Policy',
+    value: 'Deterministic gates',
+    body: 'Workspace defaults and repository overrides drive CI pass/fail behavior.'
+  }
 ];
 
 const pillars = [
   {
-    title: "Operationally safe by default",
-    body: "Webhook signature checks, delivery idempotency, and audit logs are built into the control plane.",
+    title: 'Operationally safe by default',
+    body: 'Webhook signature validation, delivery idempotency, and audit logging in the control plane.'
   },
   {
-    title: "Enterprise-ready workflow",
-    body: "GitHub OAuth, workspace RBAC, repository connection management, and manual re-review triggers in one dashboard.",
+    title: 'Enterprise workflow support',
+    body: 'GitHub OAuth, workspace RBAC, repository sync, and manual re-review triggers in one dashboard.'
   },
   {
-    title: "Roadmap-aligned architecture",
-    body: "v1 ships deterministic policy controls now while keeping clean expansion paths for deeper indexing and analytics.",
+    title: 'Roadmap-aligned architecture',
+    body: 'v1 policy controls now, with clean expansion path for deeper indexing and analytics.'
   },
   {
-    title: "Practical developer experience",
-    body: "Action setup stays simple: configure platform URL/token once, then review feedback appears directly in pull requests.",
-  },
+    title: 'Developer-first adoption',
+    body: 'Simple action setup with practical feedback delivered directly in pull request threads.'
+  }
 ];
 
 const flow = [
   {
-    step: "01",
-    title: "Capture pull request context",
-    body: "Collect changed files, hunks, and metadata from GitHub event payloads.",
+    step: '01',
+    title: 'Capture context',
+    body: 'Collect changed files, hunks, and metadata from GitHub event payloads.'
   },
   {
-    step: "02",
-    title: "Generate review findings",
-    body: "Run code analysis and produce line-level findings with severity and guidance.",
+    step: '02',
+    title: 'Generate findings',
+    body: 'Run review intelligence and produce line-level issues with severity.'
   },
   {
-    step: "03",
-    title: "Apply release policy",
-    body: "Post inline comments and enforce configured thresholds in CI.",
-  },
+    step: '03',
+    title: 'Enforce policy',
+    body: 'Post inline feedback and apply configured release gate thresholds.'
+  }
 ];
 
 const workflowSnippet = `name: Trigger Enterprise Review
@@ -77,161 +89,195 @@ export default function HomePage() {
   const year = new Date().getFullYear();
 
   return (
-    <>
-      <header className="site-header">
-        <div className="container top-nav">
-          <a className="brand" href="#home">
-            <span className="brand-mark" />
-            <span>Sarthak AI Code Reviewer</span>
-          </a>
-          <nav className="top-links">
-            <a href="#capabilities">Capabilities</a>
-            <a href="#workflow">Workflow</a>
-            <a
-              href="https://github.com/sarthakagrawal927/code-reviewer-action#readme"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Docs
-            </a>
-          </nav>
-          <div className="top-actions">
-            <a
-              className="btn btn-solid"
-              href="https://github.com/sarthakagrawal927/code-reviewer-action"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              GitHub
-            </a>
-          </div>
-        </div>
+    <Box className="radix-shell">
+      <header className="radix-header">
+        <Container size="4">
+          <Flex align="center" justify="between" gap="3" py="3">
+            <Flex align="center" gap="2">
+              <Box className="brand-mark" />
+              <Text weight="bold" size="3">
+                Sarthak AI Code Reviewer
+              </Text>
+            </Flex>
+            <Flex gap="2" wrap="wrap">
+              <Button asChild variant="soft" color="gray" size="2">
+                <a href="#capabilities">Capabilities</a>
+              </Button>
+              <Button asChild variant="soft" color="gray" size="2">
+                <a href="#workflow">Workflow</a>
+              </Button>
+              <Button asChild size="2">
+                <a
+                  href="https://github.com/sarthakagrawal927/code-reviewer-action"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  GitHub
+                </a>
+              </Button>
+            </Flex>
+          </Flex>
+        </Container>
       </header>
 
-      <main id="home" className="container page">
-        <section className="hero">
-          <div>
-            <span className="eyebrow">Enterprise v1</span>
-            <h1>AI code review that engineering teams can trust in production.</h1>
-            <p>
-              Sarthak AI Code Reviewer combines practical line-level findings with
-              deterministic policy controls, so pull request quality checks are
-              both useful to developers and reliable for release gates.
-            </p>
-            <div className="hero-actions">
+      <Container size="4" py="5">
+        <Card size="4" className="hero-card">
+          <Grid columns={{ initial: '1', md: '2' }} gap="4" align="start">
+            <Flex direction="column" gap="3">
+              <Badge color="blue" variant="soft" size="2" style={{ width: 'fit-content' }}>
+                Enterprise v1
+              </Badge>
+              <Heading size="9" style={{ letterSpacing: '-0.03em', maxWidth: 620 }}>
+                AI code review for production engineering workflows
+              </Heading>
+              <Text size="3" color="gray" style={{ lineHeight: 1.75, maxWidth: 620 }}>
+                Practical findings mapped to changed lines, deterministic policy controls, and a clean control plane
+                for workspace operations.
+              </Text>
+              <Flex gap="2" wrap="wrap">
+                <Button asChild size="3">
+                  <a
+                    href="https://github.com/sarthakagrawal927/code-reviewer-action"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Get Started
+                  </a>
+                </Button>
+                <Button asChild variant="soft" color="gray" size="3">
+                  <a
+                    href="https://github.com/sarthakagrawal927/code-reviewer-action/issues"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Report Issue
+                  </a>
+                </Button>
+              </Flex>
+            </Flex>
+
+            <Flex direction="column" gap="3">
+              <Card size="2" variant="surface">
+                <Flex direction="column" gap="2">
+                  <Text size="2" weight="medium" color="gray">
+                    workflow.yml
+                  </Text>
+                  <Box className="code-window">
+                    <pre>
+                      <code>{workflowSnippet}</code>
+                    </pre>
+                  </Box>
+                </Flex>
+              </Card>
+
+              <Card size="2" variant="surface">
+                <Image
+                  src="/images/hero.png"
+                  alt="Code reviewer dashboard preview"
+                  width={960}
+                  height={640}
+                  style={{ width: '100%', height: 'auto', borderRadius: 12 }}
+                  priority
+                />
+              </Card>
+            </Flex>
+          </Grid>
+        </Card>
+
+        <Section size="2">
+          <Grid columns={{ initial: '1', md: '3' }} gap="3">
+            {highlights.map(item => (
+              <Card key={item.label} size="3" variant="surface">
+                <Flex direction="column" gap="2">
+                  <Badge color="gray" variant="soft" size="1" style={{ width: 'fit-content' }}>
+                    {item.label}
+                  </Badge>
+                  <Heading size="5">{item.value}</Heading>
+                  <Text size="2" color="gray" style={{ lineHeight: 1.65 }}>
+                    {item.body}
+                  </Text>
+                </Flex>
+              </Card>
+            ))}
+          </Grid>
+        </Section>
+
+        <Section size="2" id="capabilities">
+          <Flex direction="column" gap="3" mb="3">
+            <Heading size="8" style={{ letterSpacing: '-0.02em', maxWidth: 760 }}>
+              Built for real delivery pipelines, not demo-only output
+            </Heading>
+            <Text size="3" color="gray" style={{ maxWidth: 760, lineHeight: 1.75 }}>
+              The platform focuses on trusted ingestion, useful review output, deterministic policy behavior, and
+              audit-ready operations.
+            </Text>
+          </Flex>
+          <Grid columns={{ initial: '1', md: '2' }} gap="3">
+            {pillars.map(item => (
+              <Card key={item.title} size="3" variant="surface">
+                <Flex direction="column" gap="2">
+                  <Heading size="5">{item.title}</Heading>
+                  <Text size="2" color="gray" style={{ lineHeight: 1.68 }}>
+                    {item.body}
+                  </Text>
+                </Flex>
+              </Card>
+            ))}
+          </Grid>
+        </Section>
+
+        <Section size="2" id="workflow">
+          <Flex direction="column" gap="3" mb="3">
+            <Heading size="8" style={{ letterSpacing: '-0.02em', maxWidth: 760 }}>
+              Event-to-enforcement execution flow
+            </Heading>
+            <Text size="3" color="gray" style={{ maxWidth: 760, lineHeight: 1.75 }}>
+              A direct sequence from pull request event context to actionable findings and policy-driven CI decisions.
+            </Text>
+          </Flex>
+          <Grid columns={{ initial: '1', md: '3' }} gap="3">
+            {flow.map(item => (
+              <Card key={item.step} size="3" variant="surface">
+                <Flex direction="column" gap="2">
+                  <Badge color="gray" variant="soft" style={{ width: 'fit-content' }}>
+                    {item.step}
+                  </Badge>
+                  <Heading size="5">{item.title}</Heading>
+                  <Text size="2" color="gray" style={{ lineHeight: 1.65 }}>
+                    {item.body}
+                  </Text>
+                </Flex>
+              </Card>
+            ))}
+          </Grid>
+        </Section>
+
+        <Card size="4" className="cta-card">
+          <Flex direction="column" gap="3" align="start">
+            <Heading size="8" style={{ color: '#f8fafc', letterSpacing: '-0.02em' }}>
+              Start with trusted PR review. Expand with policy intelligence.
+            </Heading>
+            <Text size="3" style={{ color: '#cbd5e1', maxWidth: 760, lineHeight: 1.75 }}>
+              Deploy quickly today and scale into richer workspace policy and operational controls as your team grows.
+            </Text>
+            <Button asChild size="3" color="gray" variant="solid">
               <a
-                className="btn btn-solid"
                 href="https://github.com/sarthakagrawal927/code-reviewer-action"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Get started
+                Open GitHub Project
               </a>
-              <a
-                className="btn btn-ghost"
-                href="https://github.com/sarthakagrawal927/code-reviewer-action/issues"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Report issue
-              </a>
-            </div>
-          </div>
+            </Button>
+          </Flex>
+        </Card>
 
-          <div className="hero-stack">
-            <article className="code-panel">
-              <div className="code-head">
-                <span>workflow.yml</span>
-                <span className="window-dots">
-                  <i />
-                  <i />
-                  <i />
-                </span>
-              </div>
-              <pre>
-                <code>{workflowSnippet}</code>
-              </pre>
-            </article>
-            <article className="preview-card">
-              <div className="preview-head">
-                <span>Dashboard Preview</span>
-                <b>Control Plane</b>
-              </div>
-              <Image
-                src="/images/hero.png"
-                alt="Code Reviewer dashboard preview"
-                width={960}
-                height={640}
-                priority
-              />
-            </article>
-          </div>
-        </section>
-
-        <section className="highlight-grid">
-          {highlights.map((item) => (
-            <article className="highlight-card" key={item.label}>
-              <small>{item.label}</small>
-              <h3>{item.value}</h3>
-              <p>{item.body}</p>
-            </article>
-          ))}
-        </section>
-
-        <section className="section" id="capabilities">
-          <h2>Built for modern delivery workflows, not marketing demos.</h2>
-          <p className="section-copy">
-            The platform is organized around real operational needs: trusted
-            ingestion, useful review output, policy enforcement, and auditable
-            changes.
-          </p>
-          <div className="pillar-grid">
-            {pillars.map((item) => (
-              <article className="pillar-card" key={item.title}>
-                <h3>{item.title}</h3>
-                <p>{item.body}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="section" id="workflow">
-          <h2>Execution flow from event to release gate</h2>
-          <p className="section-copy">
-            A clear path from pull request event ingestion to actionable findings
-            and policy-driven CI decisions.
-          </p>
-          <div className="flow-grid">
-            {flow.map((item) => (
-              <article className="flow-card" key={item.step}>
-                <span>{item.step}</span>
-                <h4>{item.title}</h4>
-                <p>{item.body}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="cta">
-          <h3>Start with reliable PR review. Scale into policy intelligence.</h3>
-          <p>
-            Deploy the action quickly today, then expand into richer workspace
-            policy and dashboard operations as your team grows.
-          </p>
-          <a
-            className="btn btn-solid"
-            href="https://github.com/sarthakagrawal927/code-reviewer-action"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Open GitHub Project
-          </a>
-        </section>
-      </main>
-
-      <footer className="container footer">
-        <span>© {year} Sarthak AI Code Reviewer</span>
-      </footer>
-    </>
+        <Box pt="5" pb="6">
+          <Text size="2" color="gray">
+            © {year} Sarthak AI Code Reviewer
+          </Text>
+        </Box>
+      </Container>
+    </Box>
   );
 }
