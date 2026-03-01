@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
-import { LogoutButton } from '../../../components/session-actions';
-import { WorkspaceNav } from '../../../components/workspace-nav';
+import { Sidebar } from '../../../components/sidebar';
+import { Topbar } from '../../../components/topbar';
 import { getSession, getWorkspaceBySlug } from '../../../lib/platform';
 
 export default async function WorkspaceLayout({
@@ -22,23 +22,21 @@ export default async function WorkspaceLayout({
     notFound();
   }
 
-  return (
-    <main className="shell">
-      <section className="hero">
-        <span className="eyebrow">Workspace</span>
-        <div className="topbar">
-          <div>
-            <h1>{workspace.name}</h1>
-            <p>
-              Workspace slug: <code>{workspace.slug}</code> | Role: <code>{workspace.role}</code>
-            </p>
-          </div>
-          <LogoutButton />
-        </div>
-        <WorkspaceNav workspaceSlug={workspace.slug} />
-      </section>
+  const userLogin = session.user.githubLogin || session.user.displayName || 'User';
 
-      <section className="grid">{children}</section>
-    </main>
+  return (
+    <div className="workspace-shell">
+      <Sidebar
+        workspaceSlug={workspace.slug}
+        workspaceName={workspace.name}
+        userLogin={userLogin}
+      />
+      <div className="workspace-main">
+        <Topbar workspaceSlug={workspace.slug} />
+        <main className="page-content">
+          {children}
+        </main>
+      </div>
+    </div>
   );
 }
