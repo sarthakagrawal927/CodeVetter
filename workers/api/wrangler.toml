@@ -5,3 +5,26 @@ compatibility_flags = ["nodejs_compat"]
 
 [observability]
 enabled = true
+
+# Non-secret defaults (override per-environment as needed)
+[vars]
+APP_BASE_URL = "https://your-dashboard.vercel.app"
+API_WORKER_CORS_ORIGIN = "https://your-dashboard.vercel.app"
+GITHUB_API_BASE_URL = "https://api.github.com"
+SESSION_TTL_HOURS = "168"
+RATE_LIMIT_WINDOW_MS = "60000"
+RATE_LIMIT_MAX_REQUESTS = "120"
+DB_USE_IN_MEMORY = "false"
+
+# ── Secrets ────────────────────────────────────────────────────────────────────
+# Upload each secret once with: wrangler secret put <NAME>
+#
+#   wrangler secret put COCKROACH_DATABASE_URL
+#   wrangler secret put GITHUB_CLIENT_ID
+#   wrangler secret put GITHUB_CLIENT_SECRET
+#   wrangler secret put GITHUB_WEBHOOK_SECRET
+#   wrangler secret put GITHUB_APP_ID
+#   wrangler secret put GITHUB_APP_PRIVATE_KEY
+#   wrangler secret put SESSION_SECRET
+#   wrangler secret put PLATFORM_ACTION_TOKEN
+#   wrangler secret put WORKSPACE_SECRET_ENCRYPTION_KEY
