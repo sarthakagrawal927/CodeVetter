@@ -44,8 +44,7 @@ export default function LandingPage() {
           <a href="#demo">Demo</a>
         </div>
         <div className="nav-actions">
-          <a href={`${DASHBOARD_URL}`} className="btn btn-ghost">Login</a>
-          <a href={`${DASHBOARD_URL}`} className="btn btn-primary">Get Started</a>
+          <a href={DASHBOARD_URL} className="btn btn-primary">Get Started</a>
         </div>
       </nav>
 
