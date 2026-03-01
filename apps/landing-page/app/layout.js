@@ -1,7 +1,7 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'CodeReviewAI — Review Code 10x Faster with AI',
+  title: 'CodeVetter — Review Code 10x Faster with AI',
   description: 'Automate code quality checks and security scanning directly in your GitHub PR workflow.',
 };
 

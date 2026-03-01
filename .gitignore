@@ -9,3 +9,4 @@ packages/*/dist
 workers/*/dist
 workers/*/dist-cjs
 workers/*/.wrangler
+.vercel

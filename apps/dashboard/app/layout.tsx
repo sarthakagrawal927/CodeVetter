@@ -4,8 +4,8 @@ import '@radix-ui/themes/styles.css';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Code Reviewer Dashboard',
-  description: 'Enterprise control plane for GitHub review automation.',
+  title: 'CodeVetter',
+  description: 'AI-powered code review dashboard.',
   icons: {
     icon: '/favicon.ico',
     apple: '/apple-touch-icon.png'
