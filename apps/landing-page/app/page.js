@@ -31,19 +31,17 @@ function FeatureCard({ icon, iconBg, title, body }) {
 
 export default function LandingPage() {
   const featuresRef = useFadeIn();
-  const demoRef = useFadeIn();
 
   return (
     <>
       <nav className="nav">
         <div className="nav-logo">
           <div className="nav-logo-icon">CR</div>
-          CodeReviewAI
+          CodeVetter
         </div>
         <div className="nav-links">
           <a href="#features">Features</a>
-          <a href="#integrations">Integrations</a>
-          <a href="#pricing">Pricing</a>
+          <a href="#demo">Demo</a>
         </div>
         <div className="nav-actions">
           <a href={`${DASHBOARD_URL}`} className="btn btn-ghost">Login</a>
@@ -113,7 +111,7 @@ export default function LandingPage() {
       <hr className="divider" />
 
       <section className="demo-section" id="demo">
-        <div className="fade-up" ref={demoRef}>
+        <div>
           <h2>Catch Bugs Before Production</h2>
           <p>Visualizing the impact of automated code analysis on your deployment pipeline.</p>
         </div>
@@ -150,9 +148,9 @@ export default function LandingPage() {
       <footer className="footer">
         <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
           <div className="nav-logo-icon" style={{width:22,height:22,fontSize:'0.6rem'}}>CR</div>
-          <span style={{fontSize:'0.875rem',fontWeight:600}}>CodeReviewAI</span>
+          <span style={{fontSize:'0.875rem',fontWeight:600}}>CodeVetter</span>
         </div>
-        <span className="footer-copy">© 2026 CodeReviewAI Inc. All rights reserved.</span>
+        <span className="footer-copy">© 2026 CodeVetter Inc. All rights reserved.</span>
         <div className="footer-links">
           <a href="#">Twitter</a>
           <a href="#">GitHub</a>

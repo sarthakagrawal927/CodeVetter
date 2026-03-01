@@ -39,7 +39,7 @@ function buildOverallBody(findings: Array<{ severity: string; title: string }>, 
     .filter(([, n]) => n > 0)
     .map(([s, n]) => `${n} ${s}`)
     .join(', ');
-  return `## AI Code Review\n\n**Score:** ${score.toFixed(0)}/100 | **Findings:** ${parts || 'none'}\n\n*Automated review by CodeReviewAI*`;
+  return `## AI Code Review\n\n**Score:** ${score.toFixed(0)}/100 | **Findings:** ${parts || 'none'}\n\n*Automated review by CodeVetter*`;
 }
 
 async function handleIndexingJob(job: IndexingJob, config: HandlerConfig): Promise<void> {

@@ -41,7 +41,7 @@ export default function HomePage() {
           <Flex align="center" gap="2">
             <Box className="dot-mark" />
             <Text size="2" weight="bold">
-              Code Reviewer Dashboard
+              CodeVetter
             </Text>
           </Flex>
           <Flex gap="2" wrap="wrap">

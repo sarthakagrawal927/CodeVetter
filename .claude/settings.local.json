@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(tail:*)",
+      "Bash(which npm:*)",
+      "Bash(git:*)",
+      "Bash(which tsc:*)",
+      "Bash(/Users/sarthakagrawal/Desktop/code-reviewer/node_modules/.bin/tsc:*)",
+      "Bash(head:*)",
+      "Bash(node:*)",
+      "Bash(pkill:*)",
+      "Bash(sleep 2:*)",
+      "Bash(sleep 3:*)",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "Bash(whois:*)",
+      "Bash(which vercel 2>/dev/null && vercel --version 2>/dev/null; which wrangler 2>/dev/null && wrangler --version 2>/dev/null)",
+      "Bash(wrangler whoami:*)",
+      "Bash(vercel teams:*)",
+      "Bash(wrangler:*)",
+      "Bash(cd /Users/sarthakagrawal/Desktop/code-reviewer/apps/landing-page && vercel --prod --yes 2>&1)",
+      "Bash(cd /Users/sarthakagrawal/Desktop/code-reviewer/apps/landing-page && vercel link --yes --scope sarthak-agrawals-projects-5d4953f8 2>&1 && vercel --prod --yes --scope sarthak-agrawals-projects-5d4953f8 2>&1)",
+      "Bash(vercel project:*)",
+      "Bash(vercel link:*)",
+      "Bash(vercel:*)",
+      "mcp__plugin_playwright_playwright__browser_install",
+      "mcp__plugin_playwright_playwright__browser_take_screenshot"
+    ]
+  }
+}
