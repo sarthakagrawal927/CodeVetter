@@ -1,302 +1,164 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Card,
-  Container,
-  Flex,
-  Grid,
-  Heading,
-  Section,
-  Text
-} from '@radix-ui/themes';
+'use client';
+import { useEffect, useRef } from 'react';
 
-const highlights = [
-  {
-    label: 'Context',
-    value: 'Diff + metadata',
-    body: 'Every run starts with changed hunks, files, and pull request context.'
-  },
-  {
-    label: 'Output',
-    value: 'Line-level findings',
-    body: 'Findings stay mapped to changed lines with severity and practical guidance.'
-  },
-  {
-    label: 'Policy',
-    value: 'Deterministic gates',
-    body: 'Workspace defaults and repository overrides drive CI pass/fail behavior.'
-  }
-];
+const DASHBOARD_URL = process.env.NEXT_PUBLIC_DASHBOARD_URL || '/login';
 
-const pillars = [
-  {
-    title: 'Operationally safe by default',
-    body: 'Webhook signature validation, delivery idempotency, and audit logging in the control plane.'
-  },
-  {
-    title: 'Enterprise workflow support',
-    body: 'GitHub OAuth, workspace RBAC, repository sync, and manual re-review triggers in one dashboard.'
-  },
-  {
-    title: 'Roadmap-aligned architecture',
-    body: 'v1 policy controls now, with clean expansion path for deeper indexing and analytics.'
-  },
-  {
-    title: 'Developer-first adoption',
-    body: 'Simple action setup with practical feedback delivered directly in pull request threads.'
-  }
-];
+function useFadeIn() {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { el.classList.add('visible'); obs.disconnect(); } },
+      { threshold: 0.15 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return ref;
+}
 
-const flow = [
-  {
-    step: '01',
-    title: 'Capture context',
-    body: 'Collect changed files, hunks, and metadata from GitHub event payloads.'
-  },
-  {
-    step: '02',
-    title: 'Generate findings',
-    body: 'Run review intelligence and produce line-level issues with severity.'
-  },
-  {
-    step: '03',
-    title: 'Enforce policy',
-    body: 'Post inline feedback and apply configured release gate thresholds.'
-  }
-];
+function FeatureCard({ icon, iconBg, title, body }) {
+  const ref = useFadeIn();
+  return (
+    <div className="feature-card fade-up" ref={ref}>
+      <div className="feature-icon" style={{ background: iconBg }}>{icon}</div>
+      <h3>{title}</h3>
+      <p>{body}</p>
+    </div>
+  );
+}
 
-const platformSignals = [
-  { label: 'Review Runs', value: '2,431', note: 'Processed this month' },
-  { label: 'Line Findings', value: '18,902', note: 'Mapped to changed hunks' },
-  { label: 'Policy Blocks', value: '412', note: 'Prevented risky merges' }
-];
-
-const workflowSnippet = `name: Trigger Enterprise Review
-on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-
-jobs:
-  review:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: sarthakagrawal927/code-reviewer-action@v1
-        with:
-          platform_base_url: \${{ secrets.CODE_REVIEWER_PLATFORM_BASE_URL }}
-          platform_token: \${{ secrets.CODE_REVIEWER_PLATFORM_TOKEN }}`;
-
-export default function HomePage() {
-  const year = new Date().getFullYear();
+export default function LandingPage() {
+  const featuresRef = useFadeIn();
+  const demoRef = useFadeIn();
 
   return (
-    <Box className="radix-shell">
-      <header className="radix-header">
-        <Container size="4">
-          <Flex align="center" justify="between" gap="3" py="3">
-            <Flex align="center" gap="2">
-              <Box className="brand-mark" />
-              <Text weight="bold" size="3">
-                Sarthak AI Code Reviewer
-              </Text>
-            </Flex>
-            <Flex gap="4" wrap="wrap" align="center" className="header-links">
-              <a href="#capabilities" className="header-link">
-                Capabilities
-              </a>
-              <a href="#workflow" className="header-link">
-                Workflow
-              </a>
-              <Button asChild size="2" className="header-cta">
-                <a
-                  href="https://github.com/sarthakagrawal927/code-reviewer-action"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  GitHub
-                </a>
-              </Button>
-            </Flex>
-          </Flex>
-        </Container>
-      </header>
+    <>
+      <nav className="nav">
+        <div className="nav-logo">
+          <div className="nav-logo-icon">CR</div>
+          CodeReviewAI
+        </div>
+        <div className="nav-links">
+          <a href="#features">Features</a>
+          <a href="#integrations">Integrations</a>
+          <a href="#pricing">Pricing</a>
+        </div>
+        <div className="nav-actions">
+          <a href={`${DASHBOARD_URL}`} className="btn btn-ghost">Login</a>
+          <a href={`${DASHBOARD_URL}`} className="btn btn-primary">Get Started</a>
+        </div>
+      </nav>
 
-      <Container size="4" py="5">
-        <Card size="4" className="hero-card">
-          <Grid columns={{ initial: '1', md: '2' }} gap="4" align="start">
-            <Flex direction="column" gap="3">
-              <Badge color="blue" variant="soft" size="2" style={{ width: 'fit-content' }}>
-                Production v1
-              </Badge>
-              <Heading size="9" style={{ letterSpacing: '-0.03em', maxWidth: 620 }}>
-                AI code review built for serious software delivery
-              </Heading>
-              <Text size="3" color="gray" style={{ lineHeight: 1.75, maxWidth: 620 }}>
-                Practical findings mapped to changed lines, deterministic policy controls, and a clean control plane
-                for workspace operations.
-              </Text>
-              <Flex gap="2" wrap="wrap">
-                <Button asChild size="3">
-                  <a
-                    href="https://github.com/sarthakagrawal927/code-reviewer-action"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Get Started
-                  </a>
-                </Button>
-                <Button asChild variant="soft" color="gray" size="3">
-                  <a
-                    href="https://github.com/sarthakagrawal927/code-reviewer-action/issues"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Report Issue
-                  </a>
-                </Button>
-              </Flex>
-            </Flex>
+      <section className="hero">
+        <div>
+          <div className="hero-badge">
+            <span className="hero-badge-dot" />
+            Now in public beta
+          </div>
+          <h1>Review Code <span className="hero-highlight">10x Faster</span> with AI</h1>
+          <p>Seamlessly integrate with GitHub to automate code quality checks and security scanning before you merge. Inline suggestions, severity scoring, and policy gates — all in your PR workflow.</p>
+          <div className="hero-actions">
+            <a href={DASHBOARD_URL} className="btn btn-primary btn-lg">Get Started for Free</a>
+            <a href="#demo" className="btn btn-secondary btn-lg">▶ Watch Demo</a>
+          </div>
+          <div className="trust-bar">
+            <span className="trust-label">Trusted by engineering teams at</span>
+            <div className="trust-logos">
+              <span className="trust-logo">ACME</span>
+              <span className="trust-logo">Globex</span>
+              <span className="trust-logo">Soylent</span>
+              <span className="trust-logo">Initech</span>
+            </div>
+          </div>
+        </div>
 
-            <Flex direction="column" gap="3">
-              <Card size="2" variant="surface">
-                <Flex direction="column" gap="2">
-                  <Text size="2" weight="medium" color="gray">
-                    workflow.yml
-                  </Text>
-                  <Box className="code-window">
-                    <pre>
-                      <code>{workflowSnippet}</code>
-                    </pre>
-                  </Box>
-                </Flex>
-              </Card>
+        <div className="editor-mock">
+          <div className="editor-titlebar">
+            <span className="editor-dot red" />
+            <span className="editor-dot yellow" />
+            <span className="editor-dot green" />
+            <span className="editor-filename">calculateTotal.ts</span>
+          </div>
+          <div className="editor-body">
+            <div className="code-line line-neutral"><span className="line-num">1</span><span>{'function calculateTotal(items) {'}</span></div>
+            <div className="code-line line-neutral"><span className="line-num">2</span><span>{'  let total = 0;'}</span></div>
+            <div className="code-line line-del"><span className="line-num">3</span><span>{'- items.forEach(i => total + i.price);'}</span></div>
+            <div className="code-line line-add"><span className="line-num">4</span><span>{'+ items.forEach(i => total += i.price);'}</span></div>
+            <div className="code-line line-neutral"><span className="line-num">5</span><span>{'  return total;'}</span></div>
+            <div className="code-line line-neutral"><span className="line-num">6</span><span>{'}'}</span></div>
+            <div className="ai-suggestion">
+              <div className="ai-suggestion-head">✦ AI Suggestion</div>
+              <div className="ai-suggestion-body">Assignment operator missing — total is never mutated. Use += instead of +.</div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-              <Card size="2" variant="surface">
-                <Flex direction="column" gap="3">
-                  <Text size="2" weight="medium" color="gray">
-                    Platform Signals
-                  </Text>
-                  <Grid columns="1" gap="2">
-                    {platformSignals.map(item => (
-                      <Card key={item.label} size="2" variant="surface">
-                        <Flex justify="between" align="end">
-                          <Box>
-                            <Text size="1" color="gray">
-                              {item.label}
-                            </Text>
-                            <Heading size="6">{item.value}</Heading>
-                          </Box>
-                          <Text size="1" color="gray" align="right">
-                            {item.note}
-                          </Text>
-                        </Flex>
-                      </Card>
-                    ))}
-                  </Grid>
-                </Flex>
-              </Card>
-            </Flex>
-          </Grid>
-        </Card>
+      <hr className="divider" />
 
-        <Section size="2">
-          <Grid columns={{ initial: '1', md: '3' }} gap="3">
-            {highlights.map(item => (
-              <Card key={item.label} size="3" variant="surface">
-                <Flex direction="column" gap="2">
-                  <Badge color="gray" variant="soft" size="1" style={{ width: 'fit-content' }}>
-                    {item.label}
-                  </Badge>
-                  <Heading size="5">{item.value}</Heading>
-                  <Text size="2" color="gray" style={{ lineHeight: 1.65 }}>
-                    {item.body}
-                  </Text>
-                </Flex>
-              </Card>
-            ))}
-          </Grid>
-        </Section>
+      <section className="section" id="features">
+        <div className="section-header fade-up" ref={featuresRef}>
+          <h2>Why Engineering Teams Love Us</h2>
+          <p>Supercharge your code review process with intelligent automation that fits right into your existing workflow.</p>
+        </div>
+        <div className="feature-grid">
+          <FeatureCard icon="🧠" iconBg="rgba(124,58,237,0.15)" title="AI-Powered Insights" body="Get instant inline code suggestions and automated refactoring tips powered by advanced LLMs trained on millions of repositories." />
+          <FeatureCard icon="⚡" iconBg="rgba(59,130,246,0.15)" title="Seamless Workflow" body="Integrates directly into your PR workflow on GitHub without adding friction. One YAML block and you're live." />
+          <FeatureCard icon="🛡️" iconBg="rgba(34,197,94,0.15)" title="Security First" body="Automated vulnerability scanning ensures your code is secure and compliant before it ever merges to main." />
+        </div>
+      </section>
 
-        <Section size="2" id="capabilities">
-          <Flex direction="column" gap="3" mb="3">
-            <Heading size="8" style={{ letterSpacing: '-0.02em', maxWidth: 760 }}>
-              Built for real delivery pipelines, not demo-only output
-            </Heading>
-            <Text size="3" color="gray" style={{ maxWidth: 760, lineHeight: 1.75 }}>
-              The platform focuses on trusted ingestion, useful review output, deterministic policy behavior, and
-              audit-ready operations.
-            </Text>
-          </Flex>
-          <Grid columns={{ initial: '1', md: '2' }} gap="3">
-            {pillars.map(item => (
-              <Card key={item.title} size="3" variant="surface">
-                <Flex direction="column" gap="2">
-                  <Heading size="5">{item.title}</Heading>
-                  <Text size="2" color="gray" style={{ lineHeight: 1.68 }}>
-                    {item.body}
-                  </Text>
-                </Flex>
-              </Card>
-            ))}
-          </Grid>
-        </Section>
+      <hr className="divider" />
 
-        <Section size="2" id="workflow">
-          <Flex direction="column" gap="3" mb="3">
-            <Heading size="8" style={{ letterSpacing: '-0.02em', maxWidth: 760 }}>
-              Event-to-enforcement execution flow
-            </Heading>
-            <Text size="3" color="gray" style={{ maxWidth: 760, lineHeight: 1.75 }}>
-              A direct sequence from pull request event context to actionable findings and policy-driven CI decisions.
-            </Text>
-          </Flex>
-          <Grid columns={{ initial: '1', md: '3' }} gap="3">
-            {flow.map(item => (
-              <Card key={item.step} size="3" variant="surface">
-                <Flex direction="column" gap="2">
-                  <Badge color="gray" variant="soft" style={{ width: 'fit-content' }}>
-                    {item.step}
-                  </Badge>
-                  <Heading size="5">{item.title}</Heading>
-                  <Text size="2" color="gray" style={{ lineHeight: 1.65 }}>
-                    {item.body}
-                  </Text>
-                </Flex>
-              </Card>
-            ))}
-          </Grid>
-        </Section>
+      <section className="demo-section" id="demo">
+        <div className="fade-up" ref={demoRef}>
+          <h2>Catch Bugs Before Production</h2>
+          <p>Visualizing the impact of automated code analysis on your deployment pipeline.</p>
+        </div>
+        <div className="demo-grid">
+          <div className="demo-code">
+            <div className="demo-code-header">calculateTotal.js — changed</div>
+            <div className="demo-code-body">
+              <div className="code-line line-neutral"><span className="line-num">1</span><span>{'function calculateTotal(items) {'}</span></div>
+              <div className="code-line line-neutral"><span className="line-num">2</span><span>{'  let total = 0;'}</span></div>
+              <div className="code-line line-del"><span className="line-num" style={{color:'#f85149'}}>-</span><span>{'  items.forEach(i => total + i.price);'}</span></div>
+              <div className="code-line line-add"><span className="line-num" style={{color:'#3fb950'}}>+</span><span>{'  items.forEach(i => total += i.price);'}</span></div>
+              <div className="code-line line-neutral"><span className="line-num">5</span><span>{'  return total;'}</span></div>
+              <div className="code-line line-neutral"><span className="line-num">6</span><span>{'}'}</span></div>
+            </div>
+          </div>
+          <div className="demo-alert">
+            <div className="alert-icon">🛡️</div>
+            <div className="alert-title">CRITICAL: Logic Bug Found</div>
+            <div className="alert-badge">MERGE BLOCKED</div>
+          </div>
+        </div>
+        <div className="demo-features">
+          <div className="demo-feature">
+            <h3>Inline Code Suggestions</h3>
+            <p>See exactly where improvements can be made directly in your diff view with one-click commit suggestions.</p>
+          </div>
+          <div className="demo-feature">
+            <h3>Automated Security Checks</h3>
+            <p>Block merges that contain critical vulnerabilities automatically, ensuring you never ship insecure code.</p>
+          </div>
+        </div>
+      </section>
 
-        <Card size="4" className="cta-card">
-          <Flex direction="column" gap="3" align="start">
-            <Heading size="8" style={{ color: '#f8fafc', letterSpacing: '-0.02em' }}>
-              Start with trusted PR review. Expand with policy intelligence.
-            </Heading>
-            <Text size="3" style={{ color: '#cbd5e1', maxWidth: 760, lineHeight: 1.75 }}>
-              Deploy quickly today and scale into richer workspace policy and operational controls as your team grows.
-            </Text>
-            <Button asChild size="3" color="gray" variant="solid">
-              <a
-                href="https://github.com/sarthakagrawal927/code-reviewer-action"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Open GitHub Project
-              </a>
-            </Button>
-          </Flex>
-        </Card>
-
-        <Box pt="5" pb="6">
-          <Text size="2" color="gray">
-            © {year} Sarthak AI Code Reviewer
-          </Text>
-        </Box>
-      </Container>
-    </Box>
+      <footer className="footer">
+        <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
+          <div className="nav-logo-icon" style={{width:22,height:22,fontSize:'0.6rem'}}>CR</div>
+          <span style={{fontSize:'0.875rem',fontWeight:600}}>CodeReviewAI</span>
+        </div>
+        <span className="footer-copy">© 2026 CodeReviewAI Inc. All rights reserved.</span>
+        <div className="footer-links">
+          <a href="#">Twitter</a>
+          <a href="#">GitHub</a>
+          <a href="#">Docs</a>
+        </div>
+      </footer>
+    </>
   );
 }

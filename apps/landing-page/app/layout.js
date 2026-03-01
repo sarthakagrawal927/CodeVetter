@@ -1,25 +1,14 @@
-import { Theme } from "@radix-ui/themes";
-import "@radix-ui/themes/styles.css";
-import "./globals.css";
+import './globals.css';
 
 export const metadata = {
-  title: "Sarthak AI Code Reviewer",
-  description:
-    "Sarthak AI Code Reviewer reviews pull requests with practical, inline feedback and policy-aware CI gating.",
-  icons: {
-    icon: "/favicon.ico",
-    apple: "/apple-touch-icon.png",
-  },
+  title: 'CodeReviewAI — Review Code 10x Faster with AI',
+  description: 'Automate code quality checks and security scanning directly in your GitHub PR workflow.',
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body>
-        <Theme appearance="dark" accentColor="blue" grayColor="slate" radius="large" scaling="100%">
-          {children}
-        </Theme>
-      </body>
+    <html lang="en">
+      <body>{children}</body>
     </html>
   );
 }
