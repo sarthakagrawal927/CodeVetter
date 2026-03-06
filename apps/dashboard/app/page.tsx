@@ -28,9 +28,9 @@ const productPillars = [
 ];
 
 const coreSignals = [
-  { label: 'Active Workspaces', value: '128' },
-  { label: 'Review Runs', value: '2.4k' },
-  { label: 'Policy Blocks', value: '412' }
+  { label: 'Active Workspaces', value: '\u2014' },
+  { label: 'Review Runs', value: '\u2014' },
+  { label: 'Policy Blocks', value: '\u2014' }
 ];
 
 export default function HomePage() {
