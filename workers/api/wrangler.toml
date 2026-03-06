@@ -3,13 +3,18 @@ main = "src/index.ts"
 compatibility_date = "2026-02-22"
 compatibility_flags = ["nodejs_compat"]
 
+routes = [
+  { pattern = "api.codevetter.com", zone_name = "codevetter.com", custom_domain = true }
+]
+
 [observability]
 enabled = true
 
 # Non-secret defaults (override per-environment as needed)
 [vars]
-APP_BASE_URL = "https://your-dashboard.vercel.app"
-API_WORKER_CORS_ORIGIN = "https://your-dashboard.vercel.app"
+APP_BASE_URL = "https://app.codevetter.com"
+API_WORKER_CORS_ORIGIN = "https://app.codevetter.com"
+SESSION_COOKIE_DOMAIN = ".codevetter.com"
 GITHUB_API_BASE_URL = "https://api.github.com"
 SESSION_TTL_HOURS = "168"
 RATE_LIMIT_WINDOW_MS = "60000"

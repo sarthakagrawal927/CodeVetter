@@ -56,7 +56,7 @@ export class PostgresQueueAdapter implements JobQueueAdapter {
          SET status = 'processing', started_at = NOW()
        WHERE id IN (
          SELECT id FROM review_runs
-         WHERE status = 'pending'
+         WHERE status = 'queued'
          -- ORDER BY id gives consistent claim ordering; for strict FIFO
          -- add a created_at column and ORDER BY created_at, id
          ORDER BY id
@@ -96,7 +96,7 @@ export class PostgresQueueAdapter implements JobQueueAdapter {
          SET status = 'processing', started_at = NOW()
        WHERE id IN (
          SELECT id FROM indexing_runs
-         WHERE status = 'pending'
+         WHERE status = 'queued'
          -- ORDER BY id gives consistent claim ordering; for strict FIFO
          -- add a created_at column and ORDER BY created_at, id
          ORDER BY id

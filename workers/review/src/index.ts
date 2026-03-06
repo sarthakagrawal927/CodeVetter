@@ -1,137 +1,90 @@
 import { createControlPlaneDatabase } from '@code-reviewer/db';
-import { loadReviewWorkerConfig, ReviewWorkerConfig } from './config';
 import { handleJob } from './handlers';
-import { createDefaultSeedJobs, InMemoryQueueAdapter, PostgresQueueAdapter } from './queue';
+import { PostgresQueueAdapter } from './queue';
+import { ReviewWorkerConfig } from './config';
 
-function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+type Env = {
+  COCKROACH_DATABASE_URL?: string;
+  GITHUB_API_BASE_URL?: string;
+  GITHUB_APP_ID?: string;
+  GITHUB_APP_PRIVATE_KEY?: string;
+  AI_GATEWAY_BASE_URL?: string;
+  AI_GATEWAY_API_KEY?: string;
+  AI_GATEWAY_MODEL?: string;
+  REVIEW_WORKER_MAX_RETRIES?: string;
+  INDEX_MAX_FILE_BYTES?: string;
+  INDEX_MAX_CHUNK_LINES?: string;
+};
 
-function computeBackoffMs(attempt: number, baseDelayMs: number, maxDelayMs: number): number {
-  const factor = 2 ** Math.max(0, attempt - 1);
-  return Math.min(maxDelayMs, baseDelayMs * factor);
-}
-
-async function processJobWithRetry(
-  job: Parameters<typeof handleJob>[0],
-  maxRetries: number,
-  maxIndexFileBytes: number,
-  indexChunkStrategy: 'tree-sitter',
-  indexMaxChunkLines: number,
-  retryBaseDelayMs: number,
-  retryMaxDelayMs: number,
-  workerConfig: ReviewWorkerConfig,
-  db?: ReturnType<typeof createControlPlaneDatabase>
-): Promise<void> {
-  let attempt = 0;
-
-  while (true) {
-    try {
-      await handleJob(job, {
-        maxIndexFileBytes,
-        indexChunkStrategy,
-        indexMaxChunkLines,
-        workerConfig,
-        db,
-      });
-      return;
-    } catch (error) {
-      if (attempt >= maxRetries) {
-        throw error;
-      }
-
-      attempt += 1;
-      const retryDelayMs = computeBackoffMs(attempt, retryBaseDelayMs, retryMaxDelayMs);
-      const message = error instanceof Error ? error.message : String(error);
-      console.warn(
-        `[worker-review] retry=${attempt}/${maxRetries} kind=${job.kind} ` +
-          `nextRetryInMs=${retryDelayMs} reason=${message}`
-      );
-      await delay(retryDelayMs);
-    }
-  }
-}
-
-async function run() {
-  const config = loadReviewWorkerConfig();
-  const queue = config.cockroachDatabaseUrl
-    ? new PostgresQueueAdapter(config.cockroachDatabaseUrl)
-    : new InMemoryQueueAdapter(createDefaultSeedJobs());
-
-  const db = config.cockroachDatabaseUrl
-    ? createControlPlaneDatabase({ cockroachDatabaseUrl: config.cockroachDatabaseUrl })
-    : undefined;
-
-  console.log(
-    `[worker-review] started pollIntervalMs=${config.pollIntervalMs} ` +
-      `maxIterations=${config.maxIterations} maxRetries=${config.maxRetries} ` +
-      `retryBaseMs=${config.retryBaseDelayMs} retryMaxMs=${config.retryMaxDelayMs} ` +
-      `reviewQueue=${config.reviewQueueName} indexingQueue=${config.indexingQueueName} ` +
-      `indexMaxFileBytes=${config.maxIndexFileBytes} ` +
-      `indexChunkStrategy=${config.indexChunkStrategy} indexMaxChunkLines=${config.indexMaxChunkLines} ` +
-      `aiGateway=${config.aiGatewayBaseUrl || 'unset'} ` +
-      `model=${config.aiGatewayModel} ` +
-      `db=${config.cockroachDatabaseUrl ? 'configured' : 'in-memory'} ` +
-      `githubApp=${config.githubAppId || 'unset'}`
-  );
-
-  const shutdown = async () => {
-    console.log('[worker-review] shutting down...');
-    if ('end' in queue && typeof (queue as { end?: () => Promise<void> }).end === 'function') {
-      await (queue as { end: () => Promise<void> }).end();
-    }
-    process.exit(0);
+function buildConfig(env: Env): ReviewWorkerConfig {
+  return {
+    pollIntervalMs: 2000,
+    maxIterations: 1,
+    maxRetries: Number(env.REVIEW_WORKER_MAX_RETRIES?.trim() || '3'),
+    retryBaseDelayMs: 1000,
+    retryMaxDelayMs: 30000,
+    maxIndexFileBytes: Number(env.INDEX_MAX_FILE_BYTES?.trim() || String(10 * 1024 * 1024)),
+    indexChunkStrategy: 'tree-sitter',
+    indexMaxChunkLines: Number(env.INDEX_MAX_CHUNK_LINES?.trim() || '220'),
+    reviewQueueName: 'review-jobs',
+    indexingQueueName: 'indexing-jobs',
+    cockroachDatabaseUrl: env.COCKROACH_DATABASE_URL?.trim() || undefined,
+    githubApiBaseUrl: env.GITHUB_API_BASE_URL?.trim() || 'https://api.github.com',
+    githubAppId: env.GITHUB_APP_ID?.trim() || undefined,
+    githubAppPrivateKey: env.GITHUB_APP_PRIVATE_KEY?.trim().replace(/\\n/g, '\n') || undefined,
+    aiGatewayBaseUrl: env.AI_GATEWAY_BASE_URL?.trim() || undefined,
+    aiGatewayApiKey: env.AI_GATEWAY_API_KEY?.trim() || undefined,
+    aiGatewayModel: env.AI_GATEWAY_MODEL?.trim() || 'auto',
   };
-  process.on('SIGTERM', () => { void shutdown(); });
-  process.on('SIGINT', () => { void shutdown(); });
+}
+
+async function processJobs(env: Env): Promise<void> {
+  const config = buildConfig(env);
+
+  if (!config.cockroachDatabaseUrl) {
+    console.error('[review-worker] COCKROACH_DATABASE_URL not set — skipping');
+    return;
+  }
+
+  const queue = new PostgresQueueAdapter(config.cockroachDatabaseUrl);
+  const db = createControlPlaneDatabase({ cockroachDatabaseUrl: config.cockroachDatabaseUrl });
 
   try {
-    for (let iteration = 1; iteration <= config.maxIterations; iteration += 1) {
-      const [indexingJobs, reviewJobs] = await Promise.all([
-        queue.pullIndexingJobs(5),
-        queue.pullReviewJobs(5),
-      ]);
-      const jobs = [...indexingJobs, ...reviewJobs];
+    const [indexingJobs, reviewJobs] = await Promise.all([
+      queue.pullIndexingJobs(5),
+      queue.pullReviewJobs(5),
+    ]);
+    const jobs = [...indexingJobs, ...reviewJobs];
 
-      if (jobs.length === 0) {
-        console.log(`[worker-review] iteration=${iteration} queue empty`);
-        await delay(config.pollIntervalMs);
-        continue;
+    if (jobs.length === 0) {
+      console.log('[review-worker] no queued jobs');
+      return;
+    }
+
+    console.log(`[review-worker] processing ${jobs.length} jobs`);
+
+    for (const job of jobs) {
+      try {
+        await handleJob(job, {
+          maxIndexFileBytes: config.maxIndexFileBytes,
+          indexChunkStrategy: config.indexChunkStrategy,
+          indexMaxChunkLines: config.indexMaxChunkLines,
+          workerConfig: config,
+          db,
+        });
+      } catch (err) {
+        console.error(
+          `[review-worker] job failed kind=${job.kind}: ${err instanceof Error ? err.message : String(err)}`
+        );
       }
-
-      console.log(`[worker-review] iteration=${iteration} pulled=${jobs.length}`);
-
-      for (const job of jobs) {
-        try {
-          await processJobWithRetry(
-            job,
-            config.maxRetries,
-            config.maxIndexFileBytes,
-            config.indexChunkStrategy,
-            config.indexMaxChunkLines,
-            config.retryBaseDelayMs,
-            config.retryMaxDelayMs,
-            config,
-            db
-          );
-        } catch (error) {
-          console.error(
-            `[worker-review] job failed kind=${job.kind} error=${
-              error instanceof Error ? error.message : String(error)
-            }`
-          );
-        }
-      }
-
-      await delay(config.pollIntervalMs);
     }
   } finally {
-    if ('end' in queue && typeof (queue as { end?: () => Promise<void> }).end === 'function') {
-      await (queue as { end: () => Promise<void> }).end();
-    }
+    await queue.end();
   }
-
-  console.log('[worker-review] max iterations reached, exiting.');
 }
 
-void run();
+export default {
+  async scheduled(_event: unknown, env: Env, ctx: { waitUntil: (p: Promise<unknown>) => void }): Promise<void> {
+    ctx.waitUntil(processJobs(env));
+  },
+};

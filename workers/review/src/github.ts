@@ -1,5 +1,3 @@
-import * as jwt from 'jsonwebtoken';
-
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type GitHubAppConfig = {
@@ -7,6 +5,43 @@ export type GitHubAppConfig = {
   privateKey: string;
   apiBaseUrl?: string;
 };
+
+// ── JWT helpers (Web Crypto — works in CF Workers and Node.js 20+) ─────────────
+
+function base64UrlEncode(data: Uint8Array | string): string {
+  const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function githubAppJwt(config: GitHubAppConfig): Promise<string> {
+  const now = Math.floor(Date.now() / 1000);
+  const header = base64UrlEncode(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const payload = base64UrlEncode(JSON.stringify({ iat: now - 60, exp: now + 600, iss: config.appId }));
+  const toSign = `${header}.${payload}`;
+
+  // Strip PEM armor and decode DER
+  const pem = config.privateKey
+    .replace(/-----BEGIN( RSA)? PRIVATE KEY-----/, '')
+    .replace(/-----END( RSA)? PRIVATE KEY-----/, '')
+    .replace(/\s+/g, '');
+  const keyBytes = Uint8Array.from(atob(pem), c => c.charCodeAt(0));
+
+  const key = await crypto.subtle.importKey(
+    'pkcs8',
+    keyBytes,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+
+  const sigBytes = new Uint8Array(
+    await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(toSign))
+  );
+
+  return `${toSign}.${base64UrlEncode(sigBytes)}`;
+}
 
 export type GitHubPrFile = {
   filename: string;
@@ -26,15 +61,6 @@ export type ReviewComment = {
 
 function normalizeBaseUrl(baseUrl: string | undefined): string {
   return (baseUrl || 'https://api.github.com').replace(/\/$/, '');
-}
-
-function githubAppJwt(config: GitHubAppConfig): string {
-  const now = Math.floor(Date.now() / 1000);
-  return jwt.sign(
-    { iat: now - 60, exp: now + 600, iss: config.appId },
-    config.privateKey,
-    { algorithm: 'RS256' }
-  );
 }
 
 async function githubFetch<T>(
@@ -77,7 +103,7 @@ export async function getInstallationToken(
   config: GitHubAppConfig,
   installationId: string
 ): Promise<string> {
-  const appToken = githubAppJwt(config);
+  const appToken = await githubAppJwt(config);
   const result = await githubFetch<{ token: string }>(
     `/app/installations/${encodeURIComponent(installationId)}/access_tokens`,
     appToken,

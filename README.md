@@ -90,6 +90,22 @@ Apply schema migrations:
 cockroach sql --url "$COCKROACH_DATABASE_URL" < packages/db/migrations/0001_init.sql
 ```
 
+## Deployment (Source of Truth)
+
+| Component | Platform | Project Name | Domain | Config File |
+|-----------|----------|-------------|--------|-------------|
+| **Dashboard** | Vercel | `dashboard` | app.codevetter.com | `apps/dashboard/.vercel/project.json` |
+| **Landing Page** | Vercel | `landing-page` | codevetter.com | `apps/landing-page/.vercel/project.json` |
+| **API Worker** | Cloudflare Workers | `code-reviewer-api` | api.codevetter.com | `workers/api/wrangler.toml` |
+| **Review Worker** | Cloudflare Workers | `code-reviewer-worker` | (cron, no public URL) | `workers/review/wrangler.toml` |
+| **Database** | CockroachDB | (managed) | — | via `COCKROACH_DATABASE_URL` secret |
+
+### Vercel Project Linkage
+
+Root `.vercel/project.json` points to `landing-page`. Dashboard and landing page are separate Vercel projects.
+
+> **Note:** The `dashboard` and `landing-page` Vercel projects belong to code-reviewer **only**. SaaS Maker has its own separate Vercel project (`saasmaker-dashboard`).
+
 ## Roadmap Docs
 
 - v0 details: `docs/v0-lite.md`

@@ -30,6 +30,7 @@ type ApiWorkerBindings = {
   API_WORKER_CORS_ORIGIN?: string;
   APP_BASE_URL?: string;
   SESSION_COOKIE_NAME?: string;
+  SESSION_COOKIE_DOMAIN?: string;
   SESSION_SECRET?: string;
   SESSION_TTL_HOURS?: string;
   RATE_LIMIT_WINDOW_MS?: string;
@@ -922,11 +923,13 @@ app.get('/v1/auth/github/callback', async c => {
     c.req.header('user-agent') || undefined
   );
 
+  const cookieDomain = c.env.SESSION_COOKIE_DOMAIN?.trim() || undefined;
   setCookie(c, getSessionCookieName(c.env), sessionToken, {
     httpOnly: true,
     secure: true,
     sameSite: 'Lax',
     path: '/',
+    ...(cookieDomain ? { domain: cookieDomain } : {}),
     maxAge: getSessionTtlHours(c.env) * 3600
   });
 

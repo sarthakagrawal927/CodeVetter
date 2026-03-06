@@ -1438,102 +1438,360 @@ a {
   color: #9fb0ca;
 }
 
-.login-page {
+/* ─── Split Login Page ────────────────────────────────────────────────────── */
+
+.lsp-root {
+  display: flex;
   min-height: 100vh;
+}
+
+/* Left visual panel */
+.lsp-left {
+  flex: 0 0 58%;
+  width: 58%;
+  min-height: 100vh;
+  background: #010409;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 36px 52px;
+  overflow: hidden;
+  border-right: 1px solid #21262d;
+}
+
+.lsp-left::before {
+  content: '';
+  position: absolute;
+  inset: 0;
   background:
-    radial-gradient(circle at 100% 0%, rgb(59 130 246 / 22%), transparent 42%),
-    radial-gradient(circle at 0% 100%, rgb(30 64 175 / 20%), transparent 44%);
+    radial-gradient(ellipse 65% 55% at 85% 8%, rgba(56, 139, 253, 0.18) 0%, transparent 65%),
+    radial-gradient(ellipse 45% 40% at 15% 92%, rgba(188, 140, 255, 0.09) 0%, transparent 65%);
+  pointer-events: none;
 }
 
-.login-topbar {
-  background: rgb(10 16 30 / 74%);
+.lsp-left::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(56, 139, 253, 0.14) 1px, transparent 1px);
+  background-size: 28px 28px;
+  pointer-events: none;
 }
 
-.login-hero {
-  border-color: rgb(148 163 184 / 28%);
-  background:
-    radial-gradient(circle at 100% 0%, rgb(30 64 175 / 20%), transparent 48%),
-    linear-gradient(180deg, #0f172a, #111f38);
+.lsp-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
 }
 
-.login-badge {
-  background: rgb(59 130 246 / 22%);
-  border: 1px solid rgb(96 165 250 / 45%);
-  color: #dbeafe;
+.lsp-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #388bfd, #1f6feb);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.03em;
+  flex-shrink: 0;
 }
 
-.login-title {
-  color: #f8fafc;
+.lsp-brand-text {
+  font-size: 16px;
+  font-weight: 700;
+  color: #e6edf3;
+  letter-spacing: -0.02em;
 }
 
-.login-copy {
-  color: #c9d6ea;
+/* Code window */
+.lsp-window {
+  position: relative;
+  z-index: 1;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  overflow: hidden;
+  max-width: 540px;
+  width: 100%;
+  margin: 0 auto;
+  box-shadow:
+    0 0 0 1px rgba(56, 139, 253, 0.08),
+    0 24px 64px rgba(1, 4, 9, 0.75),
+    0 0 100px rgba(56, 139, 253, 0.05);
 }
 
-.login-actions .login-primary-btn {
-  background: #f8fafc;
-  color: #111827;
-  border-color: #f8fafc;
+.lsp-win-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: #161b22;
+  border-bottom: 1px solid #21262d;
 }
 
-.login-actions .login-primary-btn:hover {
-  background: #e2e8f0;
-  border-color: #e2e8f0;
+.lsp-win-dots {
+  display: flex;
+  gap: 6px;
 }
 
-.login-actions .login-secondary-btn {
-  background: rgb(30 41 59 / 74%);
-  color: #dbeafe;
-  border: 1px solid rgb(148 163 184 / 34%);
+.lsp-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  opacity: 0.85;
 }
 
-.login-actions .login-secondary-btn:hover {
-  background: rgb(51 65 85 / 72%);
+.lsp-win-title {
+  font-size: 11px;
+  color: #6e7681;
+  font-family: var(--font-mono);
+  margin-left: 4px;
 }
 
-.login-endpoints {
-  color: #9fb2cf;
+.lsp-win-body {
+  padding: 14px 0;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.75;
+  position: relative;
+  overflow: hidden;
 }
 
-.login-signal-card {
-  background: rgb(30 41 59 / 76%);
-  border: 1px solid rgb(148 163 184 / 28%);
+/* Scanning line */
+.lsp-win-body::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 5%, rgba(56, 139, 253, 0.7) 50%, transparent 95%);
+  box-shadow: 0 0 14px rgba(56, 139, 253, 0.5);
+  opacity: 0;
+  animation: lspScan 2s ease 1.2s forwards;
 }
 
-.login-signal-label {
-  color: #9fb2cf;
+@keyframes lspScan {
+  0%   { opacity: 1; top: 0; }
+  85%  { opacity: 0.8; }
+  100% { opacity: 0; top: 100%; }
 }
 
-.login-signal-value {
-  color: #f8fafc;
+.lsp-line {
+  display: flex;
+  align-items: baseline;
+  padding: 1px 16px;
+  opacity: 0;
+  animation: lspLineIn 0.3s ease forwards;
+  animation-delay: calc(var(--i) * 0.16s);
 }
 
-.login-feature-card {
-  background: rgb(15 23 42 / 68%);
-  border: 1px solid rgb(148 163 184 / 24%);
+@keyframes lspLineIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 
-.login-feature-title {
-  color: #eaf1ff;
+.lsp-ctx { background: transparent; }
+.lsp-add { background: rgba(63, 185, 80, 0.07); }
+.lsp-rm  { background: rgba(248, 81, 73, 0.07); }
+
+.lsp-ln {
+  min-width: 30px;
+  color: #4d5566;
+  font-size: 11px;
+  text-align: right;
+  padding-right: 14px;
+  user-select: none;
+  flex-shrink: 0;
 }
 
-.login-feature-copy {
-  color: #a3b3cd;
+.lsp-code  { color: #c9d1d9; }
+.lsp-kw    { color: #ff7b72; }
+.lsp-fn    { color: #d2a8ff; }
+.lsp-ty    { color: #79c0ff; }
+.lsp-id    { color: #e6edf3; }
+.lsp-pn    { color: #8b949e; }
+.lsp-op    { color: #ff7b72; }
+.lsp-str   { color: #a5d6ff; }
+
+.lsp-diff-mark {
+  margin-right: 6px;
+  font-weight: 700;
+  user-select: none;
+}
+.lsp-add-mark { color: #3fb950; }
+.lsp-rm-mark  { color: #f85149; }
+
+/* Annotations */
+.lsp-annotations {
+  padding: 12px 16px;
+  border-top: 1px solid #21262d;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.login-trust-card {
-  background: rgb(10 16 30 / 82%);
-  border: 1px solid rgb(148 163 184 / 20%);
+.lsp-ann {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-family: var(--font-body);
+  opacity: 0;
+  animation: lspAnnIn 0.4s ease forwards;
 }
 
-.login-trust-label {
-  color: #9fb1cc;
-  letter-spacing: 0.07em;
+.lsp-ann-ok   { color: #3fb950; animation-delay: 2.6s; }
+.lsp-ann-info { color: #388bfd; animation-delay: 3.0s; }
+
+@keyframes lspAnnIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.lsp-code-inline {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: rgba(56, 139, 253, 0.12);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: #79c0ff;
+}
+
+/* Stats */
+.lsp-stats {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  position: relative;
+  z-index: 1;
+}
+
+.lsp-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.lsp-stat-val {
+  font-size: 22px;
+  font-weight: 700;
+  color: #e6edf3;
+  letter-spacing: -0.04em;
+  font-family: var(--font-mono);
+}
+
+.lsp-stat-label {
+  font-size: 11px;
+  color: #6e7681;
   text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 600;
 }
 
-.login-trust-copy {
-  color: #c7d4e8;
+.lsp-stat-sep {
+  width: 1px;
+  height: 34px;
+  background: #21262d;
+}
+
+/* Right auth panel */
+.lsp-right {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0d1117;
+  padding: 40px 32px;
+}
+
+.lsp-auth-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 320px;
+  width: 100%;
+}
+
+.lsp-auth-mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #388bfd, #1f6feb);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.03em;
+  margin-bottom: 22px;
+  box-shadow:
+    0 0 0 6px rgba(56, 139, 253, 0.12),
+    0 8px 28px rgba(56, 139, 253, 0.25);
+}
+
+.lsp-auth-title {
+  font-size: 27px;
+  font-weight: 700;
+  color: #e6edf3;
+  letter-spacing: -0.03em;
+  margin: 0 0 10px;
+}
+
+.lsp-auth-sub {
+  font-size: 14px;
+  color: #6e7681;
+  line-height: 1.6;
+  margin: 0 0 36px;
+}
+
+.lsp-github-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 13px 24px;
+  background: #e6edf3;
+  color: #0d1117;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  margin-bottom: 18px;
+}
+
+.lsp-github-btn:hover {
+  background: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+
+.lsp-back {
+  font-size: 13px;
+  color: #484f58;
+  text-decoration: none;
+  transition: color 140ms ease;
+}
+
+.lsp-back:hover {
+  color: #8b949e;
+}
+
+@media (max-width: 768px) {
+  .lsp-root { flex-direction: column; }
+  .lsp-left { flex: none; width: 100%; min-height: 55vh; padding: 28px 24px; }
+  .lsp-right { min-height: 45vh; }
 }
 
 .grid {
