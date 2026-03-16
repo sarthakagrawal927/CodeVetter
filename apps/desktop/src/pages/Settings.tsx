@@ -1,0 +1,800 @@
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import CostDashboard from "@/components/cost-dashboard";
+import {
+  getPreference,
+  setPreference,
+  isTauriAvailable,
+  checkGitHubAuth,
+  syncGitHubToken,
+  checkLinearConnection,
+  startLinearOAuth,
+  disconnectLinear,
+} from "@/lib/tauri-ipc";
+import type { GitHubAuthStatus, LinearUser } from "@/lib/tauri-ipc";
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface ToggleProps {
+  label: string;
+  description: string;
+  enabled: boolean;
+  onToggle: () => void;
+}
+
+interface SelectProps {
+  label: string;
+  description: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+}
+
+interface TextInputProps {
+  label: string;
+  description: string;
+  value: string;
+  placeholder: string;
+  mono?: boolean;
+  onChange: (value: string) => void;
+}
+
+// ─── Reusable setting controls ───────────────────────────────────────────────
+
+function Toggle({ label, description, enabled, onToggle }: ToggleProps) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-3">
+      <div>
+        <p className="text-sm font-medium text-slate-200">{label}</p>
+        <p className="text-xs text-slate-500 mt-0.5">{description}</p>
+      </div>
+      <button
+        onClick={onToggle}
+        className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${
+          enabled ? "bg-amber-500" : "bg-[#1a1d27]"
+        }`}
+      >
+        <span
+          className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${
+            enabled ? "left-5" : "left-1"
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
+function SelectSetting({
+  label,
+  description,
+  value,
+  options,
+  onChange,
+}: SelectProps) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-3">
+      <div>
+        <p className="text-sm font-medium text-slate-200">{label}</p>
+        <p className="text-xs text-slate-500 mt-0.5">{description}</p>
+      </div>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-1.5 text-sm text-slate-200 outline-none focus:border-amber-500/50"
+      >
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function TextInputSetting({
+  label,
+  description,
+  value,
+  placeholder,
+  mono,
+  onChange,
+}: TextInputProps) {
+  return (
+    <div className="flex flex-col gap-1.5 py-3">
+      <p className="text-sm font-medium text-slate-200">{label}</p>
+      <p className="text-xs text-slate-500">{description}</p>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={`mt-1 rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-amber-500/50 ${
+          mono ? "mono" : ""
+        }`}
+      />
+    </div>
+  );
+}
+
+function Divider() {
+  return <div className="border-t border-[#1e2231]" />;
+}
+
+// ─── Preference hook ────────────────────────────────────────────────────────
+
+function usePref(key: string, defaultValue: string) {
+  const [value, setValue] = useState(defaultValue);
+
+  useEffect(() => {
+    if (!isTauriAvailable()) return;
+    getPreference(key).then((v) => {
+      if (v != null) setValue(v);
+    }).catch(() => {});
+  }, [key]);
+
+  const update = useCallback(
+    (newValue: string) => {
+      setValue(newValue);
+      if (isTauriAvailable()) {
+        setPreference(key, newValue).catch(() => {});
+      }
+    },
+    [key]
+  );
+
+  return [value, update] as const;
+}
+
+function useBoolPref(key: string, defaultValue: boolean) {
+  const [raw, setRaw] = usePref(key, defaultValue ? "true" : "false");
+  const value = raw === "true";
+  const toggle = useCallback(() => setRaw(value ? "false" : "true"), [value, setRaw]);
+  return [value, toggle] as const;
+}
+
+// ─── GitHub Connection Panel ─────────────────────────────────────────────────
+
+function GitHubConnectionPanel() {
+  const [status, setStatus] = useState<GitHubAuthStatus | null>(null);
+  const [checking, setChecking] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [showManualToken, setShowManualToken] = useState(false);
+  const [manualToken, setManualToken] = usePref("github_token", "");
+  const [error, setError] = useState<string | null>(null);
+
+  const checkAuth = useCallback(async () => {
+    if (!isTauriAvailable()) {
+      setChecking(false);
+      return;
+    }
+    setChecking(true);
+    try {
+      const result = await checkGitHubAuth();
+      setStatus(result);
+    } catch {
+      setStatus(null);
+    } finally {
+      setChecking(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
+  async function handleSync() {
+    setSyncing(true);
+    setError(null);
+    try {
+      const result = await syncGitHubToken();
+      if (result.synced) {
+        await checkAuth();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function handleSaveToken() {
+    setError(null);
+    // Token is already saved via usePref. Just re-check auth.
+    await checkAuth();
+    setShowManualToken(false);
+  }
+
+  const methodLabels: Record<string, string> = {
+    pat: "Personal Access Token",
+    env: "Environment Variable",
+    gh_cli: "GitHub CLI (gh)",
+  };
+
+  return (
+    <div className="py-3">
+      <div className="rounded-lg border border-[#1e2231] bg-[#0f1117] p-4">
+        {checking ? (
+          <div className="flex items-center gap-2">
+            <div className="h-3 w-3 animate-pulse rounded-full bg-slate-600" />
+            <span className="text-sm text-slate-400">Checking GitHub connection...</span>
+          </div>
+        ) : status?.connected ? (
+          <>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/10">
+                  <svg className="h-4 w-4 text-emerald-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-200">
+                    Connected as <span className="text-emerald-400">{status.username}</span>
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    via {methodLabels[status.method ?? ""] ?? status.method}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={checkAuth}
+                className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                Refresh
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-500/10">
+                <svg className="h-4 w-4 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-200">GitHub not connected</p>
+                <p className="text-[11px] text-slate-500">
+                  Required for PR reviews and fetching pull request details
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={handleSync}
+                disabled={syncing}
+                className="flex items-center justify-center gap-2 rounded-lg bg-[#24292e] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#2f363d] disabled:opacity-50"
+              >
+                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                </svg>
+                {syncing ? "Connecting..." : "Connect with GitHub CLI (gh)"}
+              </button>
+              <p className="text-[11px] text-slate-600 text-center">
+                Uses your existing <span className="mono">gh auth</span> session
+              </p>
+
+              <button
+                onClick={() => setShowManualToken(!showManualToken)}
+                className="text-xs text-amber-400 hover:text-amber-300 transition-colors self-center mt-1"
+              >
+                {showManualToken ? "Hide" : "Or enter a token manually"}
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* Manual token input (shown on demand or if PAT method) */}
+        {(showManualToken || (status?.connected && status?.method === "pat")) && (
+          <div className="mt-3 pt-3 border-t border-[#1e2231]">
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-medium text-slate-400">Personal Access Token</label>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={manualToken}
+                  onChange={(e) => setManualToken(e.target.value)}
+                  placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  className="mono flex-1 rounded-lg border border-[#1e2231] bg-[#0a0c12] px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-amber-500/50"
+                />
+                <button
+                  onClick={handleSaveToken}
+                  className="rounded-lg bg-amber-500 px-4 py-2 text-xs font-medium text-white hover:bg-amber-600 transition-colors"
+                >
+                  Save
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                Needs <span className="mono">repo</span> scope for private repos.{" "}
+                <span className="mono">public_repo</span> is enough for public repos.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-3 rounded-md bg-red-500/5 border border-red-500/20 px-3 py-2">
+            <p className="text-xs text-red-400">{error}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Linear Connection Panel ─────────────────────────────────────────────────
+
+function LinearConnectionPanel() {
+  const [connected, setConnected] = useState(false);
+  const [user, setUser] = useState<LinearUser | null>(null);
+  const [checking, setChecking] = useState(true);
+  const [connecting, setConnecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const checkConnection = useCallback(async () => {
+    if (!isTauriAvailable()) {
+      setChecking(false);
+      return;
+    }
+    setChecking(true);
+    try {
+      const result = await checkLinearConnection();
+      setConnected(result.connected);
+      setUser(result.user ?? null);
+    } catch {
+      setConnected(false);
+      setUser(null);
+    } finally {
+      setChecking(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkConnection();
+  }, [checkConnection]);
+
+  async function handleConnect() {
+    setConnecting(true);
+    setError(null);
+    try {
+      const result = await startLinearOAuth();
+      if (result.success) {
+        await checkConnection();
+      } else {
+        setError(result.error ?? "OAuth flow failed");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setConnecting(false);
+    }
+  }
+
+  async function handleDisconnect() {
+    try {
+      await disconnectLinear();
+      setConnected(false);
+      setUser(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  return (
+    <div className="py-3">
+      <div className="rounded-lg border border-[#1e2231] bg-[#0f1117] p-4">
+        {checking ? (
+          <div className="flex items-center gap-2">
+            <div className="h-3 w-3 animate-pulse rounded-full bg-slate-600" />
+            <span className="text-sm text-slate-400">Checking Linear connection...</span>
+          </div>
+        ) : connected ? (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#5E6AD2]/10">
+                <svg className="h-4 w-4 text-[#5E6AD2]" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-200">
+                  Connected as <span className="text-[#5E6AD2]">{user?.name ?? user?.email ?? "Linear user"}</span>
+                </p>
+                {user?.email && (
+                  <p className="text-[11px] text-slate-500">{user.email}</p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={handleDisconnect}
+              className="text-xs text-slate-500 hover:text-red-400 transition-colors"
+            >
+              Disconnect
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#5E6AD2]/10">
+                <svg className="h-4 w-4 text-[#5E6AD2]" viewBox="0 0 100 100" fill="currentColor">
+                  <path d="M20 65 L50 20 L80 65 L65 65 L50 40 L35 65 Z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-200">Linear not connected</p>
+                <p className="text-[11px] text-slate-500">
+                  Connect to import issues as agent tasks
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleConnect}
+              disabled={connecting}
+              className="flex items-center justify-center gap-2 rounded-lg bg-[#5E6AD2] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#4C5ABF] disabled:opacity-50 w-full"
+            >
+              {connecting ? "Connecting..." : "Connect Linear"}
+            </button>
+          </>
+        )}
+
+        {error && (
+          <div className="mt-3 rounded-md bg-red-500/5 border border-red-500/20 px-3 py-2">
+            <p className="text-xs text-red-400">{error}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Categories ──────────────────────────────────────────────────────────────
+
+type Category = "general" | "appearance" | "integrations" | "agents" | "notifications" | "usage";
+
+interface CategoryDef {
+  key: Category;
+  label: string;
+  icon: string;
+}
+
+const categories: CategoryDef[] = [
+  { key: "general", label: "General", icon: "\u2302" },
+  { key: "appearance", label: "Appearance", icon: "\u25E8" },
+  { key: "integrations", label: "Integrations", icon: "\u2687" },
+  { key: "agents", label: "Agents", icon: "\u2699" },
+  { key: "notifications", label: "Notifications", icon: "\u2709" },
+  { key: "usage", label: "Usage", icon: "\u2261" },
+];
+
+// ─── Page ────────────────────────────────────────────────────────────────────
+
+export default function Settings() {
+  const navigate = useNavigate();
+  const [activeCategory, setActiveCategory] = useState<Category>("general");
+
+  // General
+  const [defaultTone, setDefaultTone] = usePref("review_tone", "thorough");
+  const [autoIndex, toggleAutoIndex] = useBoolPref("auto_index_on_launch", true);
+  const [indexInterval, setIndexInterval] = usePref("index_interval", "5");
+
+  // Appearance
+  const [compactMode, toggleCompactMode] = useBoolPref("compact_mode", false);
+  const [showLineNumbers, toggleShowLineNumbers] = useBoolPref("show_line_numbers", true);
+  const [showCosts, toggleShowCosts] = useBoolPref("show_costs", true);
+
+  // Agent defaults
+  const [defaultAdapter, setDefaultAdapter] = usePref("default_adapter", "claude-code");
+  const [defaultRole, setDefaultRole] = usePref("default_role", "coder");
+  const [maxConcurrentAgents, setMaxConcurrentAgents] = usePref("max_concurrent_agents", "3");
+
+  // Paths
+  const [claudeCodePath, setClaudeCodePath] = usePref("claude_cli_path", "");
+  const [codexPath, setCodexPath] = usePref("codex_cli_path", "");
+
+  // Notifications
+  const [notifyReviewDone, toggleNotifyReviewDone] = useBoolPref("notify_review_done", true);
+  const [notifyAgentError, toggleNotifyAgentError] = useBoolPref("notify_agent_error", true);
+  const [notifyTaskComplete, toggleNotifyTaskComplete] = useBoolPref("notify_task_complete", false);
+
+  function renderContent() {
+    switch (activeCategory) {
+      case "general":
+        return (
+          <div className="flex flex-col">
+            <CategoryTitle
+              title="General"
+              description="Review defaults and indexing behavior."
+            />
+            <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-6">
+              <SelectSetting
+                label="Default Review Tone"
+                description="The default tone used when starting a new review."
+                value={defaultTone}
+                options={[
+                  { value: "concise", label: "Concise" },
+                  { value: "thorough", label: "Thorough" },
+                  { value: "mentoring", label: "Mentoring" },
+                  { value: "strict", label: "Strict" },
+                ]}
+                onChange={setDefaultTone}
+              />
+
+              <Divider />
+
+              <Toggle
+                label="Auto-index Sessions"
+                description="Automatically scan for new Claude Code and Codex sessions."
+                enabled={autoIndex}
+                onToggle={toggleAutoIndex}
+              />
+
+              {autoIndex && (
+                <>
+                  <Divider />
+                  <SelectSetting
+                    label="Index Interval"
+                    description="How often to scan for new sessions (in minutes)."
+                    value={indexInterval}
+                    options={[
+                      { value: "1", label: "1 minute" },
+                      { value: "5", label: "5 minutes" },
+                      { value: "15", label: "15 minutes" },
+                      { value: "30", label: "30 minutes" },
+                    ]}
+                    onChange={setIndexInterval}
+                  />
+                </>
+              )}
+            </div>
+          </div>
+        );
+
+      case "appearance":
+        return (
+          <div className="flex flex-col">
+            <CategoryTitle
+              title="Appearance"
+              description="Visual display and layout preferences."
+            />
+            <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-6">
+              <Toggle
+                label="Compact Mode"
+                description="Reduce spacing and card sizes for denser information display."
+                enabled={compactMode}
+                onToggle={toggleCompactMode}
+              />
+
+              <Divider />
+
+              <Toggle
+                label="Show Line Numbers"
+                description="Display line numbers in code blocks and finding references."
+                enabled={showLineNumbers}
+                onToggle={toggleShowLineNumbers}
+              />
+
+              <Divider />
+
+              <Toggle
+                label="Show Costs"
+                description="Display estimated costs on session cards and the home dashboard."
+                enabled={showCosts}
+                onToggle={toggleShowCosts}
+              />
+            </div>
+          </div>
+        );
+
+      case "integrations":
+        return (
+          <div className="flex flex-col">
+            <CategoryTitle
+              title="Integrations"
+              description="Connect external services to enhance your workflow."
+            />
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+              GitHub
+            </h3>
+            <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-6">
+              <GitHubConnectionPanel />
+            </div>
+
+            <h3 className="mt-6 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Linear
+            </h3>
+            <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-6">
+              <LinearConnectionPanel />
+            </div>
+          </div>
+        );
+
+      case "agents":
+        return (
+          <div className="flex flex-col">
+            <CategoryTitle
+              title="Agents"
+              description="Default configuration for agent launches and CLI paths."
+            />
+            <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-6">
+              <SelectSetting
+                label="Default Adapter"
+                description="Preferred AI agent adapter for new launches."
+                value={defaultAdapter}
+                options={[
+                  { value: "claude-code", label: "Claude Code" },
+                  { value: "codex", label: "Codex" },
+                ]}
+                onChange={setDefaultAdapter}
+              />
+
+              <Divider />
+
+              <SelectSetting
+                label="Default Role"
+                description="Default role assigned to newly launched agents."
+                value={defaultRole}
+                options={[
+                  { value: "coder", label: "Coder" },
+                  { value: "reviewer", label: "Reviewer" },
+                  { value: "planner", label: "Planner" },
+                  { value: "debugger", label: "Debugger" },
+                ]}
+                onChange={setDefaultRole}
+              />
+
+              <Divider />
+
+              <SelectSetting
+                label="Max Concurrent Agents"
+                description="Maximum number of agents that can run simultaneously."
+                value={maxConcurrentAgents}
+                options={[
+                  { value: "1", label: "1" },
+                  { value: "2", label: "2" },
+                  { value: "3", label: "3" },
+                  { value: "5", label: "5" },
+                  { value: "10", label: "10" },
+                ]}
+                onChange={setMaxConcurrentAgents}
+              />
+            </div>
+
+            <h3 className="mt-6 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+              CLI Paths
+            </h3>
+            <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-6">
+              <TextInputSetting
+                label="Claude Code CLI"
+                description="Path to the Claude Code CLI binary. Leave empty for auto-detection."
+                value={claudeCodePath}
+                placeholder="/usr/local/bin/claude"
+                mono
+                onChange={setClaudeCodePath}
+              />
+
+              <Divider />
+
+              <TextInputSetting
+                label="Codex CLI"
+                description="Path to the Codex CLI binary. Leave empty for auto-detection."
+                value={codexPath}
+                placeholder="/usr/local/bin/codex"
+                mono
+                onChange={setCodexPath}
+              />
+            </div>
+          </div>
+        );
+
+      case "notifications":
+        return (
+          <div className="flex flex-col">
+            <CategoryTitle
+              title="Notifications"
+              description="Control which events trigger desktop notifications."
+            />
+            <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-6">
+              <Toggle
+                label="Review Completed"
+                description="Show a notification when a code review finishes."
+                enabled={notifyReviewDone}
+                onToggle={toggleNotifyReviewDone}
+              />
+
+              <Divider />
+
+              <Toggle
+                label="Agent Error"
+                description="Notify when an agent encounters an error or crashes."
+                enabled={notifyAgentError}
+                onToggle={toggleNotifyAgentError}
+              />
+
+              <Divider />
+
+              <Toggle
+                label="Task Completed"
+                description="Notify when an agent finishes a task."
+                enabled={notifyTaskComplete}
+                onToggle={toggleNotifyTaskComplete}
+              />
+            </div>
+          </div>
+        );
+
+      case "usage":
+        return (
+          <div className="flex flex-col">
+            <CategoryTitle
+              title="Usage"
+              description="Token usage and cost breakdown across sessions."
+            />
+            <CostDashboard />
+          </div>
+        );
+    }
+  }
+
+  return (
+    <div className="flex h-full">
+      {/* Sidebar */}
+      <nav className="flex w-48 shrink-0 flex-col border-r border-[#1e2231] bg-[#0f1117] py-6 px-3">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-1.5 px-2 mb-4 text-[12px] text-slate-500 hover:text-slate-200 transition-colors"
+        >
+          <span className="text-sm">{"\u2190"}</span>
+          Back
+        </button>
+        <h1 className="mb-6 px-2 text-lg font-bold text-slate-100">Settings</h1>
+        <div className="flex flex-col gap-0.5">
+          {categories.map((cat) => {
+            const active = activeCategory === cat.key;
+            return (
+              <button
+                key={cat.key}
+                onClick={() => setActiveCategory(cat.key)}
+                className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors text-left ${
+                  active
+                    ? "bg-amber-500/10 text-amber-400"
+                    : "text-slate-500 hover:bg-[#1a1d27] hover:text-slate-200"
+                }`}
+              >
+                <span className="w-4 text-center text-sm">{cat.icon}</span>
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-auto px-2">
+          <p className="text-[10px] text-slate-600">Settings are saved automatically.</p>
+        </div>
+      </nav>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-8">
+        <div className="max-w-xl">{renderContent()}</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Category Title ──────────────────────────────────────────────────────────
+
+function CategoryTitle({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="mb-4">
+      <h2 className="text-base font-semibold text-slate-100">{title}</h2>
+      <p className="mt-0.5 text-sm text-slate-500">{description}</p>
+    </div>
+  );
+}
