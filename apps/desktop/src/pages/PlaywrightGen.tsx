@@ -43,7 +43,7 @@ export default function PlaywrightGen() {
   // Workflow state
   const [step, setStep] = useState<Step>("input");
   const [error, setError] = useState<string | null>(null);
-  const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
+  const [, setActiveRequestId] = useState<string | null>(null);
 
   // Generation state
   const [progressLines, setProgressLines] = useState<string[]>([]);

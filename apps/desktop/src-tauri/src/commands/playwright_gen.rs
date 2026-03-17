@@ -559,7 +559,11 @@ fn parse_playwright_json_output(stdout: &str) -> Vec<PlaywrightTestResult> {
                     // Get duration and error from the tests array
                     let mut duration_ms = 0.0;
                     let mut error = None;
-                    let mut status = if ok { "passed" } else { "failed" };
+                    let mut status = if ok {
+                        "passed".to_string()
+                    } else {
+                        "failed".to_string()
+                    };
 
                     if let Some(tests) = spec.get("tests").and_then(|v| v.as_array()) {
                         for test in tests {
@@ -575,7 +579,7 @@ fn parse_playwright_json_output(stdout: &str) -> Vec<PlaywrightTestResult> {
                                     if let Some(s) =
                                         result.get("status").and_then(|v| v.as_str())
                                     {
-                                        status = s;
+                                        status = s.to_string();
                                     }
 
                                     if let Some(err) = result.get("error") {
@@ -591,7 +595,7 @@ fn parse_playwright_json_output(stdout: &str) -> Vec<PlaywrightTestResult> {
 
                     results.push(PlaywrightTestResult {
                         name,
-                        status: status.to_string(),
+                        status,
                         duration_ms,
                         error,
                     });
