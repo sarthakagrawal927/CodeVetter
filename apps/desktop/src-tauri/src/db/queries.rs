@@ -740,7 +740,7 @@ pub fn create_agent_task(
             input.description,
             input.acceptance_criteria,
             input.project_path,
-            input.status.as_deref().unwrap_or("backlog"),
+            input.status.as_deref().unwrap_or("todo"),
             now,
             now,
         ],

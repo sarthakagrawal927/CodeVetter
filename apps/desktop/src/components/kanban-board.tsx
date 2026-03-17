@@ -63,7 +63,14 @@ export default function KanbanBoard({ tasks, onTaskClick, onAddTask }: KanbanBoa
   return (
     <div className="grid grid-cols-4 gap-3">
       {columns.map((col) => {
-        const colTasks = tasks.filter((t) => t.status === col.id);
+        const colTasks = tasks.filter((t) => {
+          if (t.status === col.id) return true;
+          // Map legacy statuses to new columns
+          if (col.id === "todo" && (t.status === "backlog" || t.status === "pending")) return true;
+          if (col.id === "in_progress" && t.status === "in_progress") return true;
+          if (col.id === "in_review" && (t.status === "in_review" || t.status === "done")) return true;
+          return false;
+        });
         return (
           <div key={col.id} className="flex flex-col gap-2">
             {/* Column header */}
