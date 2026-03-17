@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import AgentCard from "@/components/agent-card";
 import KanbanBoard from "@/components/kanban-board";
 import ActivityFeed from "@/components/activity-feed";
+import ChatViewer from "@/components/chat-viewer";
 import DirectoryPicker from "@/components/directory-picker";
 import {
   listAgents,
@@ -13,6 +14,7 @@ import {
   listAgentPresets,
   createAgentPreset,
   deleteAgentPreset,
+  getSession,
   isTauriAvailable,
   onAgentStatusChanged,
   onActivityUpdate,
@@ -20,7 +22,7 @@ import {
   listLinearIssues,
   importLinearIssues,
 } from "@/lib/tauri-ipc";
-import type { AgentProcess, Task, ActivityEvent, AgentPreset, LinearIssue } from "@/lib/tauri-ipc";
+import type { AgentProcess, Task, ActivityEvent, AgentPreset, LinearIssue, SessionRow, MessageRow } from "@/lib/tauri-ipc";
 
 // ─── Create Task Modal ──────────────────────────────────────────────────────
 
@@ -696,6 +698,13 @@ export default function Agents() {
   const [linearConnected, setLinearConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Agent conversation panel state
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [agentSession, setAgentSession] = useState<SessionRow | null>(null);
+  const [agentMessages, setAgentMessages] = useState<MessageRow[]>([]);
+  const [agentMessagesLoading, setAgentMessagesLoading] = useState(false);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const loadPresets = useCallback(async () => {
     if (!isTauriAvailable()) return;
     try {
@@ -756,6 +765,61 @@ export default function Agents() {
       unlistenActivity?.();
     };
   }, [refresh, loadPresets]);
+
+  // ─── Load agent conversation when selected ──────────────────────────────
+
+  const selectedAgent = agents.find((a) => a.id === selectedAgentId) ?? null;
+
+  const loadAgentSession = useCallback(async (sessionId: string) => {
+    try {
+      const result = await getSession(sessionId);
+      setAgentSession(result.session);
+      setAgentMessages(result.messages);
+    } catch (err) {
+      console.error("Failed to load agent session:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Clean up previous polling
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+
+    if (!selectedAgent) {
+      setAgentSession(null);
+      setAgentMessages([]);
+      setAgentMessagesLoading(false);
+      return;
+    }
+
+    const sessionId = selectedAgent.session_id;
+    if (!sessionId) {
+      setAgentSession(null);
+      setAgentMessages([]);
+      setAgentMessagesLoading(false);
+      return;
+    }
+
+    // Initial load
+    setAgentMessagesLoading(true);
+    loadAgentSession(sessionId).finally(() => setAgentMessagesLoading(false));
+
+    // Poll every 5s if agent is running
+    if (selectedAgent.status === "running") {
+      pollIntervalRef.current = setInterval(() => {
+        loadAgentSession(sessionId);
+      }, 5000);
+    }
+
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, [selectedAgentId, selectedAgent?.session_id, selectedAgent?.status, loadAgentSession]);
 
   async function handleLaunch(
     adapter: string,
@@ -879,7 +943,13 @@ export default function Agents() {
                   <AgentCard
                     key={agent.id}
                     agent={agent}
+                    selected={selectedAgentId === agent.id}
                     onStop={handleStopAgent}
+                    onClick={() =>
+                      setSelectedAgentId(
+                        selectedAgentId === agent.id ? null : agent.id
+                      )
+                    }
                   />
                 ))
               )}
@@ -887,8 +957,8 @@ export default function Agents() {
           </div>
         </div>
 
-        {/* Center: Task Board */}
-        <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Center: Task Board + Activity Feed (shrinks when agent selected) */}
+        <div className={`flex flex-col overflow-hidden ${selectedAgentId ? "w-[320px] shrink-0 border-r border-[#1e2231]" : "flex-1"}`}>
           <div className="border-b border-[#1e2231] px-4 py-3">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
               Task Board ({tasks.length})
@@ -899,17 +969,84 @@ export default function Agents() {
           </div>
         </div>
 
-        {/* Right: Activity Feed */}
-        <div className="flex w-[300px] shrink-0 flex-col border-l border-[#1e2231]">
-          <div className="border-b border-[#1e2231] px-4 py-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Activity Feed
-            </h2>
+        {/* Right: Agent Conversation or Activity Feed */}
+        {selectedAgentId && selectedAgent ? (
+          <div className="flex flex-1 flex-col overflow-hidden">
+            {/* Conversation header */}
+            <div className="shrink-0 border-b border-[#1e2231] px-4 py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-semibold text-slate-200">
+                        {selectedAgent.display_name ?? `${selectedAgent.agent_type} agent`}
+                      </h3>
+                      {selectedAgent.status === "running" && (
+                        <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 pulse-dot" />
+                          Live
+                        </span>
+                      )}
+                      {selectedAgent.status !== "running" && (
+                        <span className="rounded-full bg-slate-500/10 px-2 py-0.5 text-[10px] font-medium text-slate-400">
+                          {selectedAgent.status}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[11px] text-slate-500 uppercase tracking-wide">
+                        {selectedAgent.agent_type}
+                        {selectedAgent.role ? ` / ${selectedAgent.role}` : ""}
+                      </span>
+                      {selectedAgent.project_path && (
+                        <span className="mono text-[11px] text-slate-600 truncate max-w-[300px]">
+                          {selectedAgent.project_path}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedAgentId(null)}
+                  className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-[#1a1d27] hover:text-slate-300"
+                  title="Close panel"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Conversation body */}
+            {!selectedAgent.session_id ? (
+              <div className="flex flex-1 flex-col items-center justify-center text-slate-600">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-amber-400 border-t-transparent mb-3" />
+                <p className="text-xs">Waiting for first message...</p>
+                <p className="text-[10px] text-slate-700 mt-1">Agent is initializing</p>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-hidden">
+                <ChatViewer
+                  messages={agentMessages}
+                  session={agentSession ?? undefined}
+                  isLoading={agentMessagesLoading}
+                />
+              </div>
+            )}
           </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            <ActivityFeed events={activity} />
+        ) : (
+          <div className="flex w-[300px] shrink-0 flex-col border-l border-[#1e2231]">
+            <div className="border-b border-[#1e2231] px-4 py-3">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Activity Feed
+              </h2>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              <ActivityFeed events={activity} />
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Create Task Modal Overlay */}

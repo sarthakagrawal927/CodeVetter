@@ -2,7 +2,9 @@ import type { AgentProcess } from "@/lib/tauri-ipc";
 
 interface AgentCardProps {
   agent: AgentProcess;
+  selected?: boolean;
   onStop?: (id: string) => void;
+  onClick?: () => void;
 }
 
 const statusConfig: Record<string, { dot: string; label: string; color: string }> = {
@@ -19,12 +21,21 @@ const adapterIcons: Record<string, string> = {
   codex: "\u25A0",
 };
 
-export default function AgentCard({ agent, onStop }: AgentCardProps) {
+export default function AgentCard({ agent, selected, onStop, onClick }: AgentCardProps) {
   const status = statusConfig[agent.status] ?? defaultStatusConfig;
   const icon = adapterIcons[agent.agent_type] ?? "\u25CF";
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-[#1e2231] bg-[#13151c] p-4 transition-colors hover:border-[#2d3348]">
+    <div
+      onClick={onClick}
+      className={`flex flex-col gap-3 rounded-xl border p-4 transition-colors ${
+        onClick ? "cursor-pointer" : ""
+      } ${
+        selected
+          ? "border-amber-500/40 bg-amber-500/5"
+          : "border-[#1e2231] bg-[#13151c] hover:border-[#2d3348]"
+      }`}
+    >
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2">
@@ -70,14 +81,30 @@ export default function AgentCard({ agent, onStop }: AgentCardProps) {
       </div>
 
       {/* Actions */}
-      {agent.status === "running" && onStop && (
-        <button
-          onClick={() => onStop(agent.id)}
-          className="mt-auto self-end rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20"
-        >
-          Stop
-        </button>
-      )}
+      <div className="flex items-center justify-between mt-auto">
+        {onClick && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onClick();
+            }}
+            className="rounded-lg border border-[#1e2231] px-3 py-1 text-xs font-medium text-slate-400 transition-colors hover:border-[#2d3348] hover:text-slate-200"
+          >
+            View Chat
+          </button>
+        )}
+        {agent.status === "running" && onStop && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onStop(agent.id);
+            }}
+            className="ml-auto rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20"
+          >
+            Stop
+          </button>
+        )}
+      </div>
     </div>
   );
 }
