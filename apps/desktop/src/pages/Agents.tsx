@@ -4,6 +4,7 @@ import KanbanBoard from "@/components/kanban-board";
 import ActivityFeed from "@/components/activity-feed";
 import ChatViewer from "@/components/chat-viewer";
 import DirectoryPicker from "@/components/directory-picker";
+import ReviewForm from "@/components/review-form";
 import {
   listAgents,
   launchAgent,
@@ -22,8 +23,11 @@ import {
   listLinearIssues,
   importLinearIssues,
   listSessions,
+  startLocalReview,
+  startPrReview,
+  generatePlaywrightTest,
 } from "@/lib/tauri-ipc";
-import type { AgentProcess, Task, ActivityEvent, AgentPreset, LinearIssue, SessionRow, MessageRow } from "@/lib/tauri-ipc";
+import type { AgentProcess, Task, ActivityEvent, AgentPreset, LinearIssue, SessionRow, MessageRow, ReviewTone } from "@/lib/tauri-ipc";
 
 // ─── Create Task Modal ──────────────────────────────────────────────────────
 
@@ -686,6 +690,174 @@ function ImportLinearModal({
   );
 }
 
+// ─── Review Modal ─────────────────────────────────────────────────────────────
+
+function ReviewModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmitLocal(repoPath: string, diffRange: string, tone: ReviewTone) {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await startLocalReview(repoPath, diffRange, tone);
+      onCreated();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleSubmitPr(owner: string, repo: string, prNumber: number, tone: ReviewTone) {
+    setIsLoading(true);
+    setError(null);
+    try {
+      await startPrReview(owner, repo, prNumber, tone);
+      onCreated();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-5 fade-in">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-slate-200">Start Review</h3>
+        <button onClick={onClose} className="text-slate-500 hover:text-slate-300 text-sm">
+          {"\u2715"}
+        </button>
+      </div>
+      {error && (
+        <div className="mb-4 rounded-md border border-red-500/20 bg-red-500/5 px-3 py-2">
+          <p className="text-xs text-red-400">{error}</p>
+        </div>
+      )}
+      <ReviewForm
+        onSubmitLocal={handleSubmitLocal}
+        onSubmitPr={handleSubmitPr}
+        isLoading={isLoading}
+      />
+    </div>
+  );
+}
+
+// ─── Test Gen Modal ──────────────────────────────────────────────────────────
+
+function TestGenModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [url, setUrl] = useState("");
+  const [description, setDescription] = useState("");
+  const [projectPath, setProjectPath] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const inputClass =
+    "rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-amber-500/50";
+
+  async function handleGenerate() {
+    if (!url.trim() || !description.trim()) {
+      setError("URL and description are required");
+      return;
+    }
+    try {
+      new URL(url.startsWith("http") ? url : `https://${url}`);
+    } catch {
+      setError("Invalid URL format");
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      await generatePlaywrightTest(
+        url.startsWith("http") ? url : `https://${url}`,
+        description,
+        projectPath || undefined,
+      );
+      onCreated();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-5 fade-in">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-slate-200">Generate Test</h3>
+        <button onClick={onClose} className="text-slate-500 hover:text-slate-300 text-sm">
+          {"\u2715"}
+        </button>
+      </div>
+      {error && (
+        <div className="mb-4 rounded-md border border-red-500/20 bg-red-500/5 px-3 py-2">
+          <p className="text-xs text-red-400">{error}</p>
+        </div>
+      )}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium text-slate-300">URL</label>
+          <input
+            type="url"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://example.com"
+            className={inputClass}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium text-slate-300">What to test</label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Test that the login flow works..."
+            rows={3}
+            className={`resize-none ${inputClass}`}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium text-slate-300">
+            Project directory{" "}
+            <span className="text-slate-600 font-normal">(optional)</span>
+          </label>
+          <input
+            type="text"
+            value={projectPath}
+            onChange={(e) => setProjectPath(e.target.value)}
+            placeholder="/path/to/project"
+            className={inputClass}
+          />
+        </div>
+        <button
+          onClick={handleGenerate}
+          disabled={isLoading || !url.trim() || !description.trim()}
+          className="self-start rounded-lg bg-amber-500 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-600 disabled:opacity-50"
+        >
+          {isLoading ? "Generating..." : "Generate Test"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function Agents() {
@@ -696,6 +868,8 @@ export default function Agents() {
   const [showLaunchPanel, setShowLaunchPanel] = useState(false);
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showLinearImport, setShowLinearImport] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showTestGenModal, setShowTestGenModal] = useState(false);
   const [linearConnected, setLinearConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -892,6 +1066,24 @@ export default function Agents() {
     }
   }
 
+  function handleAddTask(column: string) {
+    // Close any open modals first
+    setShowLaunchPanel(false);
+    setShowLinearImport(false);
+    setShowCreateTask(false);
+    setShowReviewModal(false);
+    setShowTestGenModal(false);
+
+    if (column === "in_review") {
+      setShowReviewModal(true);
+    } else if (column === "in_test") {
+      setShowTestGenModal(true);
+    } else {
+      // Backlog, In Progress, Done — open generic create task modal
+      setShowCreateTask(true);
+    }
+  }
+
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
@@ -994,7 +1186,7 @@ export default function Agents() {
             </h2>
           </div>
           <div className="flex-1 overflow-auto p-4">
-            <KanbanBoard tasks={tasks} />
+            <KanbanBoard tasks={tasks} onAddTask={handleAddTask} />
           </div>
         </div>
 
@@ -1119,6 +1311,30 @@ export default function Agents() {
             onClose={() => setShowLinearImport(false)}
             onImported={refresh}
           />
+        </div>
+      )}
+
+      {/* Review Modal Overlay */}
+      {showReviewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto">
+            <ReviewModal
+              onClose={() => setShowReviewModal(false)}
+              onCreated={refresh}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Test Gen Modal Overlay */}
+      {showTestGenModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto">
+            <TestGenModal
+              onClose={() => setShowTestGenModal(false)}
+              onCreated={refresh}
+            />
+          </div>
         </div>
       )}
     </div>

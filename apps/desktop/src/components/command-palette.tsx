@@ -93,18 +93,17 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
     return [
       // Navigation
       { id: "nav-home", label: "Go to Home", icon: "\u2302", shortcut: "g h", group: "Navigation", action: go("/") },
-      { id: "nav-review", label: "Go to Review", icon: "\u2714", shortcut: "g r", group: "Navigation", action: go("/review") },
       { id: "nav-workspaces", label: "Go to Workspaces", icon: "\u2750", shortcut: "g w", group: "Navigation", action: go("/workspaces") },
-      { id: "nav-sessions", label: "Go to Sessions", icon: "\u2630", shortcut: "g s", group: "Navigation", action: go("/sessions") },
-      { id: "nav-agents", label: "Go to Agents", icon: "\u2699", shortcut: "g a", group: "Navigation", action: go("/agents") },
+      { id: "nav-board", label: "Go to Board", icon: "\u2699", shortcut: "g b", group: "Navigation", action: go("/board") },
+      { id: "nav-history", label: "Go to History", icon: "\u2630", shortcut: "g y", group: "Navigation", action: go("/history") },
       { id: "nav-settings", label: "Go to Settings", icon: "\u2638", shortcut: "g ,", group: "Navigation", action: go("/settings") },
       { id: "nav-usage", label: "Go to Usage", icon: "\u2261", group: "Navigation", action: go("/usage") },
 
       // Actions
       { id: "act-new-workspace", label: "New Workspace", description: "Create a new workspace", icon: "+", group: "Actions", action: go("/workspaces?create=1") },
       { id: "act-new-chat", label: "New Chat", description: "Start a new chat session", icon: "+", group: "Actions", action: go("/chat") },
-      { id: "act-start-review", label: "Start Review", description: "Run a code review", icon: "\u2714", group: "Actions", action: go("/review") },
-      { id: "act-search-sessions", label: "Search Sessions", description: "Find past sessions", icon: "\u2315", group: "Actions", action: go("/sessions?search=1") },
+      { id: "act-start-review", label: "Start Review", description: "Run a code review", icon: "\u2714", group: "Actions", action: go("/board") },
+      { id: "act-search-sessions", label: "Search History", description: "Find past sessions", icon: "\u2315", group: "Actions", action: go("/history?search=1") },
 
       // Quick settings
       { id: "set-dark-mode", label: "Toggle Dark Mode", description: "Switch between light and dark", icon: "\u25D1", group: "Quick Settings", action: toggleDarkMode },

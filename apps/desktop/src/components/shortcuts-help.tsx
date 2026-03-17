@@ -40,7 +40,6 @@ const sections: ShortcutSection[] = [
   {
     title: "View",
     items: [
-      { keys: ["\u2318", "B"], label: "Toggle sidebar" },
       { keys: ["\u2318", "."], label: "Zen mode" },
       { keys: ["Ctrl", "`"], label: "Toggle terminal" },
     ],

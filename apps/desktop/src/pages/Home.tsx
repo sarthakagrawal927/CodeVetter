@@ -776,7 +776,7 @@ export default function Home() {
               Recent Sessions
             </h2>
             <Link
-              to="/sessions"
+              to="/history"
               className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
             >
               View all
@@ -833,7 +833,7 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <h2 className="text-[13px] font-medium text-slate-300">Reviews</h2>
             <Link
-              to="/review"
+              to="/board"
               className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
             >
               New review
@@ -865,7 +865,7 @@ export default function Home() {
             <div className="flex flex-col items-center justify-center py-8 rounded-lg border border-[#1e2231]">
               <p className="text-[11px] text-slate-600">No reviews yet</p>
               <Link
-                to="/review"
+                to="/board"
                 className="mt-1 text-[11px] text-slate-500 hover:text-slate-300"
               >
                 Start a review
@@ -910,7 +910,7 @@ export default function Home() {
             Agents
           </h2>
           <Link
-            to="/agents"
+            to="/board"
             className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
           >
             Mission Control
@@ -974,7 +974,7 @@ export default function Home() {
               ))}
 
               <Link
-                to="/agents"
+                to="/board"
                 className="flex items-center gap-2 px-3 py-2 text-slate-600 transition-colors hover:bg-[#1a1d27] hover:text-slate-400"
               >
                 <span className="text-sm">+</span>

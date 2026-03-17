@@ -2,21 +2,13 @@ import { useEffect, useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ShortcutsHelp from "./shortcuts-help";
 
-interface KeyboardShortcutsProps {
-  sidebarVisible: boolean;
-  toggleSidebar: () => void;
-}
-
 /**
  * Centralized keyboard shortcut manager.
  * Mount once in the Shell component. Registers global keydown listeners
  * for shortcuts that aren't already handled by individual components
  * (e.g. Cmd+K in command-palette, Cmd+T/W/Ctrl+Tab in Chat.tsx, g+key in sidebar).
  */
-export default function KeyboardShortcuts({
-  sidebarVisible,
-  toggleSidebar,
-}: KeyboardShortcutsProps) {
+export default function KeyboardShortcuts() {
   const navigate = useNavigate();
   const [showHelp, setShowHelp] = useState(false);
   const [, setZenMode] = useState(false);
@@ -36,26 +28,14 @@ export default function KeyboardShortcuts({
 
       // ─── Meta + key shortcuts (work even in inputs) ────────────
 
-      // Cmd+B — toggle sidebar
-      if (meta && !e.shiftKey && e.key === "b") {
-        e.preventDefault();
-        toggleSidebar();
-        return;
-      }
-
-      // Cmd+. — zen mode (hide all sidebars)
+      // Cmd+. — zen mode (dispatch event for panels to react)
       if (meta && !e.shiftKey && e.key === ".") {
         e.preventDefault();
         setZenMode((prev) => {
           const next = !prev;
-          // Dispatch custom event so other panels can react
           window.dispatchEvent(
             new CustomEvent("codevetter:zen-mode", { detail: { zen: next } })
           );
-          // If entering zen mode, also hide sidebar
-          if (next && sidebarVisible) toggleSidebar();
-          // If exiting zen mode, show sidebar again
-          if (!next && !sidebarVisible) toggleSidebar();
           return next;
         });
         return;
@@ -104,10 +84,10 @@ export default function KeyboardShortcuts({
         return;
       }
 
-      // Cmd+Shift+R — review code
+      // Cmd+Shift+R — open board (review/test actions)
       if (meta && e.shiftKey && e.key === "R") {
         e.preventDefault();
-        navigate("/review");
+        navigate("/board");
         return;
       }
 
@@ -158,7 +138,7 @@ export default function KeyboardShortcuts({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [navigate, sidebarVisible, toggleSidebar]);
+  }, [navigate]);
 
   return <ShortcutsHelp isOpen={showHelp} onClose={closeHelp} />;
 }

@@ -545,7 +545,7 @@ export default function Sessions() {
         <div className="flex flex-col gap-2 border-b border-[#1e2231] px-3 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h1 className="text-sm font-semibold text-slate-100">Sessions</h1>
+              <h1 className="text-sm font-semibold text-slate-100">History</h1>
               {!sessionsLoading && (
                 <span className="text-[11px] text-slate-500 tabular-nums">
                   {filtered.length}

@@ -3,6 +3,7 @@ import type { Task } from "@/lib/tauri-ipc";
 interface KanbanBoardProps {
   tasks: Task[];
   onTaskClick?: (task: Task) => void;
+  onAddTask?: (column: string) => void;
 }
 
 interface ColumnDef {
@@ -16,6 +17,7 @@ const columns: ColumnDef[] = [
   { id: "backlog", label: "Backlog", icon: "\u2610", color: "text-slate-400" },
   { id: "in_progress", label: "In Progress", icon: "\u25B6", color: "text-amber-400" },
   { id: "in_review", label: "Review", icon: "\u2714", color: "text-yellow-400" },
+  { id: "in_test", label: "Test", icon: "\u25B6", color: "text-blue-400" },
   { id: "done", label: "Done", icon: "\u2713", color: "text-emerald-400" },
 ];
 
@@ -58,22 +60,30 @@ function TaskCard({
   );
 }
 
-export default function KanbanBoard({ tasks, onTaskClick }: KanbanBoardProps) {
+export default function KanbanBoard({ tasks, onTaskClick, onAddTask }: KanbanBoardProps) {
   return (
-    <div className="grid grid-cols-4 gap-3">
+    <div className="grid grid-cols-5 gap-3">
       {columns.map((col) => {
         const colTasks = tasks.filter((t) => t.status === col.id);
         return (
           <div key={col.id} className="flex flex-col gap-2">
             {/* Column header */}
-            <div className="flex items-center gap-2 px-1 pb-1">
+            <div className="group/header flex items-center gap-2 px-1 pb-1">
               <span className={`text-xs ${col.color}`}>{col.icon}</span>
-              <span className="text-xs font-semibold text-slate-300">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                 {col.label}
               </span>
-              <span className="ml-auto rounded-full bg-[#1a1d27] px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+              <span className="rounded-full bg-[#1a1d27] px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
                 {colTasks.length}
               </span>
+              {onAddTask && (
+                <button
+                  onClick={() => onAddTask(col.id)}
+                  className="ml-auto text-sm text-slate-600 opacity-0 transition-opacity hover:text-amber-400 group-hover/header:opacity-100"
+                >
+                  +
+                </button>
+              )}
             </div>
 
             {/* Cards */}
