@@ -11,9 +11,23 @@
     "build:db": "npm run -w packages/db build",
     "build:types": "npm run -w packages/shared-types build",
     "build:gateway": "npm run -w packages/ai-gateway-client build",
-    "build:packages": "npm run build:types && npm run build:db && npm run build:gateway",
+    "build:review-core": "npm run -w packages/review-core build",
+    "build:packages": "npm run build:types && npm run build:db && npm run build:gateway && npm run build:review-core",
     "deploy:api": "npm run -w workers/api deploy",
-    "deploy:review": "npm run -w workers/review deploy"
+    "deploy:review": "npm run -w workers/review deploy",
+    "prepare": "husky"
   },
-  "license": "ISC"
+  "license": "ISC",
+  "lint-staged": {
+    "apps/desktop/src/**/*.{ts,tsx}": ["eslint --quiet --max-warnings 0"],
+    "packages/*/src/**/*.ts": ["eslint --quiet --max-warnings 0"],
+    "workers/*/src/**/*.ts": ["eslint --quiet --max-warnings 0"]
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.57.1",
+    "@typescript-eslint/parser": "^8.57.1",
+    "eslint": "^10.0.3",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0"
+  }
 }

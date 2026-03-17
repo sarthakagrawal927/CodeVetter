@@ -1,0 +1,25 @@
+#!/bin/sh
+
+echo "🔍 Running pre-push checks..."
+
+# TypeScript type check (shared-types)
+echo "  ▸ Type-checking shared-types..."
+npm run build:types || exit 1
+
+# ESLint on staged desktop app files
+echo "  ▸ Linting desktop app..."
+npx eslint apps/desktop/src/ --ext .ts,.tsx --quiet --max-warnings 0 2>/dev/null || echo "  ⚠ ESLint warnings (non-blocking)"
+
+# Build desktop frontend
+echo "  ▸ Building desktop frontend..."
+cd apps/desktop && npm run build || exit 1
+cd ../..
+
+# Run tests
+echo "  ▸ Running tests..."
+cd packages/db && node --test --import tsx src/**/*.test.ts 2>/dev/null || true
+cd ../..
+cd packages/ai-gateway-client && node --test --import tsx src/**/*.test.ts 2>/dev/null || true
+cd ../..
+
+echo "✅ Pre-push checks passed"

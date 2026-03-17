@@ -9,7 +9,10 @@
     "build:sidecar": "cd src-tauri/sidecar && bun build src/main.ts --compile --outfile review-sidecar && cp review-sidecar ../review-sidecar-$(rustc -vV | grep host | awk '{print $2}')",
     "tauri": "tauri",
     "tauri:dev": "npm run build:sidecar && tauri dev",
-    "tauri:build": "npm run build:sidecar && tauri build"
+    "tauri:build": "npm run build:sidecar && tauri build",
+    "test": "npx playwright test",
+    "test:ui": "npx playwright test --ui",
+    "lint": "eslint src/ --ext .ts,.tsx --quiet"
   },
   "dependencies": {
     "@code-reviewer/shared-types": "file:../../packages/shared-types",
@@ -17,9 +20,9 @@
     "@tauri-apps/api": "^2.2.0",
     "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-sql": "^2.2.0",
-    "@xterm/xterm": "^5.5.0",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-web-links": "^0.11.0",
+    "@xterm/xterm": "^5.5.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",
