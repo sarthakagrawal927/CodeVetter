@@ -8,12 +8,10 @@ import { getPreference, isTauriAvailable } from "@/lib/tauri-ipc";
 
 // Pages
 import Home from "@/pages/Home";
-import Review from "@/pages/Review";
 import Sessions from "@/pages/Sessions";
 import Agents from "@/pages/Agents";
 import Workspaces from "@/pages/Workspaces";
 import Usage from "@/pages/Usage";
-import PlaywrightGen from "@/pages/PlaywrightGen";
 import Settings from "@/pages/Settings";
 
 /** Hook: open/close command palette via Cmd+K */
@@ -66,15 +64,10 @@ function useOnboarding() {
   return { showOnboarding, setShowOnboarding, ready };
 }
 
-/** Main shell: sidebar + content area */
+/** Main shell: floating nav + full-width content area */
 function Shell() {
   const { showOnboarding, setShowOnboarding, ready } = useOnboarding();
   const { isOpen, close } = useCommandPalette();
-  const [sidebarVisible, setSidebarVisible] = useState(true);
-
-  const toggleSidebar = useCallback(() => {
-    setSidebarVisible((prev) => !prev);
-  }, []);
 
   if (!ready) {
     return (
@@ -89,29 +82,12 @@ function Shell() {
       {showOnboarding && (
         <Onboarding onComplete={() => setShowOnboarding(false)} />
       )}
-      {sidebarVisible && <Sidebar />}
-      <main className="flex-1 overflow-y-auto">
+      <Sidebar />
+      <main className="flex-1 h-full overflow-y-auto pt-2">
         <Outlet />
       </main>
       <CommandPalette isOpen={isOpen} onClose={close} />
-      <KeyboardShortcuts
-        sidebarVisible={sidebarVisible}
-        toggleSidebar={toggleSidebar}
-      />
-    </div>
-  );
-}
-
-/** Settings gets full screen — no main sidebar, it has its own nav */
-function FullScreenShell() {
-  const { isOpen, close } = useCommandPalette();
-
-  return (
-    <div className="flex h-full w-full">
-      <main className="flex-1">
-        <Outlet />
-      </main>
-      <CommandPalette isOpen={isOpen} onClose={close} />
+      <KeyboardShortcuts />
     </div>
   );
 }
@@ -121,14 +97,10 @@ export default function App() {
     <Routes>
       <Route element={<Shell />}>
         <Route path="/" element={<Home />} />
-        <Route path="/review" element={<Review />} />
         <Route path="/workspaces" element={<Workspaces />} />
-        <Route path="/sessions" element={<Sessions />} />
+        <Route path="/history" element={<Sessions />} />
         <Route path="/usage" element={<Usage />} />
-        <Route path="/test-gen" element={<PlaywrightGen />} />
-        <Route path="/agents" element={<Agents />} />
-      </Route>
-      <Route element={<FullScreenShell />}>
+        <Route path="/board" element={<Agents />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
     </Routes>

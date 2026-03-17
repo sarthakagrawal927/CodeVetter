@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+
 import CostDashboard from "@/components/cost-dashboard";
 import {
   getPreference,
@@ -486,7 +486,6 @@ const categories: CategoryDef[] = [
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function Settings() {
-  const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState<Category>("general");
 
   // General
@@ -766,13 +765,6 @@ export default function Settings() {
     <div className="flex h-full">
       {/* Sidebar */}
       <nav className="flex w-48 shrink-0 flex-col border-r border-[#1e2231] bg-[#0f1117] py-6 px-3">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-1.5 px-2 mb-4 text-[12px] text-slate-500 hover:text-slate-200 transition-colors"
-        >
-          <span className="text-sm">{"\u2190"}</span>
-          Back
-        </button>
         <h1 className="mb-6 px-2 text-lg font-bold text-slate-100">Settings</h1>
         <div className="flex flex-col gap-0.5">
           {categories.map((cat) => {
