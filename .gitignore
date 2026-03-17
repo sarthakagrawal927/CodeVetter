@@ -1,4 +1,4 @@
-node_modules
+node_modules/
 
 # Action runtime bundle must stay versioned.
 dist/*
@@ -10,7 +10,40 @@ workers/*/dist
 workers/*/dist-cjs
 workers/*/.wrangler
 .vercel
+out/
+.next/
+target/
+*.tsbuildinfo
+
+# Desktop app build
+apps/desktop/src-tauri/target/
+apps/desktop/out/
+apps/desktop/.next/
+
+# Environment
+.env
+.env.local
+.env.*.local
 
 # Local Cloudflare Worker secrets
 .dev.vars
-apps/desktop/src-tauri/target/
+
+# Secrets
+.claude/settings.local.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+test-results/
+playwright-report/
+.playwright-mcp/
+
+# Misc
+*.log
+.saasmaker.json
