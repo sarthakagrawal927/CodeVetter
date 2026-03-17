@@ -20,7 +20,6 @@ import type {
   SessionRow,
   MessageRow,
   SearchResult,
-  IndexStats,
   SubagentSummary,
 } from "@/lib/tauri-ipc";
 
@@ -154,7 +153,6 @@ export default function Sessions() {
 
   // Ref to prevent duplicate fetches
   const fetchingRef = useRef(false);
-  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // ─── Load sessions ──────────────────────────────────────────────────────
 

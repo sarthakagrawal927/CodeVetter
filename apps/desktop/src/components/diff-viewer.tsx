@@ -240,8 +240,8 @@ function CommentCard({
 
 export default function DiffViewer({
   diff,
-  filePath,
-  workspaceId,
+  filePath: _filePath,
+  workspaceId: _workspaceId,
   comments,
   onCommentCreate,
   onCommentDelete,

@@ -1517,6 +1517,17 @@ export interface DiffComment {
   updated_at: string;
 }
 
+export interface GitChangedFile {
+  status: string;
+  path: string;
+}
+
+export async function getGitChangedFiles(
+  repoPath: string
+): Promise<{ files: GitChangedFile[] }> {
+  return safeInvoke("get_git_changed_files", { repoPath });
+}
+
 export async function getFileDiff(
   repoPath: string,
   filePath: string

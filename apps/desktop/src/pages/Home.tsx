@@ -16,9 +16,6 @@ import {
   createProviderAccount,
   deleteProviderAccount,
   detectProviderAccounts,
-  onSessionUpdated,
-  onActivityUpdate,
-  onAgentStatusChanged,
   isTauriAvailable,
 } from "@/lib/tauri-ipc";
 
@@ -31,16 +28,9 @@ import type {
   ProviderAccount,
   AccountUsage,
   LiveUsageResult,
-  DetectedAccountInfo,
 } from "@/lib/tauri-ipc";
 
 // ─── Usage helpers ──────────────────────────────────────────────────────────
-
-function formatUsd(n: number): string {
-  if (n >= 100) return `$${n.toFixed(0)}`;
-  if (n >= 10) return `$${n.toFixed(1)}`;
-  return `$${n.toFixed(2)}`;
-}
 
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -67,17 +57,6 @@ function formatDuration(secs: number): string {
   const m = Math.floor((secs % 3600) / 60);
   if (h > 0) return `${h}h ${m}m`;
   return `${m}m`;
-}
-
-function rateLimitTypeLabel(t: string | undefined): string {
-  if (!t) return "";
-  const map: Record<string, string> = {
-    five_hour: "5-hour window",
-    one_hour: "1-hour window",
-    daily: "daily",
-    weekly: "weekly",
-  };
-  return map[t] ?? t;
 }
 
 function UsageBar({

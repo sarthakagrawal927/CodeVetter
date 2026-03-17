@@ -27,7 +27,7 @@ export default function Review() {
   const [error, setError] = useState<string | null>(null);
 
   // Active review being polled
-  const [activeReviewId, setActiveReviewId] = useState<string | null>(null);
+  const [_activeReviewId, setActiveReviewId] = useState<string | null>(null);
   const [review, setReview] = useState<Review | null>(null);
   const [findings, setFindings] = useState<ReviewFinding[]>([]);
 
@@ -82,7 +82,7 @@ export default function Review() {
             .then(setPastReviews)
             .catch(() => {});
         }
-      } catch (err) {
+      } catch {
         // Ignore transient poll errors
       }
     },
