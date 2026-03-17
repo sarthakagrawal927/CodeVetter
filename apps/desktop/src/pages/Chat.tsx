@@ -715,10 +715,9 @@ export default function Chat() {
               </div>
             )}
             {messages.map((msg, i) =>
+              msg.role === "system" ? null :
               msg.role === "user" ? (
                 <UserBubble key={i} content={msg.content} />
-              ) : msg.role === "system" ? (
-                <SystemBubble key={i} content={msg.content} />
               ) : (
                 <AssistantBubble key={i} content={msg.content} />
               )

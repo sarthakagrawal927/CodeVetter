@@ -1053,15 +1053,7 @@ function WorkspaceChat({
                 );
               }
               if (msg.role === "system") {
-                return (
-                  <div key={i}>
-                    <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-4 py-2">
-                      <p className="text-[12px] text-amber-300/80 whitespace-pre-wrap">
-                        {msg.content}
-                      </p>
-                    </div>
-                  </div>
-                );
+                return null; // Hide system/init messages
               }
               // assistant
               return (
