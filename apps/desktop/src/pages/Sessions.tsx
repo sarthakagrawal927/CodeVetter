@@ -142,7 +142,6 @@ export default function Sessions() {
   // Re-indexing state
   const [isReindexing, setIsReindexing] = useState(false);
   const [lastIndexedAt, setLastIndexedAt] = useState<string | null>(null);
-  const [showCosts, setShowCosts] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
 
   // Subagent state — cached per session, fetched on demand

@@ -106,16 +106,6 @@ function AssistantBubble({ content }: { content: string }) {
   );
 }
 
-function SystemBubble({ content }: { content: string }) {
-  return (
-    <div className="mb-4">
-      <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-4 py-2">
-        <p className="text-[12px] text-amber-300/80 whitespace-pre-wrap">{content}</p>
-      </div>
-    </div>
-  );
-}
-
 function PendingBubble({ state, text, activityStep }: { state: "waiting" | "streaming"; text: string; activityStep?: { label: string; detail?: string } | null }) {
   return (
     <div className="mb-4">
@@ -187,7 +177,6 @@ export default function Chat() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // ─── Active tab state accessors ────────────────────────────────────────
-  const _activeTab = tabs.find((t) => t.id === activeTabId);
   const activeState = activeTabId ? tabStates[activeTabId] : undefined;
 
   const updateActiveState = useCallback(

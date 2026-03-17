@@ -3,9 +3,29 @@ use crate::DbState;
 use serde_json::{json, Value};
 use tauri::State;
 
-/// Placeholder — replace with your real Linear OAuth app client ID.
-const LINEAR_CLIENT_ID: &str = "CODEVETTER_LINEAR_CLIENT_ID";
 const REDIRECT_URI: &str = "http://localhost:9876/callback";
+
+/// Resolve the Linear OAuth client ID.
+/// Priority: env var > preferences table > error.
+fn resolve_linear_client_id(conn: &rusqlite::Connection) -> Result<String, String> {
+    // 1. Environment variable
+    if let Ok(val) = std::env::var("CODEVETTER_LINEAR_CLIENT_ID") {
+        let val = val.trim().to_string();
+        if !val.is_empty() {
+            return Ok(val);
+        }
+    }
+
+    // 2. Preferences table
+    if let Ok(Some(val)) = queries::get_preference(conn, "linear_client_id") {
+        let val = val.trim().to_string();
+        if !val.is_empty() {
+            return Ok(val);
+        }
+    }
+
+    Err("Linear OAuth not configured. Set CODEVETTER_LINEAR_CLIENT_ID environment variable or configure in Settings.".to_string())
+}
 
 // ─── PKCE helpers ────────────────────────────────────────────────────────────
 
@@ -159,13 +179,18 @@ fn sha256_digest(data: &[u8]) -> Vec<u8> {
 /// exchange code for token, store in preferences.
 #[tauri::command]
 pub async fn start_linear_oauth(db: State<'_, DbState>) -> Result<Value, String> {
+    let client_id = {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        resolve_linear_client_id(&conn)?
+    };
+
     let code_verifier = generate_code_verifier();
     let challenge_bytes = sha256(code_verifier.as_bytes());
     let code_challenge = base64_url_encode(&challenge_bytes);
 
     let auth_url = format!(
         "https://linear.app/oauth/authorize?client_id={}&redirect_uri={}&response_type=code&scope=read&code_challenge={}&code_challenge_method=S256",
-        LINEAR_CLIENT_ID,
+        client_id,
         urlencoding_encode(REDIRECT_URI),
         code_challenge,
     );
@@ -178,8 +203,9 @@ pub async fn start_linear_oauth(db: State<'_, DbState>) -> Result<Value, String>
     // Start a temporary local TCP server to receive the OAuth callback.
     // This runs in a blocking thread with a timeout.
     let verifier = code_verifier.clone();
+    let cid = client_id.clone();
     let code_result = tokio::task::spawn_blocking(move || {
-        listen_for_oauth_callback(verifier)
+        listen_for_oauth_callback(verifier, &cid)
     })
     .await
     .map_err(|e| format!("OAuth listener task failed: {e}"))?;
@@ -196,7 +222,7 @@ pub async fn start_linear_oauth(db: State<'_, DbState>) -> Result<Value, String>
 
 /// Listens on port 9876 for the OAuth callback, extracts the code,
 /// and exchanges it for an access token.
-fn listen_for_oauth_callback(code_verifier: String) -> Result<String, String> {
+fn listen_for_oauth_callback(code_verifier: String, client_id: &str) -> Result<String, String> {
     use std::io::{BufRead, BufReader, Write};
     use std::net::TcpListener;
     use std::time::Duration;
@@ -259,18 +285,18 @@ fn listen_for_oauth_callback(code_verifier: String) -> Result<String, String> {
     drop(stream);
 
     // Exchange the authorization code for an access token
-    exchange_code_for_token(&code, &code_verifier)
+    exchange_code_for_token(&code, &code_verifier, client_id)
 }
 
 /// Exchange an OAuth authorization code for an access token (synchronous).
-fn exchange_code_for_token(code: &str, code_verifier: &str) -> Result<String, String> {
+fn exchange_code_for_token(code: &str, code_verifier: &str, client_id: &str) -> Result<String, String> {
     // Use a synchronous reqwest client since we're already in a blocking thread.
     let client = reqwest::blocking::Client::new();
     let resp = client
         .post("https://api.linear.app/oauth/token")
         .form(&[
             ("grant_type", "authorization_code"),
-            ("client_id", LINEAR_CLIENT_ID),
+            ("client_id", client_id),
             ("redirect_uri", REDIRECT_URI),
             ("code", code),
             ("code_verifier", code_verifier),

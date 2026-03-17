@@ -28,14 +28,18 @@ import {
   listDiffComments,
   createDiffComment,
   deleteDiffComment,
+  createReviewDoc,
+  finalizeReview,
 } from "@/lib/tauri-ipc";
-import type { WorkspaceRow, FileEntry, FilePreview, CICheck, GitChangedFile, DiffComment } from "@/lib/tauri-ipc";
+import type { WorkspaceRow, FileEntry, FilePreview, CICheck, GitChangedFile, DiffComment, MergedReviewResult } from "@/lib/tauri-ipc";
 import { useChatStream } from "@/hooks/use-chat-stream";
 import ContextMeter from "@/components/context-meter";
 import CreatePrModal from "@/components/create-pr-modal";
 import DiffViewer from "@/components/diff-viewer";
 import PrStatusPanel from "@/components/pr-status-panel";
 import TerminalPanel from "@/components/terminal-panel";
+import ReviewLive from "@/components/review-live";
+import MergedReview from "@/components/merged-review";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -1572,6 +1576,15 @@ export default function Workspaces() {
   const [showCreatePr, setShowCreatePr] = useState(false);
   const [showRightPanel, setShowRightPanel] = useState(true);
 
+  // ─── Coordinated review state ───────────────────────────────────────
+  const [activeReviewId, setActiveReviewId] = useState<string | null>(null);
+  const [activeReviewRepoPath, setActiveReviewRepoPath] = useState<string | null>(null);
+  const [canFinalize, setCanFinalize] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
+  const [mergedResult, setMergedResult] = useState<MergedReviewResult | null>(null);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const showReviewOverlay = activeReviewId !== null;
+
   // ─── Load workspaces ─────────────────────────────────────────────────
 
   const loadWorkspaces = useCallback(async () => {
@@ -1653,6 +1666,60 @@ export default function Workspaces() {
     }
   }
 
+  // ─── Coordinated review handlers ─────────────────────────────────────
+
+  function clearReviewState() {
+    setActiveReviewId(null);
+    setActiveReviewRepoPath(null);
+    setCanFinalize(false);
+    setFinalizing(false);
+    setMergedResult(null);
+    setReviewError(null);
+  }
+
+  async function handleStartReview() {
+    if (!selectedWorkspace) return;
+    clearReviewState();
+    setReviewError(null);
+    try {
+      const { review_id } = await createReviewDoc(
+        selectedWorkspace.repo_path,
+        selectedWorkspace.branch
+      );
+      setActiveReviewId(review_id);
+      setActiveReviewRepoPath(selectedWorkspace.repo_path);
+    } catch (err) {
+      setReviewError(
+        err instanceof Error ? err.message : String(err)
+      );
+    }
+  }
+
+  async function handleFinalizeReview() {
+    if (!activeReviewId || !activeReviewRepoPath) return;
+    setFinalizing(true);
+    setReviewError(null);
+    try {
+      const result = await finalizeReview(activeReviewId, activeReviewRepoPath);
+      setMergedResult(result);
+    } catch (err) {
+      setReviewError(
+        err instanceof Error ? err.message : String(err)
+      );
+    } finally {
+      setFinalizing(false);
+    }
+  }
+
+  // Clear review state when switching workspaces
+  const prevSelectedId = useRef(selectedId);
+  useEffect(() => {
+    if (prevSelectedId.current !== selectedId) {
+      prevSelectedId.current = selectedId;
+      clearReviewState();
+    }
+  }, [selectedId]);
+
   const totalCount = workspaces.filter((w) => !w.archived_at).length;
 
   // ─── Render ──────────────────────────────────────────────────────────
@@ -1730,18 +1797,84 @@ export default function Workspaces() {
       {/* Center + Right panels */}
       {selectedWorkspace ? (
         <>
-          {/* Center: Top bar + Chat */}
+          {/* Center: Top bar + Chat or Review overlay */}
           <div className="flex-1 min-w-0 flex flex-col">
             <WorkspaceTopBar
               workspace={selectedWorkspace}
               onShowCreatePr={() => setShowCreatePr(true)}
             />
             <div className="flex-1 min-h-0">
-              <WorkspaceChat
-                key={selectedWorkspace.id}
-                workspace={selectedWorkspace}
-                onSessionCreated={handleSessionCreated}
-              />
+              {showReviewOverlay ? (
+                /* ── Review overlay ── */
+                <div className="flex h-full flex-col">
+                  {/* Review header bar */}
+                  <div className="flex items-center gap-3 border-b border-[#1e2231] px-4 py-2.5 shrink-0">
+                    <button
+                      onClick={clearReviewState}
+                      className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
+                    >
+                      {"\u2190"} Back to Chat
+                    </button>
+                    <span className="text-[12px] font-medium text-slate-200">
+                      Coordinated Review
+                    </span>
+                    <span className="text-[10px] text-slate-600 font-mono">
+                      {selectedWorkspace.branch}
+                    </span>
+                  </div>
+
+                  {/* Review content */}
+                  <div className="flex-1 overflow-y-auto px-4 py-4">
+                    {reviewError && (
+                      <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3">
+                        <p className="text-[12px] text-red-400">{reviewError}</p>
+                      </div>
+                    )}
+
+                    {/* Live review progress */}
+                    {activeReviewId && activeReviewRepoPath && !mergedResult && (
+                      <ReviewLive
+                        reviewId={activeReviewId}
+                        repoPath={activeReviewRepoPath}
+                        onComplete={() => setCanFinalize(true)}
+                      />
+                    )}
+
+                    {/* Finalize button */}
+                    {canFinalize && !mergedResult && (
+                      <div className="mt-4 flex items-center gap-3">
+                        <button
+                          onClick={handleFinalizeReview}
+                          disabled={finalizing}
+                          className="rounded-lg bg-indigo-500 px-4 py-2 text-[12px] font-semibold text-white hover:bg-indigo-600 disabled:opacity-50 transition-colors"
+                        >
+                          {finalizing ? "Finalizing..." : "Finalize Review"}
+                        </button>
+                        {finalizing && (
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-400 border-t-transparent" />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Merged result */}
+                    {mergedResult && (
+                      <div className="mt-4">
+                        <MergedReview
+                          result={mergedResult}
+                          onClose={clearReviewState}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* ── Normal chat ── */
+                <WorkspaceChat
+                  key={selectedWorkspace.id}
+                  workspace={selectedWorkspace}
+                  onSessionCreated={handleSessionCreated}
+                />
+              )}
             </div>
           </div>
 
@@ -1756,9 +1889,7 @@ export default function Workspaces() {
                 workspace={selectedWorkspace}
                 onShowCreatePr={() => setShowCreatePr(true)}
                 onWorkspaceRefresh={loadWorkspaces}
-                onNavigateReview={() => {
-                  navigate(`/review?repo=${encodeURIComponent(selectedWorkspace.repo_path)}`);
-                }}
+                onNavigateReview={handleStartReview}
               />
             )}
           </div>

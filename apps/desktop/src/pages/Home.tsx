@@ -135,7 +135,7 @@ function AccountUsageRow({
   liveUsage,
   onCheckLive,
   checkingLive,
-  onDelete,
+  onDelete: _onDelete,
   isSharedUsage,
 }: {
   account: ProviderAccount;
