@@ -6,7 +6,7 @@ import {
   useRef,
   useLayoutEffect,
 } from "react";
-import { useNavigate } from "react-router-dom";
+
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -1430,7 +1430,7 @@ function WorkspaceRightPanel({
   const [gitStatus, setGitStatus] = useState<{
     changed_files: number;
   } | null>(null);
-  const [_gitLoading, setGitLoading] = useState(false);
+  const [, setGitLoading] = useState(false);
 
   useEffect(() => {
     if (!isTauriAvailable()) return;
@@ -1567,7 +1567,6 @@ function WorkspaceRightPanel({
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 export default function Workspaces() {
-  const navigate = useNavigate();
   const [workspaces, setWorkspaces] = useState<WorkspaceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1935,7 +1934,7 @@ export default function Workspaces() {
         <CreatePrModal
           workspace={selectedWorkspace}
           onClose={() => setShowCreatePr(false)}
-          onCreated={async (prNumber, prUrl) => {
+          onCreated={async (_prNumber, _prUrl) => {
             setShowCreatePr(false);
             await loadWorkspaces();
           }}

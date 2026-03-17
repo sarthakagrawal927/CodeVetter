@@ -617,7 +617,7 @@ export default function WorkspaceRightPanel({
   const [gitStatus, setGitStatus] = useState<{
     changed_files: number;
   } | null>(null);
-  const [_gitLoading, setGitLoading] = useState(false);
+  const [, setGitLoading] = useState(false);
 
   useEffect(() => {
     if (!isTauriAvailable()) return;

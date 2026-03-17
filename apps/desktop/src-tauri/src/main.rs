@@ -241,6 +241,10 @@ fn main() {
             commands::diff_comments::create_diff_comment,
             commands::diff_comments::update_diff_comment,
             commands::diff_comments::delete_diff_comment,
+            // Playwright Test Generator
+            commands::playwright_gen::generate_playwright_test,
+            commands::playwright_gen::run_playwright_test,
+            commands::playwright_gen::iterate_playwright_test,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

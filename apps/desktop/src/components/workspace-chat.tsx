@@ -69,7 +69,7 @@ export default function WorkspaceChat({
 
   // ─── Stream handler ─────────────────────────────────────────────────────
 
-  const { sending, streamingText, stats: chatStats, activityStep } = useChatStream({
+  const { sending, streamingText, stats: chatStats } = useChatStream({
     onAssistantDone(text, newSessionId) {
       setChatState("idle");
       if (text.trim()) {

@@ -15,6 +15,7 @@ const navItems: NavItem[] = [
   { label: "Review", href: "/review", icon: "\u2714", shortcut: "R" },
   { label: "Workspaces", href: "/workspaces", icon: "\u2750", shortcut: "W" },
   { label: "Sessions", href: "/sessions", icon: "\u2630", shortcut: "S" },
+  { label: "Test Gen", href: "/test-gen", icon: "\u25B6", shortcut: "T" },
   { label: "Agents", href: "/agents", icon: "\u2699", shortcut: "A" },
   { label: "Settings", href: "/settings", icon: "\u2638", shortcut: "," },
 ];

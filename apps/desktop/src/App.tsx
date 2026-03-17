@@ -13,6 +13,7 @@ import Sessions from "@/pages/Sessions";
 import Agents from "@/pages/Agents";
 import Workspaces from "@/pages/Workspaces";
 import Usage from "@/pages/Usage";
+import PlaywrightGen from "@/pages/PlaywrightGen";
 import Settings from "@/pages/Settings";
 
 /** Hook: open/close command palette via Cmd+K */
@@ -124,6 +125,7 @@ export default function App() {
         <Route path="/workspaces" element={<Workspaces />} />
         <Route path="/sessions" element={<Sessions />} />
         <Route path="/usage" element={<Usage />} />
+        <Route path="/test-gen" element={<PlaywrightGen />} />
         <Route path="/agents" element={<Agents />} />
       </Route>
       <Route element={<FullScreenShell />}>

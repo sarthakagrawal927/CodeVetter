@@ -10,6 +10,7 @@ pub mod github_ops;
 pub mod history;
 pub mod linear;
 pub mod mission;
+pub mod playwright_gen;
 pub mod preferences;
 pub mod presets;
 pub mod review;

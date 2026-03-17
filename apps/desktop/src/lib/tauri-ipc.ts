@@ -1580,3 +1580,67 @@ export async function updateDiffComment(opts: {
 export async function deleteDiffComment(id: string): Promise<void> {
   await safeInvoke("delete_diff_comment", { id });
 }
+
+// ─── Playwright Test Generator ──────────────────────────────────────────────
+
+export interface PlaywrightTestResult {
+  name: string;
+  status: "passed" | "failed" | "skipped" | "timedOut";
+  duration_ms: number;
+  error?: string;
+}
+
+export interface PlaywrightGenStreamEvent {
+  request_id: string;
+  event_type: string; // "progress" | "code" | "done" | "error"
+  content: Record<string, unknown>;
+}
+
+export async function generatePlaywrightTest(
+  url: string,
+  description: string,
+  projectPath?: string,
+): Promise<{ request_id: string; test_file: string; status: string }> {
+  return safeInvoke("generate_playwright_test", {
+    url,
+    description,
+    projectPath: projectPath ?? null,
+  });
+}
+
+export async function runPlaywrightTest(
+  testFile: string,
+  projectPath?: string,
+): Promise<{
+  passed: boolean;
+  results: PlaywrightTestResult[];
+  stdout: string;
+  stderr: string;
+}> {
+  return safeInvoke("run_playwright_test", {
+    testFile,
+    projectPath: projectPath ?? null,
+  });
+}
+
+export async function iteratePlaywrightTest(
+  testFile: string,
+  errorMessage: string,
+  url: string,
+  description: string,
+): Promise<{ request_id: string; test_file: string; status: string }> {
+  return safeInvoke("iterate_playwright_test", {
+    testFile,
+    errorMessage,
+    url,
+    description,
+  });
+}
+
+export function onPlaywrightGenStream(
+  callback: (event: PlaywrightGenStreamEvent) => void,
+): Promise<UnlistenFn> {
+  return listen<PlaywrightGenStreamEvent>("playwright-gen-stream", (event) => {
+    callback(event.payload);
+  });
+}

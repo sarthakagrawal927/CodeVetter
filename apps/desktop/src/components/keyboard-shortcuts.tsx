@@ -19,7 +19,7 @@ export default function KeyboardShortcuts({
 }: KeyboardShortcutsProps) {
   const navigate = useNavigate();
   const [showHelp, setShowHelp] = useState(false);
-  const [_zenMode, setZenMode] = useState(false);
+  const [, setZenMode] = useState(false);
 
   const closeHelp = useCallback(() => setShowHelp(false), []);
 

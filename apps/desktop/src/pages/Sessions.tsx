@@ -10,7 +10,6 @@ import {
   mergeSessions,
   triggerIndex,
   getIndexStats,
-  getPreference,
   onSessionUpdated,
   isTauriAvailable,
   detectRunningAgents,
@@ -210,16 +209,12 @@ export default function Sessions() {
     }
   }, [hasMoreSessions]);
 
-  // Load last index time and cost preference
+  // Load last index time
   const loadMeta = useCallback(async () => {
     if (!isTauriAvailable()) return;
     try {
-      const [stats, costPref] = await Promise.all([
-        getIndexStats(),
-        getPreference("show_costs"),
-      ]);
+      const stats = await getIndexStats();
       setLastIndexedAt(stats.last_indexed_at);
-      if (costPref !== null) setShowCosts(costPref === "true");
     } catch {
       // ignore
     }
