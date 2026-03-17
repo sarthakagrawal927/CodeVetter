@@ -1339,6 +1339,7 @@ export default function Agents() {
   const [showLinearImport, setShowLinearImport] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showTestGenModal, setShowTestGenModal] = useState(false);
+  const [showPersonaPicker, setShowPersonaPicker] = useState(false);
   const [linearConnected, setLinearConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1904,15 +1905,8 @@ export default function Agents() {
               <KanbanBoard
                 tasks={tasks}
                 onAddTask={handleAddTask}
-                onAssignAgent={(_task) => {
-                  // Find first idle persona and open persona detail
-                  const idle = personas.find(
-                    (p) => !agents.some((a) => a.status === "running" && a.role === p.name)
-                  );
-                  if (idle) {
-                    setSelectedAgentId(null);
-                    setSelectedPersona(idle);
-                  }
+                onAssignAgent={() => {
+                  setShowPersonaPicker(true);
                 }}
               />
             </div>
@@ -2006,6 +2000,54 @@ export default function Agents() {
             }}
             onSaved={loadPersonas}
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* Persona Picker Dialog */}
+      <Dialog open={showPersonaPicker} onOpenChange={setShowPersonaPicker}>
+        <DialogContent hideClose className="max-w-sm">
+          <DialogTitle className="text-sm font-semibold text-slate-200">
+            Choose an Agent
+          </DialogTitle>
+          <DialogDescription className="text-[12px] text-slate-500 mb-3">
+            Select a persona to assign this task to
+          </DialogDescription>
+          <div className="flex flex-col gap-1.5 max-h-[400px] overflow-y-auto">
+            {personas
+              .filter((p) => !agents.some((a) => a.status === "running" && a.role === p.name))
+              .map((persona) => {
+                const accentColor = COLOR_MAP[persona.color] || "#f59e0b";
+                return (
+                  <button
+                    key={persona.id}
+                    onClick={() => {
+                      setShowPersonaPicker(false);
+                      setSelectedAgentId(null);
+                      setSelectedPersona(persona);
+                    }}
+                    className="flex items-center gap-3 rounded-lg border border-[#1e2231] bg-[#13151c] p-3 text-left transition-colors hover:border-[#2d3348] hover:bg-[#1a1d27]"
+                  >
+                    <span
+                      className="h-2 w-2 rounded-full shrink-0"
+                      style={{ backgroundColor: accentColor }}
+                    />
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-medium text-slate-200 truncate">
+                        {persona.name}
+                      </p>
+                      <p className="text-[10px] text-slate-500 truncate">
+                        {persona.department.replace(/-/g, " ")}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            {personas.filter((p) => !agents.some((a) => a.status === "running" && a.role === p.name)).length === 0 && (
+              <p className="text-[12px] text-slate-600 text-center py-4">
+                All personas are busy
+              </p>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
