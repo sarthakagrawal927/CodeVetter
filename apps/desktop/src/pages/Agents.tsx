@@ -1715,7 +1715,19 @@ export default function Agents() {
             </h2>
           </div>
           <div className="flex-1 overflow-auto p-4">
-            <KanbanBoard tasks={tasks} onAddTask={handleAddTask} />
+            <KanbanBoard
+              tasks={tasks}
+              onAddTask={handleAddTask}
+              onAssignAgent={(task) => {
+                // Find first idle persona and open assign modal with task pre-filled
+                const idle = personas.find(
+                  (p) => !agents.some((a) => a.status === "running" && a.role === p.name)
+                );
+                if (idle) {
+                  setAssignPersona(idle);
+                }
+              }}
+            />
           </div>
         </div>
 

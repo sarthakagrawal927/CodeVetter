@@ -4,6 +4,7 @@ interface KanbanBoardProps {
   tasks: Task[];
   onTaskClick?: (task: Task) => void;
   onAddTask?: (column: string) => void;
+  onAssignAgent?: (task: Task) => void;
 }
 
 interface ColumnDef {
@@ -23,43 +24,51 @@ const columns: ColumnDef[] = [
 function TaskCard({
   task,
   onClick,
+  onAssign,
 }: {
   task: Task;
   onClick?: () => void;
+  onAssign?: () => void;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className="w-full rounded-lg border border-[#1e2231] bg-[#0f1117] p-3 text-left transition-all hover:border-[#2d3348] hover:bg-[#13151c]"
-    >
-      <h5 className="text-xs font-medium text-slate-200 line-clamp-2">
-        {task.title}
-      </h5>
-      {task.description && (
-        <p className="mt-1 text-[11px] text-slate-500 line-clamp-2">
-          {task.description}
-        </p>
-      )}
+    <div className="group/task w-full rounded-lg border border-[#1e2231] bg-[#0f1117] p-3 text-left transition-all hover:border-[#2d3348] hover:bg-[#13151c]">
+      <div className="cursor-pointer" onClick={onClick}>
+        <h5 className="text-xs font-medium text-slate-200 line-clamp-2">
+          {task.title}
+        </h5>
+        {task.description && (
+          <p className="mt-1 text-[11px] text-slate-500 line-clamp-2">
+            {task.description}
+          </p>
+        )}
+      </div>
       <div className="mt-2 flex items-center gap-2">
-        {task.assigned_agent && (
+        {task.assigned_agent ? (
           <div className="flex items-center gap-1">
             <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
             <span className="mono text-[10px] text-amber-400">
               {task.assigned_agent.slice(0, 8)}
             </span>
           </div>
-        )}
+        ) : onAssign ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); onAssign(); }}
+            className="text-[10px] text-slate-600 hover:text-amber-400 opacity-0 group-hover/task:opacity-100"
+          >
+            Assign agent
+          </button>
+        ) : null}
         {task.review_score != null && (
           <span className="text-[10px] text-slate-500">
             Score: {Math.round(task.review_score)}
           </span>
         )}
       </div>
-    </button>
+    </div>
   );
 }
 
-export default function KanbanBoard({ tasks, onTaskClick, onAddTask }: KanbanBoardProps) {
+export default function KanbanBoard({ tasks, onTaskClick, onAddTask, onAssignAgent }: KanbanBoardProps) {
   return (
     <div className="grid grid-cols-4 gap-3">
       {columns.map((col) => {
@@ -104,6 +113,7 @@ export default function KanbanBoard({ tasks, onTaskClick, onAddTask }: KanbanBoa
                     key={task.id}
                     task={task}
                     onClick={() => onTaskClick?.(task)}
+                    onAssign={onAssignAgent ? () => onAssignAgent(task) : undefined}
                   />
                 ))
               )}
