@@ -784,7 +784,7 @@ export default function Sessions() {
                               }
                             });
                           }}
-                          className="shrink-0 p-1.5 rounded text-slate-700 hover:text-red-400 hover:bg-red-400/10 opacity-0 group-hover:opacity-100 transition-all duration-150"
+                          className="shrink-0 p-1.5 rounded text-slate-700 hover:text-slate-400 opacity-0 group-hover:opacity-100"
                           title="Delete session"
                         >
                           <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
