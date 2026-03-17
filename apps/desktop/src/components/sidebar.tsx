@@ -139,11 +139,6 @@ export default function Sidebar() {
               {item.icon}
             </Link>
 
-            {/* Active indicator dot */}
-            {active && (
-              <span className="absolute -bottom-1 h-1 w-1 rounded-full bg-amber-400" />
-            )}
-
             {/* Tooltip */}
             {hoveredItem === item.href && (
               <span className="absolute top-full mt-2 whitespace-nowrap rounded border border-[#1e2231] bg-[#13151c] px-2 py-1 text-[10px] text-slate-400">
