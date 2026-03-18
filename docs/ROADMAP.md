@@ -17,11 +17,20 @@
 ### Beyond Conductor
 - [x] CRDT multi-agent coordination (all 5 phases)
 - [x] Linear OAuth integration
-- [x] Subagent visibility in sessions
 - [x] System resource monitor
 - [x] Slash commands dropdown
 - [x] Thinking/Plan/Fast mode toggles
 - [x] Playwright test generator (URL + description -> generate -> run -> iterate)
+- [x] Persona-based Agent Squad (read from ~/.claude/agents/, CRUD)
+- [x] Floating pill nav bar (auto-hide, icon-only, tooltips)
+- [x] shadcn/ui component library setup
+
+### Restructure
+- [x] Nav: Home, Workspaces, Board, History, Settings (5 items)
+- [x] Sessions → History (read-only, no chat input)
+- [x] Review + Test Gen → Board column actions (not separate pages)
+- [x] Kanban: To Do, In Progress, Review, Test (4 columns)
+- [x] Agent Squad: persona cards with CRUD, assign tasks directly
 
 ### Cloud Platform
 - [x] Cloudflare Workers (API + review worker)
@@ -37,12 +46,38 @@
 - [x] Rust 0 warnings
 - [x] Memory efficiency fixes
 - [x] Workspaces.tsx split into 5 modules
-- [x] Sessions made read-only
 - [x] Dead code removed, .gitignore + .env.example
+- [x] tauri:dev port fix (1420, auto-kill)
+
+---
+
+## In Progress
+
+### shadcn/ui Migration
+- [x] Setup: 10 components (Button, Card, Badge, Tooltip, Dialog, etc.)
+- [x] Board page migrated (persona cards, modals, kanban)
+- [x] Floating nav migrated (tooltips, separators)
+- [ ] Home page migration
+- [ ] History page migration
+- [ ] Settings page migration
+- [ ] Workspaces page migration
+- [ ] Command palette migration
+
+### E2E Workflow Verification
+- [ ] Create workspace → chat → review → PR → merge (full flow audit)
 
 ---
 
 ## Planned
+
+### Review Experience (Next Priority)
+- [ ] Rich review dashboard inside Workspace (not just findings list)
+- [ ] Severity-ranked findings with file/line links
+- [ ] Cross-file analysis ("this change breaks assumption in other file")
+- [ ] Approve/dismiss individual findings with reasons
+- [ ] Auto-generated review summary
+- [ ] Post review to GitHub as formal review
+- [ ] Track review quality over time (signal vs noise)
 
 ### Embeddings & RAG
 - [ ] Choose embedding model (text-embedding-3-small or free alternative)
@@ -54,7 +89,6 @@
 ### Desktop Polish
 - [ ] Live session detection — match Claude processes to sessions by cwd
 - [ ] Auto-trigger usage refresh (periodic, not manual /usage)
-- [ ] End-to-end user flow testing (workspace -> chat -> review -> PR -> merge)
 - [ ] Update Playwright e2e tests for new UI structure
 
 ### Cloud
@@ -64,7 +98,7 @@
 
 ### Future Exploration
 - [ ] Go sidecar for heavy processing (if needed at scale)
-- [ ] Durable workflows for long-running reviews (Golem/Temporal, if needed)
+- [ ] Durable workflows for long-running reviews (if needed)
 - [ ] SaaS Maker re-integration (after data restore)
 - [ ] Cross-repo coordinated reviews
 - [ ] Function-level file claiming (tree-sitter powered)
