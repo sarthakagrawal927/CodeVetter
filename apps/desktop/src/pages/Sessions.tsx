@@ -26,7 +26,7 @@ import type {
 
 // ─── Filter types ────────────────────────────────────────────────────────────
 
-type AgentFilter = "all" | "claude-code" | "codex";
+type AgentFilter = "all" | "claude-code" | "codex" | "cursor";
 type TimeRange = "30d" | "90d" | "all";
 
 function formatRelativeTime(dateStr: string): string {
@@ -629,7 +629,7 @@ export default function Sessions() {
 
           {/* Filters row */}
           <div className="flex items-center gap-1 flex-wrap text-[11px]">
-            {(["all", "claude-code", "codex"] as AgentFilter[]).map(
+            {(["all", "claude-code", "codex", "cursor"] as AgentFilter[]).map(
               (filter) => (
                 <Button
                   key={filter}
@@ -647,6 +647,8 @@ export default function Sessions() {
                     ? "All"
                     : filter === "claude-code"
                     ? "Claude"
+                    : filter === "cursor"
+                    ? "Cursor"
                     : "Codex"}
                 </Button>
               )

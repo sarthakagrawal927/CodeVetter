@@ -149,6 +149,7 @@ fn main() {
             // History / indexer commands
             commands::history::trigger_index,
             commands::history::get_index_stats,
+            commands::history::detect_cursor,
             // Agent commands
             commands::agents::launch_agent,
             commands::agents::stop_agent,

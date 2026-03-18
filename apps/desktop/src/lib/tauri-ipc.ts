@@ -214,7 +214,7 @@ export interface ReviewListItem {
 }
 
 // -- Agent aliases --
-export type AgentAdapter = "claude-code" | "codex";
+export type AgentAdapter = "claude-code" | "codex" | "cursor";
 export type AgentStatus = "idle" | "running" | "paused" | "stopped" | "error";
 export type AgentRole = "reviewer" | "coder" | "planner" | "debugger";
 
@@ -410,6 +410,16 @@ export async function triggerIndex(): Promise<TriggerIndexResult> {
 
 export async function getIndexStats(): Promise<IndexStats> {
   return safeInvoke<IndexStats>("get_index_stats");
+}
+
+export interface CursorDetectResult {
+  installed: boolean;
+  path: string;
+  has_workspaces: boolean;
+}
+
+export async function detectCursor(): Promise<CursorDetectResult> {
+  return safeInvoke<CursorDetectResult>("detect_cursor");
 }
 
 // ─── Agent Commands ──────────────────────────────────────────────────────────

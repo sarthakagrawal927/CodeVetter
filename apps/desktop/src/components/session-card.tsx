@@ -11,6 +11,7 @@ interface SessionCardProps {
 const agentDot: Record<string, string> = {
   "claude-code": "bg-amber-400",
   codex: "bg-emerald-400",
+  cursor: "bg-blue-400",
 };
 
 function formatRelativeTime(dateStr: string | null | undefined): string {

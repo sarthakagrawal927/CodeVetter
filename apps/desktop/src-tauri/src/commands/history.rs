@@ -580,6 +580,12 @@ fn full_index_impl(conn: &rusqlite::Connection) -> Result<(u64, u64, u64), Strin
     indexed_sessions += codex_indexed;
     indexed_messages += codex_messages;
 
+    // ── Phase 3: Scan Cursor AI sessions ─────────────────────
+    let (cursor_indexed, cursor_messages, cursor_skipped) = index_cursor_sessions(&conn)?;
+    indexed_sessions += cursor_indexed;
+    indexed_messages += cursor_messages;
+    skipped_sessions += cursor_skipped;
+
     Ok((indexed_sessions, indexed_messages, skipped_sessions))
 }
 
@@ -1020,6 +1026,643 @@ fn parse_codex_session(
     .map_err(|e| e.to_string())?;
 
     Ok((1, new_messages))
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Cursor AI session detection & indexing
+// ─────────────────────────────────────────────────────────────────
+
+/// Detect whether Cursor IDE is installed on this machine.
+#[tauri::command]
+pub async fn detect_cursor() -> Result<Value, String> {
+    let cursor_dir = resolve_cursor_data_dir();
+    let installed = cursor_dir.exists();
+    let workspace_storage = cursor_dir.join("User").join("workspaceStorage");
+    let has_workspaces = workspace_storage.exists();
+    Ok(json!({
+        "installed": installed,
+        "path": cursor_dir.to_string_lossy().to_string(),
+        "has_workspaces": has_workspaces,
+    }))
+}
+
+/// Resolve the Cursor data directory (platform-specific).
+fn resolve_cursor_data_dir() -> std::path::PathBuf {
+    #[cfg(target_os = "macos")]
+    {
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+        std::path::PathBuf::from(home)
+            .join("Library")
+            .join("Application Support")
+            .join("Cursor")
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+        std::path::PathBuf::from(home).join(".config").join("Cursor")
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let appdata = std::env::var("APPDATA").unwrap_or_else(|_| ".".to_string());
+        std::path::PathBuf::from(appdata).join("Cursor")
+    }
+}
+
+/// Resolve the workspace storage directory that contains .vscdb files.
+pub fn resolve_cursor_workspace_storage_dir() -> std::path::PathBuf {
+    resolve_cursor_data_dir()
+        .join("User")
+        .join("workspaceStorage")
+}
+
+/// Index Cursor AI sessions from workspace storage .vscdb files.
+///
+/// Cursor stores AI conversation data in SQLite databases within:
+///   ~/Library/Application Support/Cursor/User/workspaceStorage/<hash>/state.vscdb
+///
+/// The conversations are stored as JSON blobs keyed by specific storage keys.
+/// We extract the conversation data and map it into our existing cc_sessions schema.
+fn index_cursor_sessions(
+    conn: &rusqlite::Connection,
+) -> Result<(u64, u64, u64), String> {
+    let workspace_storage = resolve_cursor_workspace_storage_dir();
+    if !workspace_storage.exists() {
+        return Ok((0, 0, 0));
+    }
+
+    let mut indexed_sessions = 0u64;
+    let mut indexed_messages = 0u64;
+    let mut skipped_sessions = 0u64;
+
+    // Each workspace subdirectory may contain a state.vscdb
+    let entries = match std::fs::read_dir(&workspace_storage) {
+        Ok(e) => e,
+        Err(_) => return Ok((0, 0, 0)),
+    };
+
+    for entry in entries.flatten() {
+        let workspace_dir = entry.path();
+        if !workspace_dir.is_dir() {
+            continue;
+        }
+
+        let vscdb_path = workspace_dir.join("state.vscdb");
+        if !vscdb_path.exists() {
+            continue;
+        }
+
+        let vscdb_path_str = vscdb_path.to_string_lossy().to_string();
+
+        // ── Incremental check: use file mtime ────────────────
+        let file_meta = std::fs::metadata(&vscdb_path).ok();
+        let file_size = file_meta.as_ref().map(|m| m.len() as i64).unwrap_or(0);
+        let file_mtime_str = file_meta
+            .as_ref()
+            .and_then(|m| m.modified().ok())
+            .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339());
+
+        let existing = queries::get_session_by_jsonl_path(conn, &vscdb_path_str)
+            .map_err(|e| e.to_string())?;
+
+        if let Some(ref meta) = existing {
+            if meta.file_mtime.as_deref() == file_mtime_str.as_deref()
+                && meta.message_count > 0
+            {
+                skipped_sessions += 1;
+                continue;
+            }
+        }
+
+        // ── Try to read the workspace folder metadata ─────────
+        let workspace_json_path = workspace_dir.join("workspace.json");
+        let workspace_folder = read_cursor_workspace_folder(&workspace_json_path);
+
+        // ── Open the .vscdb and extract conversations ─────────
+        match parse_cursor_vscdb(
+            &vscdb_path,
+            conn,
+            &workspace_folder,
+            &vscdb_path_str,
+            file_size,
+            &file_mtime_str,
+        ) {
+            Ok((sessions, messages)) => {
+                indexed_sessions += sessions;
+                indexed_messages += messages;
+            }
+            Err(e) => {
+                log::warn!("Failed to parse Cursor vscdb {}: {}", vscdb_path_str, e);
+                continue;
+            }
+        }
+    }
+
+    Ok((indexed_sessions, indexed_messages, skipped_sessions))
+}
+
+/// Read the workspace.json file to determine the project folder.
+fn read_cursor_workspace_folder(workspace_json_path: &std::path::Path) -> Option<String> {
+    let content = std::fs::read_to_string(workspace_json_path).ok()?;
+    let parsed: Value = serde_json::from_str(&content).ok()?;
+
+    // workspace.json typically has { "folder": "file:///path/to/project" }
+    let folder = parsed.get("folder").and_then(|v| v.as_str())?;
+
+    // Strip the file:// URI prefix
+    let path = if let Some(stripped) = folder.strip_prefix("file://") {
+        // URL-decode common sequences
+        stripped
+            .replace("%20", " ")
+            .replace("%23", "#")
+            .replace("%25", "%")
+    } else {
+        folder.to_string()
+    };
+
+    if path.is_empty() {
+        None
+    } else {
+        Some(path)
+    }
+}
+
+/// Parse a Cursor state.vscdb SQLite file and extract AI conversation data.
+///
+/// The .vscdb file is a SQLite database with a `ItemTable` containing key-value
+/// pairs. AI-related data is stored under various keys prefixed with
+/// `workbench.panel.aichat` or `cursor.composerData` or similar.
+///
+/// We look for stored conversation data and map it into sessions + messages.
+fn parse_cursor_vscdb(
+    vscdb_path: &std::path::Path,
+    app_conn: &rusqlite::Connection,
+    workspace_folder: &Option<String>,
+    vscdb_path_str: &str,
+    file_size: i64,
+    file_mtime_str: &Option<String>,
+) -> Result<(u64, u64), String> {
+    // Open the .vscdb file in read-only mode
+    let cursor_db = rusqlite::Connection::open_with_flags(
+        vscdb_path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(|e| format!("Failed to open vscdb: {e}"))?;
+
+    let now = chrono::Utc::now().to_rfc3339();
+
+    // Resolve or create the project for this workspace
+    let cwd = workspace_folder.clone().unwrap_or_default();
+    if cwd.is_empty() {
+        return Ok((0, 0));
+    }
+
+    let project_id = queries::get_project_id_by_dir(app_conn, &cwd)
+        .map_err(|e| e.to_string())?
+        .unwrap_or_else(|| {
+            let pid = uuid::Uuid::new_v4().to_string();
+            let display = std::path::Path::new(&cwd)
+                .file_name()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| cwd.clone());
+            let _ = queries::upsert_project(
+                app_conn,
+                &queries::ProjectInput {
+                    id: pid.clone(),
+                    display_name: display,
+                    dir_path: cwd.clone(),
+                    session_count: None,
+                    last_activity: Some(now.clone()),
+                    created_at: now.clone(),
+                },
+            );
+            pid
+        });
+
+    let mut total_sessions = 0u64;
+    let mut total_messages = 0u64;
+
+    // ── Strategy 1: Look for composer/chat data in ItemTable ──────
+    // Cursor stores AI conversations in the ItemTable with keys like:
+    //   "composerData", "cursor.composerData", "aichat.sessions", etc.
+    let conversation_keys = [
+        "composerData",
+        "cursor.composerData",
+        "workbench.panel.aichat.sessions",
+        "workbench.panel.aichat",
+        "aiConversations",
+    ];
+
+    for key_prefix in &conversation_keys {
+        // Try exact match first, then LIKE prefix match
+        let values: Vec<String> = {
+            let mut results = Vec::new();
+
+            // Try exact key match
+            if let Ok(val) = cursor_db.query_row(
+                "SELECT value FROM ItemTable WHERE key = ?1",
+                rusqlite::params![key_prefix],
+                |row| row.get::<_, String>(0),
+            ) {
+                results.push(val);
+            }
+
+            // Also try prefix match for keys like "composerData.xxx"
+            if let Ok(mut stmt) = cursor_db.prepare(
+                "SELECT value FROM ItemTable WHERE key LIKE ?1 LIMIT 50",
+            ) {
+                let pattern = format!("{}%", key_prefix);
+                if let Ok(rows) = stmt.query_map(rusqlite::params![pattern], |row| {
+                    row.get::<_, String>(0)
+                }) {
+                    for row in rows.flatten() {
+                        if !results.contains(&row) {
+                            results.push(row);
+                        }
+                    }
+                }
+            }
+
+            results
+        };
+
+        for json_str in &values {
+            let parsed: Value = match serde_json::from_str(json_str) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+
+            // The data might be an array of conversations or an object
+            let conversations = if let Some(arr) = parsed.as_array() {
+                arr.clone()
+            } else if let Some(obj) = parsed.as_object() {
+                // Could be a map of conversation IDs to conversation objects
+                if let Some(convos) = obj.get("conversations").and_then(|v| v.as_array()) {
+                    convos.clone()
+                } else if let Some(tabs) = obj.get("allTabs").and_then(|v| v.as_array()) {
+                    // Composer data often stored under "allTabs"
+                    tabs.clone()
+                } else {
+                    // Try treating each value as a conversation
+                    obj.values().filter(|v| v.is_object()).cloned().collect()
+                }
+            } else {
+                continue;
+            };
+
+            for convo in &conversations {
+                let (sessions, messages) = parse_cursor_conversation(
+                    convo,
+                    app_conn,
+                    &project_id,
+                    &cwd,
+                    vscdb_path_str,
+                    file_size,
+                    file_mtime_str,
+                    &now,
+                )?;
+                total_sessions += sessions;
+                total_messages += messages;
+            }
+        }
+    }
+
+    // ── Strategy 2: If no structured data found, scan for JSON blobs ──
+    // Some Cursor versions store conversations differently. Scan all
+    // large JSON values in ItemTable for conversation-like structures.
+    if total_sessions == 0 {
+        if let Ok(mut stmt) = cursor_db.prepare(
+            "SELECT key, value FROM ItemTable WHERE length(value) > 500 LIMIT 200",
+        ) {
+            if let Ok(rows) = stmt.query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                ))
+            }) {
+                for row in rows.flatten() {
+                    let (_key, json_str) = row;
+                    let parsed: Value = match serde_json::from_str(&json_str) {
+                        Ok(v) => v,
+                        Err(_) => continue,
+                    };
+
+                    // Look for objects that look like conversations
+                    // (have messages/bubbles array, or role fields)
+                    if has_conversation_shape(&parsed) {
+                        let (sessions, messages) = parse_cursor_conversation(
+                            &parsed,
+                            app_conn,
+                            &project_id,
+                            &cwd,
+                            vscdb_path_str,
+                            file_size,
+                            file_mtime_str,
+                            &now,
+                        )?;
+                        total_sessions += sessions;
+                        total_messages += messages;
+                    }
+                }
+            }
+        }
+    }
+
+    Ok((total_sessions, total_messages))
+}
+
+/// Check if a JSON value looks like a conversation object.
+fn has_conversation_shape(v: &Value) -> bool {
+    if let Some(obj) = v.as_object() {
+        // Must have some kind of messages array
+        let has_messages = obj.contains_key("messages")
+            || obj.contains_key("bubbles")
+            || obj.contains_key("conversation")
+            || obj.contains_key("turns");
+
+        // Optionally should have conversation metadata
+        let has_meta = obj.contains_key("id")
+            || obj.contains_key("createdAt")
+            || obj.contains_key("name")
+            || obj.contains_key("title");
+
+        has_messages && has_meta
+    } else {
+        false
+    }
+}
+
+/// Parse a single Cursor conversation object and upsert it as a session + messages.
+fn parse_cursor_conversation(
+    convo: &Value,
+    app_conn: &rusqlite::Connection,
+    project_id: &str,
+    cwd: &str,
+    vscdb_path_str: &str,
+    file_size: i64,
+    file_mtime_str: &Option<String>,
+    now: &str,
+) -> Result<(u64, u64), String> {
+    // Extract conversation ID (for dedup)
+    let convo_id = convo
+        .get("id")
+        .or_else(|| convo.get("conversationId"))
+        .or_else(|| convo.get("tabId"))
+        .and_then(|v| v.as_str())
+        .map(String::from);
+
+    // Use a stable session ID derived from the vscdb path + conversation ID
+    // to enable deduplication across re-indexes.
+    let session_id = if let Some(ref cid) = convo_id {
+        format!("cursor-{}", cid)
+    } else {
+        // No conversation ID — generate from path hash
+        let hash = simple_hash(vscdb_path_str);
+        format!("cursor-{:x}", hash)
+    };
+
+    // Check if already indexed with same file_mtime
+    if let Ok(Some(existing)) = queries::get_session_by_jsonl_path(
+        app_conn,
+        &format!("{}#{}", vscdb_path_str, session_id),
+    ) {
+        if existing.file_mtime.as_deref() == file_mtime_str.as_deref()
+            && existing.message_count > 0
+        {
+            return Ok((0, 0));
+        }
+    }
+
+    // Extract messages from the conversation
+    let messages_arr = convo
+        .get("messages")
+        .or_else(|| convo.get("bubbles"))
+        .or_else(|| convo.get("turns"))
+        .or_else(|| convo.get("conversation"))
+        .and_then(|v| v.as_array());
+
+    let messages = match messages_arr {
+        Some(msgs) if !msgs.is_empty() => msgs,
+        _ => return Ok((0, 0)), // No messages, skip
+    };
+
+    // Extract conversation metadata
+    let title = convo
+        .get("name")
+        .or_else(|| convo.get("title"))
+        .and_then(|v| v.as_str())
+        .map(String::from);
+
+    let created_at = convo
+        .get("createdAt")
+        .or_else(|| convo.get("created_at"))
+        .or_else(|| convo.get("timestamp"))
+        .and_then(|v| {
+            // Could be a number (unix ms) or a string (ISO)
+            if let Some(s) = v.as_str() {
+                Some(s.to_string())
+            } else if let Some(n) = v.as_i64() {
+                // Unix milliseconds → RFC3339
+                chrono::DateTime::from_timestamp_millis(n)
+                    .map(|dt| dt.to_rfc3339())
+            } else if let Some(n) = v.as_f64() {
+                chrono::DateTime::from_timestamp_millis(n as i64)
+                    .map(|dt| dt.to_rfc3339())
+            } else {
+                None
+            }
+        });
+
+    let mut msg_count: i64 = 0;
+    let mut total_input: i64 = 0;
+    let mut total_output: i64 = 0;
+    let mut first_message: Option<String> = None;
+    let mut last_message: Option<String> = None;
+    let mut model_used: Option<String> = None;
+    let mut new_messages: u64 = 0;
+
+    // Delete existing messages for this session before re-indexing
+    let _ = app_conn.execute(
+        "DELETE FROM cc_messages WHERE session_id = ?1",
+        rusqlite::params![session_id],
+    );
+
+    for (i, msg) in messages.iter().enumerate() {
+        let role = msg
+            .get("role")
+            .or_else(|| msg.get("type"))
+            .or_else(|| msg.get("sender"))
+            .and_then(|v| v.as_str())
+            .map(|r| {
+                // Normalize Cursor roles to standard role names
+                match r {
+                    "human" | "user" | "1" => "user",
+                    "ai" | "assistant" | "bot" | "2" => "assistant",
+                    "system" => "system",
+                    other => other,
+                }
+                .to_string()
+            });
+
+        // Extract content text
+        let content_text = msg
+            .get("text")
+            .or_else(|| msg.get("content"))
+            .or_else(|| msg.get("message"))
+            .and_then(|v| {
+                if let Some(s) = v.as_str() {
+                    Some(s.to_string())
+                } else if let Some(arr) = v.as_array() {
+                    // Array of content blocks
+                    let texts: Vec<&str> = arr
+                        .iter()
+                        .filter_map(|block| {
+                            if let Some(s) = block.as_str() {
+                                Some(s)
+                            } else {
+                                block.get("text").and_then(|t| t.as_str())
+                            }
+                        })
+                        .collect();
+                    if texts.is_empty() { None } else { Some(texts.join("\n\n")) }
+                } else {
+                    None
+                }
+            });
+
+        // Skip empty messages
+        if content_text.as_ref().map(|t| t.trim().is_empty()).unwrap_or(true) {
+            continue;
+        }
+
+        // Timestamp
+        let ts = msg
+            .get("timestamp")
+            .or_else(|| msg.get("createdAt"))
+            .or_else(|| msg.get("created_at"))
+            .and_then(|v| {
+                if let Some(s) = v.as_str() {
+                    Some(s.to_string())
+                } else if let Some(n) = v.as_i64() {
+                    chrono::DateTime::from_timestamp_millis(n)
+                        .map(|dt| dt.to_rfc3339())
+                } else if let Some(n) = v.as_f64() {
+                    chrono::DateTime::from_timestamp_millis(n as i64)
+                        .map(|dt| dt.to_rfc3339())
+                } else {
+                    None
+                }
+            })
+            .or_else(|| created_at.clone());
+
+        if first_message.is_none() {
+            first_message = ts.clone();
+        }
+        last_message = ts.clone();
+
+        // Model
+        if let Some(m) = msg
+            .get("model")
+            .or_else(|| msg.get("modelType"))
+            .and_then(|v| v.as_str())
+        {
+            model_used = Some(m.to_string());
+        }
+
+        // Token usage (if available)
+        if let Some(usage) = msg.get("usage").or_else(|| msg.get("tokenCount")) {
+            let input_t = usage
+                .get("input_tokens")
+                .or_else(|| usage.get("promptTokens"))
+                .or_else(|| usage.get("input"))
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0);
+            let output_t = usage
+                .get("output_tokens")
+                .or_else(|| usage.get("completionTokens"))
+                .or_else(|| usage.get("output"))
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0);
+            total_input += input_t;
+            total_output += output_t;
+        }
+
+        let msg_id = format!("{}-msg-{}", session_id, i);
+
+        let _ = queries::insert_message(
+            app_conn,
+            &queries::MessageInput {
+                id: msg_id,
+                session_id: session_id.clone(),
+                parent_uuid: None,
+                msg_type: Some("message".to_string()),
+                role,
+                content_text,
+                model: model_used.clone(),
+                input_tokens: None,
+                output_tokens: None,
+                timestamp: ts,
+                line_number: Some(i as i64),
+                is_sidechain: Some(0),
+            },
+        );
+
+        msg_count += 1;
+        new_messages += 1;
+    }
+
+    if msg_count == 0 {
+        return Ok((0, 0));
+    }
+
+    let estimated_cost = estimate_cost(
+        model_used.as_deref().unwrap_or(""),
+        total_input,
+        total_output,
+        0,
+        0,
+    );
+
+    // Use a composite path for dedup: vscdb_path#session_id
+    let composite_path = format!("{}#{}", vscdb_path_str, session_id);
+
+    queries::upsert_session(
+        app_conn,
+        &queries::SessionInput {
+            id: session_id,
+            project_id: project_id.to_string(),
+            agent_type: Some("cursor".to_string()),
+            jsonl_path: Some(composite_path),
+            git_branch: None,
+            cwd: Some(cwd.to_string()),
+            cli_version: None,
+            first_message,
+            last_message,
+            message_count: Some(msg_count),
+            total_input_tokens: Some(total_input),
+            total_output_tokens: Some(total_output),
+            model_used,
+            slug: title,
+            file_size_bytes: Some(file_size),
+            indexed_at: Some(now.to_string()),
+            file_mtime: file_mtime_str.clone(),
+            cache_read_tokens: Some(0),
+            cache_creation_tokens: Some(0),
+            compaction_count: Some(0),
+            estimated_cost_usd: Some(estimated_cost),
+        },
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok((1, new_messages))
+}
+
+/// Simple hash for generating stable IDs from strings.
+fn simple_hash(s: &str) -> u64 {
+    let mut hash: u64 = 5381;
+    for byte in s.bytes() {
+        hash = hash.wrapping_mul(33).wrapping_add(byte as u64);
+    }
+    hash
 }
 
 // ─────────────────────────────────────────────────────────────────

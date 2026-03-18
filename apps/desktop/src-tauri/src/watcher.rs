@@ -22,7 +22,13 @@ pub struct SessionUpdatedPayload {
 ///
 /// Returns the `RecommendedWatcher` handle -- dropping it stops the watcher.
 pub fn start_watcher(app_handle: AppHandle) -> Result<RecommendedWatcher, String> {
-    let watch_dirs = resolve_all_claude_projects_dirs();
+    let mut watch_dirs = resolve_all_claude_projects_dirs();
+
+    // Also watch Cursor workspace storage for .vscdb changes
+    let cursor_ws = crate::commands::history::resolve_cursor_workspace_storage_dir();
+    if cursor_ws.exists() {
+        watch_dirs.push(cursor_ws);
+    }
 
     let (tx, rx) = mpsc::channel::<Result<Event, notify::Error>>();
 
@@ -104,19 +110,19 @@ fn debounce_loop(
 
         match rx.recv_timeout(timeout) {
             Ok(Ok(event)) => {
-                // Filter to only JSONL files.
-                let jsonl_paths: Vec<PathBuf> = event
+                // Filter to JSONL and vscdb files (Claude Code + Cursor).
+                let session_paths: Vec<PathBuf> = event
                     .paths
                     .into_iter()
                     .filter(|p| {
                         p.extension()
-                            .map(|ext| ext == "jsonl")
+                            .map(|ext| ext == "jsonl" || ext == "vscdb")
                             .unwrap_or(false)
                     })
                     .collect();
 
-                if !jsonl_paths.is_empty() {
-                    for p in jsonl_paths {
+                if !session_paths.is_empty() {
+                    for p in session_paths {
                         pending.insert(p);
                     }
                     if window_start.is_none() {

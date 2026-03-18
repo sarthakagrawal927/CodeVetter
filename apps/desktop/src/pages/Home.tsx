@@ -735,7 +735,7 @@ export default function Home() {
             {accounts.length === 0 ? (
               <CardContent className="flex flex-col items-center justify-center py-5 p-5">
                 <p className="text-[11px] text-slate-600">No CLI accounts detected</p>
-                <p className="text-[11px] text-slate-600 mt-0.5">Log into Claude Code, Codex, or Gemini to auto-detect</p>
+                <p className="text-[11px] text-slate-600 mt-0.5">Log into Claude Code, Codex, Cursor, or Gemini to auto-detect</p>
               </CardContent>
             ) : (
               accounts.map((account, idx) => {
