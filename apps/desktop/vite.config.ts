@@ -10,8 +10,8 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
-    strictPort: true,
+    port: 1420,
+    strictPort: false,
   },
   build: {
     outDir: "out",
