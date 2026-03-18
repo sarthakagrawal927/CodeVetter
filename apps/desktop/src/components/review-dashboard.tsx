@@ -27,8 +27,6 @@ interface TriagedFinding {
   comment: string;
 }
 
-type SidebarFilter = "all" | "file" | "severity";
-
 // ─── Severity Config ────────────────────────────────────────────────────────
 
 const SEVERITY_ORDER = ["critical", "high", "medium", "warning", "low", "suggestion", "info"];
@@ -662,7 +660,7 @@ export default function ReviewDashboard({
   }, [findings]);
 
   const filteredTriaged = useMemo(() => {
-    let result = triaged;
+    let result = [...triaged];
     if (filterFile) {
       result = result.filter((t) => t.finding.file_path === filterFile);
     }
