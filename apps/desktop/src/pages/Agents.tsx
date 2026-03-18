@@ -25,6 +25,7 @@ import {
   stopAgent,
   listTasks,
   createTask,
+  updateTask,
   listActivity,
   listAgentPresets,
   createAgentPreset,
@@ -2033,6 +2034,9 @@ export default function Agents() {
                         const projectPath = pendingAssignTask.project_path || "";
                         if (projectPath) {
                           handleAssignPersona(persona, taskDesc, projectPath);
+                          // Move task to in_progress
+                          updateTask(pendingAssignTask.id, "in_progress", persona.name).catch(() => {});
+                          refresh();
                         } else {
                           // No project path on task — fall back to persona detail
                           setSelectedAgentId(null);
