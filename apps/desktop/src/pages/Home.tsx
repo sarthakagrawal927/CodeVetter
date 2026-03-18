@@ -696,9 +696,12 @@ export default function Home() {
               className="h-auto px-1.5 py-0.5 text-[11px] text-slate-500 hover:text-slate-300"
               onClick={async () => {
                 try {
-                  const result = await detectProviderAccounts();
+                  // Re-detect accounts AND re-index sessions
+                  const [result] = await Promise.all([
+                    detectProviderAccounts(),
+                    triggerIndex(),
+                  ]);
                   setAccounts(result.accounts);
-                  // Refresh usages
                   if (result.accounts.length > 0) {
                     const usageResults = await Promise.allSettled(
                       result.accounts.map((a) => checkAccountUsage(a.id))
@@ -711,15 +714,14 @@ export default function Home() {
                     });
                     setAccountUsages(usageMap);
                   }
+                  // Refresh dashboard data after index
+                  refreshDashboard();
                 } catch (err) {
                   console.error("Detection failed:", err);
                 }
               }}
             >
               Re-detect
-            </Button>
-            <Button variant="link" size="sm" className="h-auto px-0 py-0 text-[11px] text-slate-500 hover:text-slate-300" asChild>
-              <Link to="/usage">Details</Link>
             </Button>
           </div>
         </div>
