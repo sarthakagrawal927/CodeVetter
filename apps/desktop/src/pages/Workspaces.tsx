@@ -4,7 +4,6 @@ import {
   useCallback,
   useMemo,
 } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   listWorkspaces,
   createWorkspace,
@@ -17,6 +16,7 @@ import WorkspaceChat from "@/components/workspace-chat";
 import WorkspaceRightPanel from "@/components/workspace-right-panel";
 import WorkspaceTopBar from "@/components/workspace-top-bar";
 import CreateWorkspaceModal from "@/components/create-workspace-modal";
+import ReviewDashboard from "@/components/review-dashboard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -181,7 +181,6 @@ function WorkspaceGroup({
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 export default function Workspaces() {
-  const navigate = useNavigate();
   const [workspaces, setWorkspaces] = useState<WorkspaceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -189,6 +188,7 @@ export default function Workspaces() {
   const [showCreate, setShowCreate] = useState(false);
   const [showCreatePr, setShowCreatePr] = useState(false);
   const [showRightPanel, setShowRightPanel] = useState(true);
+  const [showReview, setShowReview] = useState(false);
 
   // ─── Load workspaces ─────────────────────────────────────────────────
 
@@ -352,57 +352,68 @@ export default function Workspaces() {
       {/* Center + Right panels */}
       {selectedWorkspace ? (
         <>
-          {/* Center: Top bar + Chat */}
-          <div className="flex-1 min-w-0 flex flex-col">
-            <WorkspaceTopBar
-              workspace={selectedWorkspace}
-              onShowCreatePr={() => setShowCreatePr(true)}
-            />
-            <div className="flex-1 min-h-0">
-              <WorkspaceChat
-                key={selectedWorkspace.id}
+          {showReview ? (
+            /* ── Review Dashboard (full center area) ── */
+            <div className="flex-1 min-w-0 flex flex-col">
+              <ReviewDashboard
+                key={`review-${selectedWorkspace.id}`}
                 workspace={selectedWorkspace}
-                onSessionCreated={handleSessionCreated}
+                onClose={() => setShowReview(false)}
               />
             </div>
-          </div>
+          ) : (
+            <>
+              {/* Center: Top bar + Chat */}
+              <div className="flex-1 min-w-0 flex flex-col">
+                <WorkspaceTopBar
+                  workspace={selectedWorkspace}
+                  onShowCreatePr={() => setShowCreatePr(true)}
+                />
+                <div className="flex-1 min-h-0">
+                  <WorkspaceChat
+                    key={selectedWorkspace.id}
+                    workspace={selectedWorkspace}
+                    onSessionCreated={handleSessionCreated}
+                  />
+                </div>
+              </div>
 
-          {/* Right panel toggle + panel */}
-          <div
-            className={`shrink-0 border-l border-[#1e2231] transition-all ${
-              showRightPanel ? "w-[280px]" : "w-0"
-            } overflow-hidden`}
-          >
-            {showRightPanel && (
-              <WorkspaceRightPanel
-                workspace={selectedWorkspace}
-                onShowCreatePr={() => setShowCreatePr(true)}
-                onWorkspaceRefresh={loadWorkspaces}
-                onNavigateReview={() => {
-                  navigate(`/review?repo=${encodeURIComponent(selectedWorkspace.repo_path)}`);
-                }}
-              />
-            )}
-          </div>
+              {/* Right panel toggle + panel */}
+              <div
+                className={`shrink-0 border-l border-[#1e2231] transition-all ${
+                  showRightPanel ? "w-[280px]" : "w-0"
+                } overflow-hidden`}
+              >
+                {showRightPanel && (
+                  <WorkspaceRightPanel
+                    workspace={selectedWorkspace}
+                    onShowCreatePr={() => setShowCreatePr(true)}
+                    onWorkspaceRefresh={loadWorkspaces}
+                    onNavigateReview={() => setShowReview(true)}
+                  />
+                )}
+              </div>
 
-          {/* Toggle button (fixed to right edge of center) */}
-          <button
-            onClick={() => setShowRightPanel(!showRightPanel)}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 rounded-l-md bg-[#1a1d27] border border-r-0 border-[#1e2231] px-1 py-3 text-slate-500 hover:text-slate-300 transition-colors"
-            title={showRightPanel ? "Hide panel" : "Show panel"}
-          >
-            <svg
-              className={`h-3 w-3 transition-transform ${showRightPanel ? "" : "rotate-180"}`}
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </button>
+              {/* Toggle button (fixed to right edge of center) */}
+              <button
+                onClick={() => setShowRightPanel(!showRightPanel)}
+                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 rounded-l-md bg-[#1a1d27] border border-r-0 border-[#1e2231] px-1 py-3 text-slate-500 hover:text-slate-300 transition-colors"
+                title={showRightPanel ? "Hide panel" : "Show panel"}
+              >
+                <svg
+                  className={`h-3 w-3 transition-transform ${showRightPanel ? "" : "rotate-180"}`}
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+            </>
+          )}
         </>
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center text-slate-600">
