@@ -69,7 +69,7 @@ export default function WorkspaceChat({
 
   // ─── Stream handler ─────────────────────────────────────────────────────
 
-  const { sending, streamingText, stats: chatStats } = useChatStream({
+  const { sending, streamingText, stats: chatStats, activityStep } = useChatStream({
     onAssistantDone(text, newSessionId) {
       setChatState("idle");
       if (text.trim()) {
@@ -296,9 +296,9 @@ export default function WorkspaceChat({
                         />
                       </div>
                       <span className="text-[12px] text-slate-500">
-                        {chatState === "waiting"
-                          ? "Connecting..."
-                          : "Thinking..."}
+                        {activityStep
+                          ? `${activityStep.label}${activityStep.detail ? ` ${activityStep.detail}` : ""}...`
+                          : "Working..."}
                       </span>
                     </div>
                   )}
