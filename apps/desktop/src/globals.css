@@ -114,4 +114,41 @@
       opacity: 0.5;
     }
   }
+
+  /* Onboarding step transitions */
+  .onboarding-enter-forward {
+    animation: onboardingEnterForward 0.3s ease-out;
+  }
+
+  .onboarding-enter-backward {
+    animation: onboardingEnterBackward 0.3s ease-out;
+  }
+
+  .onboarding-exit {
+    opacity: 0;
+    transform: scale(0.98);
+    transition: opacity 0.15s ease-in, transform 0.15s ease-in;
+  }
+
+  @keyframes onboardingEnterForward {
+    from {
+      opacity: 0;
+      transform: translateX(16px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0) scale(1);
+    }
+  }
+
+  @keyframes onboardingEnterBackward {
+    from {
+      opacity: 0;
+      transform: translateX(-16px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0) scale(1);
+    }
+  }
 }

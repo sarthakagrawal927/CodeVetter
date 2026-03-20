@@ -15,6 +15,7 @@ pub mod preferences;
 pub mod presets;
 pub mod review;
 pub mod sessions;
+pub mod setup;
 pub mod system_monitor;
 pub mod terminal;
 pub mod workspaces;

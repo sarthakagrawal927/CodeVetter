@@ -823,6 +823,18 @@ export async function setPreference(
   return safeInvoke("set_preference", { key, value });
 }
 
+// ─── Setup / Onboarding Commands ────────────────────────────────────────────
+
+export interface PrerequisiteStatus {
+  claude_code: boolean;
+  github_cli: boolean;
+  codex: boolean;
+}
+
+export async function checkPrerequisites(): Promise<PrerequisiteStatus> {
+  return safeInvoke("check_prerequisites");
+}
+
 // ─── Git Commands ───────────────────────────────────────────────────────────
 
 export interface GitBranchesResult {

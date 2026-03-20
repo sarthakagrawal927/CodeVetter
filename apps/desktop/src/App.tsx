@@ -4,6 +4,7 @@ import Sidebar from "@/components/sidebar";
 import Onboarding from "@/components/onboarding";
 import CommandPalette from "@/components/command-palette";
 import KeyboardShortcuts from "@/components/keyboard-shortcuts";
+import UpdateChecker from "@/components/update-checker";
 import { getPreference, isTauriAvailable } from "@/lib/tauri-ipc";
 
 // Pages
@@ -79,6 +80,7 @@ function Shell() {
 
   return (
     <div className="flex h-full w-full">
+      <UpdateChecker />
       {showOnboarding && (
         <Onboarding onComplete={() => setShowOnboarding(false)} />
       )}

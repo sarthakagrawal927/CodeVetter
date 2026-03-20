@@ -28,6 +28,8 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // Resolve the app-local data directory for storing the SQLite DB.
             let app_data_dir = app
@@ -250,6 +252,8 @@ fn main() {
             commands::playwright_gen::generate_playwright_test,
             commands::playwright_gen::run_playwright_test,
             commands::playwright_gen::iterate_playwright_test,
+            // Setup / onboarding
+            commands::setup::check_prerequisites,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
