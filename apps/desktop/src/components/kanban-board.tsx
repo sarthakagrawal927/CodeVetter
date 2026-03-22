@@ -1,9 +1,12 @@
 import type { Task } from "@/lib/tauri-ipc";
+import type { LoopState } from "@/lib/review-loop";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 interface KanbanBoardProps {
   tasks: Task[];
+  loopStates?: Map<string, LoopState>;
   onTaskClick?: (task: Task) => void;
   onAddTask?: (column: string) => void;
   onAssignAgent?: (task: Task) => void;
@@ -21,14 +24,57 @@ const columns: ColumnDef[] = [
   { id: "in_progress", label: "In Progress", icon: "\u25B6", color: "text-amber-400" },
   { id: "in_review", label: "Review", icon: "\u2714", color: "text-yellow-400" },
   { id: "in_test", label: "Test", icon: "\u25B6", color: "text-blue-400" },
+  { id: "done", label: "Done", icon: "\u2713", color: "text-emerald-400" },
 ];
+
+function LoopBadge({ loopState }: { loopState: LoopState }) {
+  switch (loopState.status) {
+    case "reviewing":
+      return (
+        <Badge variant="outline" className="animate-pulse border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-400 px-1.5 py-0">
+          Reviewing...
+        </Badge>
+      );
+    case "waiting_for_fix":
+      return (
+        <Badge variant="outline" className="border-yellow-500/40 bg-yellow-500/10 text-[10px] text-yellow-400 px-1.5 py-0">
+          Fix attempt {loopState.attempt}/{loopState.maxAttempts}
+        </Badge>
+      );
+    case "passed":
+      return (
+        <Badge variant="outline" className="border-emerald-500/40 bg-emerald-500/10 text-[10px] text-emerald-400 px-1.5 py-0">
+          Passed &#10003; {loopState.lastScore}
+        </Badge>
+      );
+    case "failed_max_attempts":
+      return (
+        <Badge variant="outline" className="border-red-500/40 bg-red-500/10 text-[10px] text-red-400 px-1.5 py-0">
+          Failed ({loopState.lastScore})
+        </Badge>
+      );
+    default:
+      return null;
+  }
+}
+
+function ScoreTrend({ history }: { history: LoopState["reviewHistory"] }) {
+  if (history.length < 2) return null;
+  return (
+    <span className="text-[10px] text-slate-500">
+      {history.map((h) => Math.round(h.score)).join(" \u2192 ")}
+    </span>
+  );
+}
 
 function TaskCard({
   task,
+  loopState,
   onClick,
   onAssign,
 }: {
   task: Task;
+  loopState?: LoopState;
   onClick?: () => void;
   onAssign?: () => void;
 }) {
@@ -45,6 +91,14 @@ function TaskCard({
             </p>
           )}
         </div>
+
+        {loopState && loopState.status !== "idle" && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <LoopBadge loopState={loopState} />
+            <ScoreTrend history={loopState.reviewHistory} />
+          </div>
+        )}
+
         <div className="mt-2 flex items-center gap-2">
           {task.assigned_agent ? (
             <div className="flex items-center gap-1">
@@ -74,16 +128,17 @@ function TaskCard({
   );
 }
 
-export default function KanbanBoard({ tasks, onTaskClick, onAddTask, onAssignAgent }: KanbanBoardProps) {
+export default function KanbanBoard({ tasks, loopStates, onTaskClick, onAddTask, onAssignAgent }: KanbanBoardProps) {
   return (
-    <div className="grid grid-cols-4 gap-3 min-w-[600px]">
+    <div className="grid grid-cols-5 gap-3 min-w-[750px]">
       {columns.map((col) => {
         const colTasks = tasks.filter((t) => {
           if (t.status === col.id) return true;
-          // Map legacy statuses to new columns
+          // Map legacy statuses to columns
           if (col.id === "todo" && (t.status === "backlog" || t.status === "pending")) return true;
           if (col.id === "in_progress" && t.status === "in_progress") return true;
-          if (col.id === "in_review" && (t.status === "in_review" || t.status === "done")) return true;
+          if (col.id === "in_review" && t.status === "in_review") return true;
+          if (col.id === "done" && t.status === "done") return true;
           return false;
         });
         return (
@@ -120,6 +175,7 @@ export default function KanbanBoard({ tasks, onTaskClick, onAddTask, onAssignAge
                   <TaskCard
                     key={task.id}
                     task={task}
+                    loopState={loopStates?.get(task.id)}
                     onClick={() => onTaskClick?.(task)}
                     onAssign={onAssignAgent ? () => onAssignAgent(task) : undefined}
                   />

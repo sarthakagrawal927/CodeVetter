@@ -47,6 +47,7 @@ import {
   deleteAgentPersona,
 } from "@/lib/tauri-ipc";
 import type { AgentProcess, Task, ActivityEvent, AgentPreset, AgentPersona, LinearIssue, SessionRow, MessageRow, ReviewTone } from "@/lib/tauri-ipc";
+import { startReviewLoop, continueReviewLoop, getAllActiveLoops, type LoopState } from "@/lib/review-loop";
 
 // ─── Create Task Modal ──────────────────────────────────────────────────────
 
@@ -1337,6 +1338,7 @@ export default function Agents() {
   const [pendingAssignTask, setPendingAssignTask] = useState<Task | null>(null);
   const [linearConnected, setLinearConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loopStates, setLoopStates] = useState<Map<string, LoopState>>(new Map());
 
   // Agent conversation panel state
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -1424,6 +1426,32 @@ export default function Agents() {
       unlistenActivity?.();
     };
   }, [refresh, loadPresets, loadPersonas]);
+
+  // ─── Review feedback loop ─────────────────────────────────────────────────
+
+  const handleLoopStateChange = useCallback((state: LoopState) => {
+    setLoopStates(prev => {
+      const next = new Map(prev);
+      next.set(state.taskId, state);
+      return next;
+    });
+    refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    for (const task of tasks) {
+      if (task.status === "in_review" && task.project_path) {
+        const existing = loopStates.get(task.id);
+        if (!existing || existing.status === "waiting_for_fix") {
+          if (existing?.status === "waiting_for_fix") {
+            continueReviewLoop(task, handleLoopStateChange);
+          } else if (!existing) {
+            startReviewLoop(task, handleLoopStateChange);
+          }
+        }
+      }
+    }
+  }, [tasks]); // intentionally sparse deps — only trigger on task list changes
 
   // ─── Load agent conversation when selected ──────────────────────────────
 
@@ -1910,6 +1938,7 @@ export default function Agents() {
           <div className="flex-1 overflow-auto p-4">
             <KanbanBoard
               tasks={tasks}
+              loopStates={loopStates}
               onAddTask={handleAddTask}
               onAssignAgent={(task) => {
                 setPendingAssignTask(task);
