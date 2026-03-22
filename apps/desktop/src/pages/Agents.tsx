@@ -1629,297 +1629,295 @@ export default function Agents() {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Header — minimal: task count left, actions right */}
-      <div className="flex items-center justify-between border-b border-[#1e2231] px-6 py-3">
-        <div className="flex items-center gap-3">
-          <span className="text-[13px] text-slate-400">
-            {tasks.length} {tasks.length === 1 ? "task" : "tasks"}
-          </span>
+    <div className="flex h-full">
+      {/* Left sidebar - Agent Squad (always visible) */}
+      <div className="w-60 shrink-0 border-r border-[#1e2231] flex flex-col overflow-hidden">
+        <div className="border-b border-[#1e2231] px-4 py-3">
+          <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            Agent Squad
+          </h2>
         </div>
-        <div className="flex items-center gap-2">
-          {linearConnected && (
-            <button
-              onClick={() => {
-                setShowLinearImport(true);
-                setShowCreateTask(false);
-                setShowLaunchPanel(false);
-              }}
-              className="rounded-lg border border-[#5E6AD2]/30 px-3 py-1.5 text-[12px] font-medium text-[#5E6AD2] transition-colors hover:border-[#5E6AD2]/60 hover:bg-[#5E6AD2]/5"
-            >
-              Import from Linear
-            </button>
-          )}
-          <button
-            onClick={() => {
-              setShowCreateTask(!showCreateTask);
-              setShowLaunchPanel(false);
-              setShowLinearImport(false);
-            }}
-            className="rounded-lg border border-[#1e2231] px-3 py-1.5 text-[12px] font-medium text-slate-300 transition-colors hover:border-[#2d3348] hover:text-white"
-          >
-            + Task
-          </button>
-        </div>
-      </div>
-
-      {/* Error banner */}
-      {error && (
-        <div className="mx-6 mt-3 rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-2">
-          <p className="text-xs text-red-400">{error}</p>
-        </div>
-      )}
-
-      {/* Two-panel layout */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left panel: Agent Squad */}
-        <div className="flex w-[320px] min-w-[220px] max-w-[320px] shrink-0 flex-col border-r border-[#1e2231] overflow-hidden">
-          <div className="border-b border-[#1e2231] px-4 py-3">
-            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-              Agent Squad
-            </h2>
-          </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            {personas.length === 0 ? (
-              <div className="flex flex-col gap-3">
-                {/* Fallback: show flat agent cards when no personas loaded */}
-                {agents.length === 0 ? (
-                  <div className="flex flex-col items-center py-12 text-slate-600">
-                    <p className="text-xs">No personas yet</p>
-                    <button
-                      onClick={() => {
-                        setEditingPersona(undefined);
-                        setShowPersonaModal(true);
-                      }}
-                      className="mt-2 text-xs text-amber-400 hover:text-amber-300"
-                    >
-                      Create one
-                    </button>
-                  </div>
-                ) : (
-                  agents.map((agent) => (
-                    <AgentCard
-                      key={agent.id}
-                      agent={agent}
-                      selected={selectedAgentId === agent.id}
-                      onStop={handleStopAgent}
-                      onClick={() => {
-                        setSelectedPersona(null);
-                        setSelectedAgentId(
-                          selectedAgentId === agent.id ? null : agent.id
-                        );
-                      }}
-                    />
-                  ))
-                )}
-                {/* + New Persona */}
-                <button
-                  onClick={() => {
-                    setEditingPersona(undefined);
-                    setShowPersonaModal(true);
-                  }}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#2d3348] bg-transparent py-2.5 text-slate-500 transition-colors hover:border-amber-500/40 hover:text-slate-400"
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                  <span className="text-[11px]">New Persona</span>
-                </button>
-              </div>
-            ) : (
-              <div className="flex flex-col">
-                {Object.entries(personasByDepartment).map(([dept, deptPersonas]) => (
-                  <div key={dept}>
-                    <h3 className="text-[10px] uppercase tracking-wider text-slate-600 mt-4 mb-2 px-1 first:mt-0">
-                      {dept.replace(/-/g, " ")}
-                    </h3>
-                    <div className="flex flex-col gap-1.5">
-                      {deptPersonas.map((persona) => (
-                        <CompactPersonaCard
-                          key={persona.id}
-                          persona={persona}
-                          busyAgent={getBusyAgentForPersona(persona)}
-                          selected={selectedPersona?.id === persona.id && rightPanelMode === "persona-detail"}
-                          onClick={() => {
-                            const busy = getBusyAgentForPersona(persona);
-                            if (busy) {
-                              // If busy, go directly to agent conversation
-                              setSelectedPersona(null);
-                              setSelectedAgentId(busy.id);
-                            } else {
-                              // Show persona detail
-                              setSelectedAgentId(null);
-                              setSelectedPersona(
-                                selectedPersona?.id === persona.id ? null : persona
-                              );
-                            }
-                          }}
-                          onEdit={() => handleEditPersona(persona)}
-                          onDelete={() => handleDeletePersona(persona)}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-
-                {/* Show any running agents not matched to a persona */}
-                {agents.filter(
-                  (a) =>
-                    a.status === "running" &&
-                    !personas.some((p) => p.name === a.role)
-                ).length > 0 && (
-                  <div>
-                    <h3 className="text-[10px] uppercase tracking-wider text-slate-600 mt-4 mb-2 px-1">
-                      Custom Agents
-                    </h3>
-                    <div className="flex flex-col gap-1.5">
-                      {agents
-                        .filter(
-                          (a) =>
-                            a.status === "running" &&
-                            !personas.some((p) => p.name === a.role)
-                        )
-                        .map((agent) => (
-                          <AgentCard
-                            key={agent.id}
-                            agent={agent}
-                            selected={selectedAgentId === agent.id}
-                            onStop={handleStopAgent}
-                            onClick={() => {
-                              setSelectedPersona(null);
-                              setSelectedAgentId(
-                                selectedAgentId === agent.id ? null : agent.id
-                              );
-                            }}
-                          />
-                        ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* + New Persona */}
-                <button
-                  onClick={() => {
-                    setEditingPersona(undefined);
-                    setShowPersonaModal(true);
-                  }}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#2d3348] bg-transparent py-2.5 mt-4 text-slate-500 transition-colors hover:border-amber-500/40 hover:text-slate-400"
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                  <span className="text-[11px]">New Persona</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right panel: context-sensitive */}
-        <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
-          {rightPanelMode === "agent-conversation" && selectedAgent ? (
-            <>
-              {/* Conversation header */}
-              <div className="shrink-0 border-b border-[#1e2231] px-4 py-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => setSelectedAgentId(null)}
-                      className="flex items-center gap-1 text-[12px] text-slate-500 hover:text-slate-300 transition-colors"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="15 18 9 12 15 6" />
-                      </svg>
-                      Back to Board
-                    </button>
-                    <div className="h-4 w-px bg-[#1e2231]" />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-semibold text-slate-200">
-                          {selectedAgent.display_name ?? `${selectedAgent.agent_type} agent`}
-                        </h3>
-                        {selectedAgent.status === "running" && (
-                          <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            Live
-                          </span>
-                        )}
-                        {selectedAgent.status !== "running" && (
-                          <span className="rounded-full bg-slate-500/10 px-2 py-0.5 text-[10px] font-medium text-slate-400">
-                            {selectedAgent.status}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[11px] text-slate-500 uppercase tracking-wide">
-                          {selectedAgent.agent_type}
-                          {selectedAgent.role ? ` / ${selectedAgent.role}` : ""}
-                        </span>
-                        {selectedAgent.project_path && (
-                          <span className="mono text-[11px] text-slate-600 truncate max-w-[200px]">
-                            {selectedAgent.project_path}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Conversation body */}
-              {agentMessagesLoading ? (
-                <div className="flex flex-1 flex-col items-center justify-center text-slate-600">
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-amber-400 border-t-transparent mb-3" />
-                  <p className="text-xs">Loading conversation...</p>
-                </div>
-              ) : agentMessages.length === 0 && !selectedAgent.session_id ? (
-                <div className="flex flex-1 flex-col items-center justify-center text-slate-600">
-                  <p className="text-xs">No conversation found</p>
-                  <p className="text-[10px] text-slate-700 mt-1">
-                    {selectedAgent.status === "running"
-                      ? "Agent is still running — messages will appear after re-indexing"
-                      : "Session may not have been indexed yet. Try triggering a re-index from Home."}
-                  </p>
+        <div className="flex-1 overflow-y-auto p-3">
+          {personas.length === 0 ? (
+            <div className="flex flex-col gap-3">
+              {/* Fallback: show flat agent cards when no personas loaded */}
+              {agents.length === 0 ? (
+                <div className="flex flex-col items-center py-12 text-slate-600">
+                  <p className="text-xs">No personas yet</p>
+                  <button
+                    onClick={() => {
+                      setEditingPersona(undefined);
+                      setShowPersonaModal(true);
+                    }}
+                    className="mt-2 text-xs text-amber-400 hover:text-amber-300"
+                  >
+                    Create one
+                  </button>
                 </div>
               ) : (
-                <div className="flex-1 overflow-hidden">
-                  <ChatViewer
-                    messages={agentMessages}
-                    session={agentSession ?? undefined}
-                    isLoading={false}
+                agents.map((agent) => (
+                  <AgentCard
+                    key={agent.id}
+                    agent={agent}
+                    selected={selectedAgentId === agent.id}
+                    onStop={handleStopAgent}
+                    onClick={() => {
+                      setSelectedPersona(null);
+                      setSelectedAgentId(
+                        selectedAgentId === agent.id ? null : agent.id
+                      );
+                    }}
                   />
+                ))
+              )}
+              {/* + New Persona */}
+              <button
+                onClick={() => {
+                  setEditingPersona(undefined);
+                  setShowPersonaModal(true);
+                }}
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#2d3348] bg-transparent py-2.5 text-slate-500 transition-colors hover:border-amber-500/40 hover:text-slate-400"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                <span className="text-[11px]">New Persona</span>
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col">
+              {Object.entries(personasByDepartment).map(([dept, deptPersonas]) => (
+                <div key={dept}>
+                  <h3 className="text-[10px] uppercase tracking-wider text-slate-600 mt-4 mb-2 px-1 first:mt-0">
+                    {dept.replace(/-/g, " ")}
+                  </h3>
+                  <div className="flex flex-col gap-1.5">
+                    {deptPersonas.map((persona) => (
+                      <CompactPersonaCard
+                        key={persona.id}
+                        persona={persona}
+                        busyAgent={getBusyAgentForPersona(persona)}
+                        selected={selectedPersona?.id === persona.id && rightPanelMode === "persona-detail"}
+                        onClick={() => {
+                          const busy = getBusyAgentForPersona(persona);
+                          if (busy) {
+                            // If busy, go directly to agent conversation
+                            setSelectedPersona(null);
+                            setSelectedAgentId(busy.id);
+                          } else {
+                            // Show persona detail
+                            setSelectedAgentId(null);
+                            setSelectedPersona(
+                              selectedPersona?.id === persona.id ? null : persona
+                            );
+                          }
+                        }}
+                        onEdit={() => handleEditPersona(persona)}
+                        onDelete={() => handleDeletePersona(persona)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {/* Show any running agents not matched to a persona */}
+              {agents.filter(
+                (a) =>
+                  a.status === "running" &&
+                  !personas.some((p) => p.name === a.role)
+              ).length > 0 && (
+                <div>
+                  <h3 className="text-[10px] uppercase tracking-wider text-slate-600 mt-4 mb-2 px-1">
+                    Custom Agents
+                  </h3>
+                  <div className="flex flex-col gap-1.5">
+                    {agents
+                      .filter(
+                        (a) =>
+                          a.status === "running" &&
+                          !personas.some((p) => p.name === a.role)
+                      )
+                      .map((agent) => (
+                        <AgentCard
+                          key={agent.id}
+                          agent={agent}
+                          selected={selectedAgentId === agent.id}
+                          onStop={handleStopAgent}
+                          onClick={() => {
+                            setSelectedPersona(null);
+                            setSelectedAgentId(
+                              selectedAgentId === agent.id ? null : agent.id
+                            );
+                          }}
+                        />
+                      ))}
+                  </div>
                 </div>
               )}
-            </>
-          ) : rightPanelMode === "persona-detail" && selectedPersona ? (
-            <PersonaDetailPanel
-              persona={selectedPersona}
-              busyAgent={getBusyAgentForPersona(selectedPersona)}
-              onBack={() => setSelectedPersona(null)}
-              onAssign={(taskDesc, projectPath) =>
-                handleAssignPersona(selectedPersona, taskDesc, projectPath)
-              }
-              onViewAgent={(agentId) => {
-                setSelectedPersona(null);
-                setSelectedAgentId(agentId);
-              }}
-            />
-          ) : (
-            /* Default: Kanban board (full width, clean) */
-            <div className="flex-1 overflow-auto p-4">
-              <KanbanBoard
-                tasks={tasks}
-                onAddTask={handleAddTask}
-                onAssignAgent={(task) => {
-                  setPendingAssignTask(task);
-                  setShowPersonaPicker(true);
+
+              {/* + New Persona */}
+              <button
+                onClick={() => {
+                  setEditingPersona(undefined);
+                  setShowPersonaModal(true);
                 }}
-              />
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#2d3348] bg-transparent py-2.5 mt-4 text-slate-500 transition-colors hover:border-amber-500/40 hover:text-slate-400"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                <span className="text-[11px]">New Persona</span>
+              </button>
             </div>
           )}
         </div>
+      </div>
+
+      {/* Main area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header — minimal: task count left, actions right */}
+        <div className="flex items-center justify-between border-b border-[#1e2231] px-6 py-3">
+          <div className="flex items-center gap-3">
+            <span className="text-[13px] text-slate-400">
+              {tasks.length} {tasks.length === 1 ? "task" : "tasks"}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {linearConnected && (
+              <button
+                onClick={() => {
+                  setShowLinearImport(true);
+                  setShowCreateTask(false);
+                  setShowLaunchPanel(false);
+                }}
+                className="rounded-lg border border-[#5E6AD2]/30 px-3 py-1.5 text-[12px] font-medium text-[#5E6AD2] transition-colors hover:border-[#5E6AD2]/60 hover:bg-[#5E6AD2]/5"
+              >
+                Import from Linear
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setShowCreateTask(!showCreateTask);
+                setShowLaunchPanel(false);
+                setShowLinearImport(false);
+              }}
+              className="rounded-lg border border-[#1e2231] px-3 py-1.5 text-[12px] font-medium text-slate-300 transition-colors hover:border-[#2d3348] hover:text-white"
+            >
+              + Task
+            </button>
+          </div>
+        </div>
+
+        {/* Error banner */}
+        {error && (
+          <div className="mx-6 mt-3 rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-2">
+            <p className="text-xs text-red-400">{error}</p>
+          </div>
+        )}
+
+        {/* Content: context-sensitive */}
+        {rightPanelMode === "agent-conversation" && selectedAgent ? (
+          <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
+            {/* Conversation header */}
+            <div className="shrink-0 border-b border-[#1e2231] px-4 py-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setSelectedAgentId(null)}
+                    className="flex items-center gap-1 text-[12px] text-slate-500 hover:text-slate-300 transition-colors"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="15 18 9 12 15 6" />
+                    </svg>
+                    Back to Board
+                  </button>
+                  <div className="h-4 w-px bg-[#1e2231]" />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-semibold text-slate-200">
+                        {selectedAgent.display_name ?? `${selectedAgent.agent_type} agent`}
+                      </h3>
+                      {selectedAgent.status === "running" && (
+                        <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          Live
+                        </span>
+                      )}
+                      {selectedAgent.status !== "running" && (
+                        <span className="rounded-full bg-slate-500/10 px-2 py-0.5 text-[10px] font-medium text-slate-400">
+                          {selectedAgent.status}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[11px] text-slate-500 uppercase tracking-wide">
+                        {selectedAgent.agent_type}
+                        {selectedAgent.role ? ` / ${selectedAgent.role}` : ""}
+                      </span>
+                      {selectedAgent.project_path && (
+                        <span className="mono text-[11px] text-slate-600 truncate max-w-[200px]">
+                          {selectedAgent.project_path}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Conversation body */}
+            {agentMessagesLoading ? (
+              <div className="flex flex-1 flex-col items-center justify-center text-slate-600">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-amber-400 border-t-transparent mb-3" />
+                <p className="text-xs">Loading conversation...</p>
+              </div>
+            ) : agentMessages.length === 0 && !selectedAgent.session_id ? (
+              <div className="flex flex-1 flex-col items-center justify-center text-slate-600">
+                <p className="text-xs">No conversation found</p>
+                <p className="text-[10px] text-slate-700 mt-1">
+                  {selectedAgent.status === "running"
+                    ? "Agent is still running — messages will appear after re-indexing"
+                    : "Session may not have been indexed yet. Try triggering a re-index from Home."}
+                </p>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-hidden">
+                <ChatViewer
+                  messages={agentMessages}
+                  session={agentSession ?? undefined}
+                  isLoading={false}
+                />
+              </div>
+            )}
+          </div>
+        ) : rightPanelMode === "persona-detail" && selectedPersona ? (
+          <PersonaDetailPanel
+            persona={selectedPersona}
+            busyAgent={getBusyAgentForPersona(selectedPersona)}
+            onBack={() => setSelectedPersona(null)}
+            onAssign={(taskDesc, projectPath) =>
+              handleAssignPersona(selectedPersona, taskDesc, projectPath)
+            }
+            onViewAgent={(agentId) => {
+              setSelectedPersona(null);
+              setSelectedAgentId(agentId);
+            }}
+          />
+        ) : (
+          /* Default: Kanban board (full width) */
+          <div className="flex-1 overflow-auto p-4">
+            <KanbanBoard
+              tasks={tasks}
+              onAddTask={handleAddTask}
+              onAssignAgent={(task) => {
+                setPendingAssignTask(task);
+                setShowPersonaPicker(true);
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Create Task Dialog */}
