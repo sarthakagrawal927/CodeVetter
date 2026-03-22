@@ -73,26 +73,26 @@ Remove dead code and simplify architecture.
 
 Wire review-core directly into the desktop webview. No sidecar, no server.
 
-- [ ] Local repo indexing
-  - Tree-sitter code chunking (reuse logic from `workers/review/`)
-  - Index local repo files into SQLite (semantic chunks)
-  - Incremental re-indexing on file changes (leverage existing file watcher)
-  - Feed indexed context into review prompts (RAG)
-- [ ] Review orchestration in React
-  - User picks a local repo (directory picker via Tauri IPC)
-  - Tauri Rust command: `get_local_diff(repo_path)` returns git diff
-  - React imports `review-core.buildPrompt()` + `ai-gateway-client`
-  - Calls LLM with user's configured API key + indexed context
-  - `review-core.parseReviewResponse()` + `computeScore()`
-  - Tauri Rust command: `save_review(findings, score)` to local SQLite
-- [ ] Review results UI
+- [x] Review orchestration in React
+  - review-service.ts: get diff (IPC) → review-core → ai-gateway-client → save (IPC)
+  - use-review.ts hook with progress tracking
+  - review-dashboard rewired to use direct pipeline (no sidecar, no polling)
+- [x] Settings: AI Provider configuration
+  - Anthropic, OpenAI, OpenRouter, or custom gateway
+  - API key + model stored in localStorage
+- [x] Improve review prompt for agent-specific mistakes
+  - Detailed bloat detection rules (one-use abstractions, wrapper functions, dead config)
+  - Agent artifact detection (unused imports, dead vars, debug logs, TODOs)
+  - Correctness checks (broken callers, hardcoded values, disabled auth)
+  - System prompt tuned for "less code is better"
+- [ ] Custom review rules per repo/language
+  - Store rules in local SQLite, inject into prompt
+  - Reuse workspace_rule_defaults / repository_rule_overrides pattern from cloud schema
+- [ ] Review results UI polish
   - Severity-ranked findings with file/line links
   - Approve/dismiss individual findings
   - Auto-generated summary (markdown)
   - Review history (list past reviews per repo)
-- [ ] Settings: API key configuration
-  - Support Anthropic, OpenAI, or custom gateway URL
-  - Store securely (Tauri keychain or encrypted local storage)
 
 ---
 
@@ -134,7 +134,18 @@ Strengthen the mission control / agent orchestration features.
 
 ---
 
-## Phase 5: Web App (later)
+## Phase 5: Semantic Indexing (later)
+
+Detect duplicate/similar functions across the codebase to catch agent copy-paste.
+
+- [ ] Embedding-based similarity search for code symbols
+- [ ] "You added X but Y already exists" findings
+- [ ] Tree-sitter symbol extraction + vector storage
+- [ ] Incremental re-indexing on file changes
+
+---
+
+## Phase 6: Web App (later)
 
 Strip down desktop app into a hosted web version.
 
