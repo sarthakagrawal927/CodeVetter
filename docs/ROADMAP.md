@@ -1,5 +1,7 @@
 # CodeVetter Roadmap
 
+> Desktop-first. Web later. Previous roadmap archived at `plans/2026-03-21-roadmap-pre-consolidation.md`.
+
 ## Completed
 
 ### Desktop App — Conductor Parity
@@ -20,96 +22,138 @@
 - [x] System resource monitor
 - [x] Slash commands dropdown
 - [x] Thinking/Plan/Fast mode toggles
-- [x] Playwright test generator (URL + description -> generate -> run -> iterate)
-- [x] Persona-based Agent Squad (read from ~/.claude/agents/, CRUD)
-- [x] Floating pill nav bar (auto-hide, icon-only, tooltips)
+- [x] Playwright test generator
+- [x] Persona-based Agent Squad (from ~/.claude/agents/)
+- [x] Floating pill nav bar
 - [x] shadcn/ui component library setup
 
-### Restructure
-- [x] Nav: Home, Workspaces, Board, History, Settings (5 items)
-- [x] Sessions → History (read-only, no chat input)
-- [x] Review + Test Gen → Board column actions (not separate pages)
-- [x] Kanban: To Do, In Progress, Review, Test (4 columns)
-- [x] Agent Squad: persona cards with CRUD, assign tasks directly
+### Structure
+- [x] Nav: Home, Workspaces, Board, History, Settings
+- [x] Sessions -> History (read-only)
+- [x] Kanban: To Do, In Progress, Review, Test
+- [x] Agent Squad: persona cards with CRUD
 
-### Cloud Platform
+### Cloud Platform (built, on hold)
 - [x] Cloudflare Workers (API + review worker)
-- [x] Next.js dashboard on Vercel
 - [x] Landing page on Vercel
-- [x] CockroachDB with indexing tables
-- [x] GitHub OAuth + RBAC
-- [x] Webhook ingestion with signature validation
+- [x] Dashboard on Vercel (to be deprecated)
+- [x] CockroachDB + GitHub OAuth + webhooks
 
 ### Infrastructure
-- [x] Husky pre-commit (lint-staged) + pre-push hooks
-- [x] ESLint flat config (0 warnings)
-- [x] Rust 0 warnings
-- [x] Memory efficiency fixes
-- [x] Workspaces.tsx split into 5 modules
-- [x] Dead code removed, .gitignore + .env.example
-- [x] tauri:dev port fix (1420, auto-kill)
+- [x] Husky pre-commit + pre-push hooks
+- [x] ESLint flat config, Rust 0 warnings
+- [x] .gitignore for target/, sidecar/, .env
+- [x] git history cleaned (removed 2GB+ of build artifacts)
 
 ---
 
-## In Progress
+## Phase 1: Cleanup (current)
 
-### shadcn/ui Migration
-- [x] Setup: 10 components (Button, Card, Badge, Tooltip, Dialog, etc.)
-- [x] Board page migrated (persona cards, modals, kanban)
-- [x] Floating nav migrated (tooltips, separators)
-- [ ] Home page migration
-- [ ] History page migration
-- [ ] Settings page migration
-- [ ] Workspaces page migration
-- [ ] Command palette migration
+Remove dead code and simplify architecture.
 
-### E2E Workflow Verification
-- [ ] Create workspace → chat → review → PR → merge (full flow audit)
+- [x] Delete sidecar directory and all references
+  - Removed sidecar spawning from `review.rs`, replaced with `get_local_diff` + `save_review`
+  - Removed sidecar spawning from `mission.rs`, emits `task-review-requested` event instead
+  - Removed `build:sidecar` script from `apps/desktop/package.json`
+  - Removed `externalBin` from `tauri.conf.json`
+  - Deleted `apps/desktop/src-tauri/sidecar/`
+- [x] Audit Rust commands — all 21 files registered and wrapped, no orphans (some unused functions flagged for future cleanup)
+- [x] Clean up unused React components
+  - Deleted: activity-feed, status-bar, review-live, textarea, tabs, dropdown-menu (ui), Review page, PlaywrightGen page
+- [x] shadcn/ui migration
+  - Sessions.tsx: 6 raw buttons → Button
+  - Workspaces.tsx: 4 raw buttons → Button
+  - command-palette.tsx: input → Input, buttons → Button, kbd → Badge
+  - Home.tsx + Settings.tsx: already ~90-95% compliant
+- [ ] E2E smoke test: each nav page loads without errors
 
 ---
 
-## Planned
+## Phase 2: Local Code Review
 
-### Review Experience (Next Priority)
-- [ ] Rich review dashboard inside Workspace (not just findings list)
-- [ ] Severity-ranked findings with file/line links
-- [ ] Cross-file analysis ("this change breaks assumption in other file")
-- [ ] Approve/dismiss individual findings with reasons
-- [ ] Auto-generated review summary
-- [ ] Post review to GitHub as formal review
-- [ ] Track review quality over time (signal vs noise)
+Wire review-core directly into the desktop webview. No sidecar, no server.
 
-### Embeddings & RAG
-- [ ] Choose embedding model (text-embedding-3-small or free alternative)
-- [ ] Generate vector embeddings for tree-sitter code chunks
-- [ ] Store embeddings in semantic_chunks table
-- [ ] Vector search for RAG context during reviews
-- [ ] Feed relevant code chunks into review prompts
+- [ ] Local repo indexing
+  - Tree-sitter code chunking (reuse logic from `workers/review/`)
+  - Index local repo files into SQLite (semantic chunks)
+  - Incremental re-indexing on file changes (leverage existing file watcher)
+  - Feed indexed context into review prompts (RAG)
+- [ ] Review orchestration in React
+  - User picks a local repo (directory picker via Tauri IPC)
+  - Tauri Rust command: `get_local_diff(repo_path)` returns git diff
+  - React imports `review-core.buildPrompt()` + `ai-gateway-client`
+  - Calls LLM with user's configured API key + indexed context
+  - `review-core.parseReviewResponse()` + `computeScore()`
+  - Tauri Rust command: `save_review(findings, score)` to local SQLite
+- [ ] Review results UI
+  - Severity-ranked findings with file/line links
+  - Approve/dismiss individual findings
+  - Auto-generated summary (markdown)
+  - Review history (list past reviews per repo)
+- [ ] Settings: API key configuration
+  - Support Anthropic, OpenAI, or custom gateway URL
+  - Store securely (Tauri keychain or encrypted local storage)
 
-### Desktop Polish
-- [ ] Live session detection — match Claude processes to sessions by cwd
-- [ ] Auto-trigger usage refresh (periodic, not manual /usage)
-- [ ] Update Playwright e2e tests for new UI structure
+---
 
-### Cloud
-- [ ] Re-verify dashboard + landing page deployments after desktop sprint
-- [ ] Re-verify API + review worker deployments
-- [ ] Apply 0003_indexing_tables.sql migration to production CockroachDB
+## Phase 3: PR Review via GitHub PAT
 
-### Symphony-Style Agent Orchestration
-Inspired by [OpenAI Symphony](https://github.com/openai/symphony). Cherry-pick the good patterns:
-- [ ] WORKFLOW.md per-repo — version agent prompt + settings with the code
-- [ ] Auto-polling Linear — continuous 30s polling instead of manual import
-- [ ] Retry with exponential backoff — auto-retry failed agent runs
-- [ ] Reconciliation — stop agents when Linear issues are closed/terminal
-- [ ] Per-issue workspace isolation (already have Workspaces, need auto-creation from issues)
-- [ ] Concurrency limits (global + per-state)
-- [ ] Multi-turn agent sessions (agent continues until issue is done, not just one response)
-- [ ] Optional: Codex app-server protocol support alongside Claude CLI
+Desktop-local PR review. No server, no OAuth, no webhooks.
 
-### Future Exploration
-- [ ] Go sidecar for heavy processing (if needed at scale)
-- [ ] Durable workflows for long-running reviews (if needed)
-- [ ] SaaS Maker re-integration (after data restore)
-- [ ] Cross-repo coordinated reviews
-- [ ] Function-level file claiming (tree-sitter powered)
+- [ ] GitHub PAT configuration in Settings
+  - Paste token, validate scopes, store securely
+- [ ] PR picker UI
+  - List user's repos (from PAT)
+  - List open PRs for selected repo
+  - Show PR metadata (title, author, changed files)
+- [ ] PR review flow
+  - `review-core.getPrDiffWithPat()` + `getPrFilesWithPat()`
+  - Same review pipeline as local (buildPrompt -> LLM -> parse -> score)
+  - Option to post review back to GitHub as PR comment
+- [ ] Review dashboard
+  - Cross-file analysis
+  - Track review quality over time
+
+---
+
+## Phase 4: Conductor Polish
+
+Strengthen the mission control / agent orchestration features.
+
+- [ ] Symphony-style agent orchestration
+  - WORKFLOW.md per-repo
+  - Auto-polling Linear (continuous, not manual import)
+  - Retry with exponential backoff
+  - Reconciliation (stop agents when issues close)
+  - Per-issue workspace isolation
+  - Concurrency limits
+  - Multi-turn agent sessions
+- [ ] Live session detection (match Claude processes to sessions by cwd)
+- [ ] Auto-trigger usage refresh (periodic, not manual)
+- [ ] Update Playwright e2e tests for current UI
+
+---
+
+## Phase 5: Web App (later)
+
+Strip down desktop app into a hosted web version.
+
+- [ ] Abstract Tauri IPC behind provider pattern (Tauri vs HTTP)
+- [ ] Fold useful dashboard pages into shared React app
+  - Workspace RBAC (members, audit, rules)
+  - GitHub onboarding flow
+  - Repository management
+- [ ] GitHub App integration (team-scale, webhook-driven)
+- [ ] Deploy web variant to Vercel (same React app, no Tauri)
+- [ ] Delete apps/dashboard/
+- [ ] Re-verify workers/api + workers/review deployments
+- [ ] Embeddings & RAG for enhanced review context
+
+---
+
+## Not Doing
+
+- ~~Go sidecar~~ — unnecessary, review-core runs in webview
+- ~~Bun-compiled sidecar binary~~ — eliminated, 61MB for no reason
+- ~~Separate web dashboard~~ — will be same codebase as desktop
+- ~~Supabase~~ — using CockroachDB/D1

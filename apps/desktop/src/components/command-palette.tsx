@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { setPreference, getPreference } from "@/lib/tauri-ipc";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -191,10 +193,10 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
         {/* Search input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-[#1e2231]">
           <span className="text-slate-500 text-sm">{"\u2315"}</span>
-          <input
+          <Input
             ref={inputRef}
             type="text"
-            className="flex-1 bg-transparent text-lg text-slate-100 placeholder-slate-600 outline-none"
+            className="flex-1 bg-transparent text-lg text-slate-100 placeholder-slate-600 outline-none border-none shadow-none focus-visible:ring-0 h-auto p-0"
             placeholder="Search commands, sessions, workspaces..."
             value={query}
             onChange={(e) => {
@@ -202,9 +204,9 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
               setSelectedIndex(0);
             }}
           />
-          <kbd className="text-[10px] font-mono text-slate-600 bg-[#1e2231] rounded px-1.5 py-0.5">
+          <Badge variant="outline" className="text-[10px] font-mono text-slate-600 bg-[#1e2231] rounded px-1.5 py-0.5">
             ESC
-          </kbd>
+          </Badge>
         </div>
 
         {/* Results */}
@@ -223,10 +225,11 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
               {group.items.map(({ item, globalIndex }) => {
                 const isSelected = globalIndex === selectedIndex;
                 return (
-                  <button
+                  <Button
                     key={item.id}
+                    variant="ghost"
                     data-index={globalIndex}
-                    className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors cursor-pointer ${
+                    className={`w-full flex items-center gap-3 px-3 py-2 h-auto text-left justify-start rounded-none transition-colors cursor-pointer ${
                       isSelected
                         ? "bg-amber-500/10 text-slate-100"
                         : "text-slate-400 hover:bg-[#1a1d27]"
@@ -242,11 +245,11 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
                       </span>
                     )}
                     {item.shortcut && (
-                      <kbd className="text-[11px] text-slate-600 font-mono shrink-0">
+                      <Badge variant="outline" className="text-[11px] text-slate-600 font-mono shrink-0 rounded px-1 py-0">
                         {item.shortcut}
-                      </kbd>
+                      </Badge>
                     )}
-                  </button>
+                  </Button>
                 );
               })}
             </div>

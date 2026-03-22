@@ -281,30 +281,64 @@ interface AgentsResponse {
 
 // ─── Review Commands ─────────────────────────────────────────────────────────
 
-export async function startLocalReview(
+export async function getLocalDiff(
   repoPath: string,
   diffRange?: string,
-  tone?: ReviewTone
-): Promise<{ review_id: string; status: string; diff_bytes: number }> {
-  return safeInvoke("start_local_review", {
-    repoPath: repoPath,
+): Promise<{ diff: string; files: Array<{ path: string; status: string }>; empty: boolean }> {
+  return safeInvoke("get_local_diff", {
+    repoPath,
     diffRange: diffRange ?? null,
-    tone: tone ?? null,
   });
 }
 
-export async function startPrReview(
-  owner: string,
-  repo: string,
-  prNumber: number,
-  tone?: ReviewTone
+export interface SaveReviewInput {
+  repoPath?: string;
+  sourceLabel: string;
+  reviewType: string;
+  repoFullName?: string;
+  prNumber?: number;
+  score: number;
+  findings: Array<{
+    severity: string;
+    title: string;
+    summary: string;
+    suggestion?: string;
+    filePath?: string;
+    line?: number;
+    confidence?: number;
+    fingerprint?: string;
+  }>;
+  reviewAction?: string;
+  summaryMarkdown?: string;
+}
+
+export async function saveReview(
+  input: SaveReviewInput
+): Promise<{ review_id: string; status: string; score: number; findings_count: number }> {
+  return safeInvoke("save_review", input);
+}
+
+// Legacy wrappers — these now go through the webview review-core pipeline.
+// TODO: Replace callers with direct review-core integration.
+export async function startLocalReview(
+  repoPath: string,
+  diffRange?: string,
+  _tone?: ReviewTone
 ): Promise<{ review_id: string; status: string; diff_bytes: number }> {
-  return safeInvoke("start_pr_review", {
-    owner,
-    repo,
-    prNumber: prNumber,
-    tone: tone ?? null,
-  });
+  // Temporary: get diff and return a stub — full review-core integration in Phase 2
+  const diff = await getLocalDiff(repoPath, diffRange);
+  if (diff.empty) throw new Error("No changes to review");
+  return { review_id: "pending", status: "not_implemented", diff_bytes: diff.diff.length };
+}
+
+export async function startPrReview(
+  _owner: string,
+  _repo: string,
+  _prNumber: number,
+  _tone?: ReviewTone
+): Promise<{ review_id: string; status: string; diff_bytes: number }> {
+  // Temporary stub — full PR review via PAT in Phase 3
+  throw new Error("PR review via sidecar removed. Review-core integration coming in Phase 3.");
 }
 
 export async function getReview(

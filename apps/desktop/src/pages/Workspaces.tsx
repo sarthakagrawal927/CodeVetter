@@ -115,9 +115,10 @@ function WorkspaceGroup({
 
   return (
     <div className="flex flex-col">
-      <button
+      <Button
+        variant="ghost"
         onClick={() => setCollapsed(!collapsed)}
-        className="flex items-center gap-2 px-3 py-2 text-[11px] font-medium uppercase tracking-wider text-slate-500 hover:text-slate-300 transition-colors"
+        className="flex items-center justify-start gap-2 px-3 py-2 h-auto rounded-none text-[11px] font-medium uppercase tracking-wider text-slate-500 hover:text-slate-300 transition-colors w-full"
       >
         <svg
           className={`h-3 w-3 transition-transform ${collapsed ? "" : "rotate-90"}`}
@@ -132,27 +133,28 @@ function WorkspaceGroup({
         </svg>
         <span className={config.color}>{config.label}</span>
         <span className="text-slate-600">{workspaces.length}</span>
-      </button>
+      </Button>
 
       {!collapsed && (
         <div className="flex flex-col">
           {workspaces.map((ws) => (
-            <button
+            <Button
               key={ws.id}
+              variant="ghost"
               onClick={() => onSelect(ws.id)}
-              className={`flex flex-col gap-1 px-3 py-2.5 text-left border-b border-[#1e2231]/50 transition-colors ${
+              className={`flex flex-col gap-1 px-3 py-2.5 h-auto rounded-none text-left border-b border-[#1e2231]/50 transition-colors w-full ${
                 selectedId === ws.id
                   ? "bg-amber-500/5 border-l-2 border-l-amber-500"
                   : "hover:bg-[#1a1d27] border-l-2 border-l-transparent"
               }`}
             >
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="flex items-center gap-2 min-w-0 w-full">
                 <span className="text-[13px] font-medium text-slate-200 truncate flex-1">
                   {ws.name}
                 </span>
                 <StatusBadge status={ws.status} />
               </div>
-              <div className="flex items-center gap-2 text-[11px] text-slate-500">
+              <div className="flex items-center gap-2 text-[11px] text-slate-500 w-full">
                 <span className="font-mono truncate max-w-[120px]">
                   {ws.branch}
                 </span>
@@ -170,7 +172,7 @@ function WorkspaceGroup({
                   {formatRelativeTime(ws.updated_at)}
                 </span>
               </div>
-            </button>
+            </Button>
           ))}
         </div>
       )}
@@ -311,12 +313,13 @@ export default function Workspaces() {
           ) : error ? (
             <div className="flex flex-col items-center justify-center py-16 px-4">
               <p className="text-xs text-red-400 text-center">{error}</p>
-              <button
+              <Button
+                variant="ghost"
                 onClick={loadWorkspaces}
-                className="mt-2 text-[11px] text-slate-500 hover:text-slate-300"
+                className="mt-2 h-auto px-0 py-0 text-[11px] text-slate-500 hover:text-slate-300"
               >
                 Retry
-              </button>
+              </Button>
             </div>
           ) : totalCount === 0 ? (
             <div className="flex flex-col items-center justify-center py-16">
@@ -395,9 +398,11 @@ export default function Workspaces() {
               </div>
 
               {/* Toggle button (fixed to right edge of center) */}
-              <button
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => setShowRightPanel(!showRightPanel)}
-                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 rounded-l-md bg-[#1a1d27] border border-r-0 border-[#1e2231] px-1 py-3 text-slate-500 hover:text-slate-300 transition-colors"
+                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 rounded-l-md rounded-r-none bg-[#1a1d27] border border-r-0 border-[#1e2231] px-1 py-3 h-auto w-auto text-slate-500 hover:text-slate-300 transition-colors"
                 title={showRightPanel ? "Hide panel" : "Show panel"}
               >
                 <svg
@@ -411,7 +416,7 @@ export default function Workspaces() {
                     clipRule="evenodd"
                   />
                 </svg>
-              </button>
+              </Button>
             </>
           )}
         </>

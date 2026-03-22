@@ -28,7 +28,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/sarthakagrawal927/code-reviewer-action/releases/latest/download/latest.json"
+        "https://github.com/sarthakagrawal927/CodeVetter/releases/latest/download/latest.json"
       ],
       "pubkey": ""
     }
@@ -52,8 +52,6 @@
     "shortDescription": "AI code review and agent management",
     "longDescription": "CodeVetter Desktop combines AI-powered code review, agent session management (Mission Control), and unified chat history into a single desktop application.",
     "copyright": "Copyright 2026 CodeVetter",
-    "externalBin": [
-      "review-sidecar"
-    ]
+    "externalBin": []
   }
 }

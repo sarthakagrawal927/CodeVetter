@@ -136,8 +136,8 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             // Review commands
-            commands::review::start_local_review,
-            commands::review::start_pr_review,
+            commands::review::get_local_diff,
+            commands::review::save_review,
             commands::review::get_review,
             commands::review::list_reviews,
             // Session commands

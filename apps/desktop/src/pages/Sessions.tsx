@@ -571,21 +571,24 @@ export default function Sessions() {
                   Cancel merge
                 </Button>
               )}
-              <button
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => setShowMenu((v) => !v)}
-                className="rounded p-1 text-slate-500 hover:text-slate-300 hover:bg-[#1a1d27] transition-colors"
+                className="h-auto w-auto p-1 text-slate-500 hover:text-slate-300 hover:bg-[#1a1d27]"
               >
                 <svg className="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
                   <circle cx="8" cy="3" r="1.5" />
                   <circle cx="8" cy="8" r="1.5" />
                   <circle cx="8" cy="13" r="1.5" />
                 </svg>
-              </button>
+              </Button>
               {showMenu && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
                   <div className="absolute right-0 top-full z-50 mt-1 min-w-[140px] rounded-lg border border-[#1e2231] bg-[#13151c] py-1 shadow-xl">
-                    <button
+                    <Button
+                      variant="ghost"
                       onClick={async () => {
                         setShowMenu(false);
                         if (isReindexing) return;
@@ -600,19 +603,20 @@ export default function Sessions() {
                         }
                       }}
                       disabled={isReindexing}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-[12px] text-slate-300 hover:bg-[#1a1d27] transition-colors disabled:opacity-50 text-left"
+                      className="flex w-full items-center gap-2 px-3 py-1.5 h-auto rounded-none text-[12px] text-slate-300 hover:bg-[#1a1d27] justify-start"
                     >
                       {isReindexing ? "Indexing..." : "Re-index"}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="ghost"
                       onClick={() => {
                         setShowMenu(false);
                         setMergeMode(true);
                       }}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-[12px] text-slate-300 hover:bg-[#1a1d27] transition-colors text-left"
+                      className="flex w-full items-center gap-2 px-3 py-1.5 h-auto rounded-none text-[12px] text-slate-300 hover:bg-[#1a1d27] justify-start"
                     >
                       Merge sessions
-                    </button>
+                    </Button>
                   </div>
                 </>
               )}
@@ -732,12 +736,13 @@ export default function Sessions() {
               <p className="text-xs text-red-400 text-center">
                 {sessionsError}
               </p>
-              <button
+              <Button
+                variant="ghost"
                 onClick={loadSessions}
-                className="mt-2 text-[11px] text-slate-500 hover:text-slate-300"
+                className="mt-2 h-auto p-0 text-[11px] text-slate-500 hover:text-slate-300 hover:bg-transparent"
               >
                 Retry
-              </button>
+              </Button>
             </div>
           ) : filtered.length === 0 ? (
             <p className="py-8 text-center text-[11px] text-slate-600">
@@ -783,7 +788,9 @@ export default function Sessions() {
                         />
                       </div>
                       {!mergeMode && (
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={(e) => {
                             e.stopPropagation();
                             deleteSession(session.id).then(() => {
@@ -795,13 +802,13 @@ export default function Sessions() {
                               }
                             });
                           }}
-                          className="shrink-0 p-1.5 rounded text-slate-700 hover:text-slate-400 opacity-0 group-hover:opacity-100"
+                          className="shrink-0 h-auto w-auto p-1.5 text-slate-700 hover:text-slate-400 opacity-0 group-hover:opacity-100"
                           title="Delete session"
                         >
                           <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                           </svg>
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </div>
@@ -883,16 +890,17 @@ export default function Sessions() {
             <p className="text-[11px] text-slate-500 text-center mb-3 max-w-md">
               {messagesError}
             </p>
-            <button
+            <Button
+              variant="ghost"
               onClick={() => {
                 const id = selectedId;
                 setSelectedId(null);
                 setTimeout(() => setSelectedId(id), 50);
               }}
-              className="text-[11px] text-slate-500 hover:text-slate-300"
+              className="h-auto p-0 text-[11px] text-slate-500 hover:text-slate-300 hover:bg-transparent"
             >
               Retry
-            </button>
+            </Button>
           </div>
         ) : selectedId ? (
           <ChatViewer

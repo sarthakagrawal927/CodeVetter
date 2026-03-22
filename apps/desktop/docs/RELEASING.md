@@ -31,7 +31,7 @@
    - `CodeVetter.app.tar.gz.sig` — signature file
    - `latest.json` — update manifest (contains version, download URL, signature)
 
-4. Create a GitHub release at `sarthakagrawal927/code-reviewer-action`:
+4. Create a GitHub release at `sarthakagrawal927/CodeVetter`:
    - Tag: `v{x.y.z}`
    - Upload all build artifacts including `latest.json`
 
