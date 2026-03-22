@@ -1,17 +1,21 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   isTauriAvailable,
-  startLocalReview,
-  startPrReview,
   getReview,
   getGitRemoteInfo,
+  getPreference,
 } from "@/lib/tauri-ipc";
 import type {
   WorkspaceRow,
   Review,
   ReviewFinding,
-  ReviewTone,
 } from "@/lib/tauri-ipc";
+import {
+  reviewLocalDiff,
+  reviewPullRequest,
+  loadReviewConfig,
+  type ReviewProgress,
+} from "@/lib/review-service";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -396,12 +400,12 @@ function FindingCard({
 
 // ─── Progress / Loading State ───────────────────────────────────────────────
 
-function ReviewProgress({
+function ReviewProgressPanel({
   review,
-  startedAt,
+  progress,
 }: {
   review: Review | null;
-  startedAt: string | null;
+  progress: ReviewProgress;
 }) {
   const status = review?.status ?? "analyzing";
   const isFailed = status === "failed";
@@ -427,19 +431,22 @@ function ReviewProgress({
             <div className="absolute inset-0 h-10 w-10 animate-ping rounded-full border border-amber-500/20" />
           </div>
           <div className="text-center">
-            <p className="text-[14px] font-medium text-slate-200">Analyzing code...</p>
-            <p className="text-[12px] text-slate-500 mt-1">
-              {startedAt ? `Started ${formatRelativeTime(startedAt)}` : "Starting review..."}
+            <p className="text-[14px] font-medium text-slate-200">
+              {progress.message || "Analyzing code..."}
             </p>
           </div>
           <div className="flex gap-6 text-[11px] text-slate-500 mt-2">
-            <span>Scanning files</span>
-            <span className="text-slate-600">{">"}</span>
-            <span className={status === "analyzing" ? "text-amber-400" : ""}>
-              Running analysis
+            <span className={progress.stage === "fetching_diff" ? "text-amber-400" : ""}>
+              Getting diff
             </span>
             <span className="text-slate-600">{">"}</span>
-            <span>Generating findings</span>
+            <span className={progress.stage === "reviewing" ? "text-amber-400" : ""}>
+              AI review
+            </span>
+            <span className="text-slate-600">{">"}</span>
+            <span className={progress.stage === "saving" ? "text-amber-400" : ""}>
+              Saving
+            </span>
           </div>
         </>
       )}
@@ -541,18 +548,18 @@ export default function ReviewDashboard({
   const [filterFile, setFilterFile] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [exportCopied, setExportCopied] = useState(false);
-  const [tone] = useState<ReviewTone>("thorough");
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [progress, setProgress] = useState<ReviewProgress>({ stage: "idle" });
 
   const isCompleted = review?.status === "completed";
   const isFailed = review?.status === "failed";
-  const isLoading = !isCompleted && !isFailed;
+  const isLoading = progress.stage !== "idle" && progress.stage !== "completed" && progress.stage !== "error";
 
-  // ─── Start review ───────────────────────────────────────────────────────
+  // ─── Start review (via review-core in webview) ────────────────────────
 
   const startReview = useCallback(async () => {
-    if (!isTauriAvailable()) {
-      setError("Tauri not available");
+    const config = loadReviewConfig();
+    if (!config) {
+      setError("No AI provider configured. Go to Settings → General → AI Provider to add your API key.");
       return;
     }
 
@@ -562,81 +569,93 @@ export default function ReviewDashboard({
     setTriaged([]);
     setSelectedFindingId(null);
     setFilterFile(null);
+    setProgress({ stage: "fetching_diff" });
 
     try {
-      let result: { review_id: string };
-
       if (workspace.pr_number) {
-        // PR review: need owner/repo
+        // PR review via PAT
         const remoteInfo = await getGitRemoteInfo(workspace.repo_path);
-        result = await startPrReview(
+        const githubPat = await getPreference("github_token") ?? "";
+        if (!githubPat) {
+          throw new Error("No GitHub token configured. Set one in Settings → Integrations → GitHub.");
+        }
+
+        const result = await reviewPullRequest(
           remoteInfo.owner,
           remoteInfo.repo,
           workspace.pr_number,
-          tone
+          githubPat,
+          config,
+          setProgress,
+        );
+
+        setReviewId(result.reviewId);
+        setReview({
+          id: result.reviewId,
+          status: "completed",
+          score_composite: result.score,
+          findings_count: result.findings.length,
+          review_action: result.action,
+          summary_markdown: result.summaryMarkdown,
+          source_label: `${remoteInfo.owner}/${remoteInfo.repo}#${workspace.pr_number}`,
+          review_type: "local_pr",
+          repo_path: workspace.repo_path,
+          agent_used: "review-core",
+          started_at: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
+        } as Review);
+        setFindings(result.findings as ReviewFinding[]);
+        setTriaged(
+          result.findings.map((f) => ({
+            finding: f as ReviewFinding,
+            action: "pending" as FindingAction,
+            comment: "",
+          }))
         );
       } else {
         // Local diff review
-        result = await startLocalReview(workspace.repo_path, undefined, tone);
-      }
+        const result = await reviewLocalDiff(
+          workspace.repo_path,
+          config,
+          undefined,
+          setProgress,
+        );
 
-      setReviewId(result.review_id);
+        setReviewId(result.reviewId);
+        setReview({
+          id: result.reviewId,
+          status: "completed",
+          score_composite: result.score,
+          findings_count: result.findings.length,
+          review_action: result.action,
+          summary_markdown: result.summaryMarkdown,
+          source_label: "working tree",
+          review_type: "local_diff",
+          repo_path: workspace.repo_path,
+          agent_used: "review-core",
+          started_at: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
+        } as Review);
+        setFindings(result.findings as ReviewFinding[]);
+        setTriaged(
+          result.findings.map((f) => ({
+            finding: f as ReviewFinding,
+            action: "pending" as FindingAction,
+            comment: "",
+          }))
+        );
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg);
+      setProgress({ stage: "error", message: msg });
     }
-  }, [workspace, tone]);
+  }, [workspace]);
 
   // Auto-start on mount
   useEffect(() => {
     startReview();
   }, [startReview]);
-
-  // ─── Poll for completion ────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (!reviewId) return;
-
-    async function poll() {
-      try {
-        const data = await getReview(reviewId!);
-        setReview(data.review);
-
-        if (data.review.status === "completed" || data.review.status === "failed") {
-          // Stop polling
-          if (pollRef.current) {
-            clearInterval(pollRef.current);
-            pollRef.current = null;
-          }
-
-          if (data.review.status === "completed" && data.findings.length > 0) {
-            setFindings(data.findings);
-            setTriaged(
-              data.findings.map((f) => ({
-                finding: f,
-                action: "pending" as FindingAction,
-                comment: "",
-              }))
-            );
-          }
-        }
-      } catch (err) {
-        console.error("Failed to poll review:", err);
-      }
-    }
-
-    // Initial check
-    poll();
-
-    // Poll every 2 seconds
-    pollRef.current = setInterval(poll, 2000);
-
-    return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-    };
-  }, [reviewId]);
 
   // ─── Computed values ────────────────────────────────────────────────────
 
@@ -765,7 +784,7 @@ export default function ReviewDashboard({
       />
 
       {isLoading ? (
-        <ReviewProgress review={review} startedAt={review?.started_at ?? null} />
+        <ReviewProgressPanel review={review} progress={progress} />
       ) : (
         <>
           {/* Main content: sidebar + findings */}
