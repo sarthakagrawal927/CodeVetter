@@ -29,6 +29,7 @@ export type GatewayReviewRequest = {
     prNumber?: number;
     reviewTone?: string;
     agent?: AgentContext;
+    customRules?: string[];
   };
 };
 

@@ -1,170 +1,101 @@
 # CodeVetter Roadmap
 
-> Desktop-first. Web later. Previous roadmap archived at `plans/2026-03-21-roadmap-pre-consolidation.md`.
+> Desktop-first. Web later. Core thesis: force agents to write less code.
+> Previous roadmap archived at `plans/2026-03-21-roadmap-pre-consolidation.md`.
 
 ## Completed
 
-### Desktop App — Conductor Parity
-- [x] Warm amber design system
-- [x] Workspace architecture (3-column layout, git integration)
-- [x] Multi-tab chat with persistence
-- [x] Command palette (Cmd+K)
-- [x] Real terminal (xterm.js + portable-pty)
-- [x] File explorer + diff viewer
-- [x] PR management + CI status via gh CLI
-- [x] Diff commenting with inline line selection
-- [x] Keyboard shortcuts + cheatsheet
-- [x] Context meter, sidebar toggle, zen mode
+### Phase 1: Cleanup
+- [x] Sidecar eliminated — review-core runs directly in webview
+- [x] Dead code removed (8 components, 2 pages, -2700 lines)
+- [x] shadcn/ui migration (Sessions, Workspaces, command-palette)
+- [x] History page made read-only (no merge, no delete)
+- [x] Board page restructured (Linear-style: sidebar squad + full kanban)
+- [x] Agent launches linked to kanban tasks (in_progress + assigned agent)
+- [x] Workspace status grouping removed (flat list)
+- [x] Git history cleaned (removed 2GB+ build artifacts)
 
-### Beyond Conductor
-- [x] CRDT multi-agent coordination (all 5 phases)
-- [x] Linear OAuth integration
-- [x] System resource monitor
-- [x] Slash commands dropdown
-- [x] Thinking/Plan/Fast mode toggles
-- [x] Playwright test generator
-- [x] Persona-based Agent Squad (from ~/.claude/agents/)
-- [x] Floating pill nav bar
-- [x] shadcn/ui component library setup
+### Phase 2: Local Code Review
+- [x] Review pipeline in webview (review-service.ts → review-core → ai-gateway-client)
+- [x] AI Provider config in Settings (Anthropic/OpenAI/OpenRouter/Custom)
+- [x] Review prompt tuned for agent bloat detection
+- [x] review-dashboard rewired (no sidecar, no polling, direct pipeline)
 
-### Structure
-- [x] Nav: Home, Workspaces, Board, History, Settings
-- [x] Sessions -> History (read-only)
-- [x] Kanban: To Do, In Progress, Review, Test
-- [x] Agent Squad: persona cards with CRUD
-
-### Cloud Platform (built, on hold)
-- [x] Cloudflare Workers (API + review worker)
-- [x] Landing page on Vercel
-- [x] Dashboard on Vercel (to be deprecated)
-- [x] CockroachDB + GitHub OAuth + webhooks
-
-### Infrastructure
-- [x] Husky pre-commit + pre-push hooks
-- [x] ESLint flat config, Rust 0 warnings
-- [x] .gitignore for target/, sidecar/, .env
-- [x] git history cleaned (removed 2GB+ of build artifacts)
+### Foundation (prior work)
+- [x] Desktop app (Tauri + React + Vite)
+- [x] Conductor parity (workspaces, chat, terminal, file explorer, diff viewer)
+- [x] Agent Squad + Kanban board
+- [x] Session history + usage tracking
+- [x] Cloud platform built (workers, CockroachDB, GitHub OAuth) — on hold
 
 ---
 
-## Phase 1: Cleanup (current)
+## Phase 3: Review Feedback Loop (next)
 
-Remove dead code and simplify architecture.
+Close the loop: review → findings → agent fixes → re-review.
 
-- [x] Delete sidecar directory and all references
-  - Removed sidecar spawning from `review.rs`, replaced with `get_local_diff` + `save_review`
-  - Removed sidecar spawning from `mission.rs`, emits `task-review-requested` event instead
-  - Removed `build:sidecar` script from `apps/desktop/package.json`
-  - Removed `externalBin` from `tauri.conf.json`
-  - Deleted `apps/desktop/src-tauri/sidecar/`
-- [x] Audit Rust commands — all 21 files registered and wrapped, no orphans (some unused functions flagged for future cleanup)
-- [x] Clean up unused React components
-  - Deleted: activity-feed, status-bar, review-live, textarea, tabs, dropdown-menu (ui), Review page, PlaywrightGen page
-- [x] shadcn/ui migration
-  - Sessions.tsx: 6 raw buttons → Button
-  - Workspaces.tsx: 4 raw buttons → Button
-  - command-palette.tsx: input → Input, buttons → Button, kbd → Badge
-  - Home.tsx + Settings.tsx: already ~90-95% compliant
-- [ ] E2E smoke test: each nav page loads without errors
-
----
-
-## Phase 2: Local Code Review
-
-Wire review-core directly into the desktop webview. No sidecar, no server.
-
-- [x] Review orchestration in React
-  - review-service.ts: get diff (IPC) → review-core → ai-gateway-client → save (IPC)
-  - use-review.ts hook with progress tracking
-  - review-dashboard rewired to use direct pipeline (no sidecar, no polling)
-- [x] Settings: AI Provider configuration
-  - Anthropic, OpenAI, OpenRouter, or custom gateway
-  - API key + model stored in localStorage
-- [x] Improve review prompt for agent-specific mistakes
-  - Detailed bloat detection rules (one-use abstractions, wrapper functions, dead config)
-  - Agent artifact detection (unused imports, dead vars, debug logs, TODOs)
-  - Correctness checks (broken callers, hardcoded values, disabled auth)
-  - System prompt tuned for "less code is better"
 - [ ] Custom review rules per repo/language
-  - Store rules in local SQLite, inject into prompt
-  - Reuse workspace_rule_defaults / repository_rule_overrides pattern from cloud schema
+  - Rules editor in workspace settings (e.g., "use Tailwind not MUI", "async/await not .then()")
+  - Store in local SQLite per workspace
+  - Inject into buildPrompt alongside agent rules
+- [ ] Auto-send findings back to agent
+  - When task in "Review" column scores below threshold
+  - Format findings as agent instructions: "Fix these issues: [findings]"
+  - Re-launch agent with fix instructions → re-review on completion
+  - Stop loop when score >= threshold or max attempts reached
 - [ ] Review results UI polish
   - Severity-ranked findings with file/line links
   - Approve/dismiss individual findings
-  - Auto-generated summary (markdown)
-  - Review history (list past reviews per repo)
+  - Review history per repo
 
 ---
 
-## Phase 3: PR Review via GitHub PAT
+## Phase 4: PR Review via GitHub PAT
 
-Desktop-local PR review. No server, no OAuth, no webhooks.
+Desktop-local PR review. No server needed.
 
-- [ ] GitHub PAT configuration in Settings
-  - Paste token, validate scopes, store securely
-- [ ] PR picker UI
-  - List user's repos (from PAT)
-  - List open PRs for selected repo
-  - Show PR metadata (title, author, changed files)
-- [ ] PR review flow
-  - `review-core.getPrDiffWithPat()` + `getPrFilesWithPat()`
-  - Same review pipeline as local (buildPrompt -> LLM -> parse -> score)
-  - Option to post review back to GitHub as PR comment
-- [ ] Review dashboard
-  - Cross-file analysis
-  - Track review quality over time
+- [ ] GitHub PAT config in Settings (already partially built)
+- [ ] PR picker UI (list repos/PRs from PAT)
+- [ ] Review flow: fetch diff → review-core → display findings
+- [ ] Post review back to GitHub as PR comment
+- [ ] Track review quality over time
 
 ---
 
-## Phase 4: Conductor Polish
+## Phase 5: Conductor Polish
 
-Strengthen the mission control / agent orchestration features.
-
-- [ ] Symphony-style agent orchestration
-  - WORKFLOW.md per-repo
-  - Auto-polling Linear (continuous, not manual import)
-  - Retry with exponential backoff
-  - Reconciliation (stop agents when issues close)
-  - Per-issue workspace isolation
-  - Concurrency limits
-  - Multi-turn agent sessions
+- [ ] Symphony-style agent orchestration (WORKFLOW.md, auto-polling Linear, retry, reconciliation)
 - [ ] Live session detection (match Claude processes to sessions by cwd)
-- [ ] Auto-trigger usage refresh (periodic, not manual)
-- [ ] Update Playwright e2e tests for current UI
+- [ ] Per-issue workspace isolation
+- [ ] Concurrency limits + multi-turn agent sessions
 
 ---
 
-## Phase 5: Semantic Indexing (later)
+## Phase 6: Semantic Indexing
 
-Detect duplicate/similar functions across the codebase to catch agent copy-paste.
+Detect duplicate/similar functions to catch agent copy-paste.
 
 - [ ] Embedding-based similarity search for code symbols
 - [ ] "You added X but Y already exists" findings
 - [ ] Tree-sitter symbol extraction + vector storage
-- [ ] Incremental re-indexing on file changes
 
 ---
 
-## Phase 6: Web App (later)
+## Phase 7: Web App
 
-Strip down desktop app into a hosted web version.
+Same React app, stripped down, deployed to Vercel.
 
 - [ ] Abstract Tauri IPC behind provider pattern (Tauri vs HTTP)
-- [ ] Fold useful dashboard pages into shared React app
-  - Workspace RBAC (members, audit, rules)
-  - GitHub onboarding flow
-  - Repository management
 - [ ] GitHub App integration (team-scale, webhook-driven)
-- [ ] Deploy web variant to Vercel (same React app, no Tauri)
-- [ ] Delete apps/dashboard/
-- [ ] Re-verify workers/api + workers/review deployments
-- [ ] Embeddings & RAG for enhanced review context
+- [ ] Fold useful dashboard pages into shared codebase
+- [ ] Deploy web variant
 
 ---
 
 ## Not Doing
 
-- ~~Go sidecar~~ — unnecessary, review-core runs in webview
-- ~~Bun-compiled sidecar binary~~ — eliminated, 61MB for no reason
-- ~~Separate web dashboard~~ — will be same codebase as desktop
+- ~~Sidecar binary~~ — eliminated
+- ~~RAG for reviews~~ — diff + good prompt is enough
+- ~~Full file indexing for review context~~ — overkill, build catches import errors
+- ~~Separate web dashboard~~ — same codebase as desktop
 - ~~Supabase~~ — using CockroachDB/D1

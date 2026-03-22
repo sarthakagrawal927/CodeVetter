@@ -177,11 +177,22 @@ function buildPrompt(request: GatewayReviewRequest, truncated: boolean): string 
     rules.push('- Note: diff content was truncated for token safety.');
   }
 
+  // Build custom rules section
+  const customRules = request.context?.customRules?.filter(r => r.trim().length > 0) ?? [];
+  const customRulesSection = customRules.length > 0
+    ? [
+        '',
+        'Project-specific rules (enforced by the user -- treat as high priority):',
+        ...customRules.map(r => `- ${r}`),
+      ]
+    : [];
+
   return [
     'Review this pull request diff and return ONLY JSON with this shape:',
     jsonShape,
     'Rules:',
     ...rules,
+    ...customRulesSection,
     '',
     `Review tone: ${request.context?.reviewTone ?? 'balanced'}`,
     `Repository: ${request.context?.repoFullName ?? 'unknown'}`,

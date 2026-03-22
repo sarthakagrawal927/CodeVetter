@@ -14,7 +14,7 @@ import {
   getPrFilesWithPat,
 } from "@code-reviewer/review-core";
 import type { GatewayConfig, GatewayReviewRequest, ReviewFinding } from "@code-reviewer/shared-types";
-import { getLocalDiff, saveReview, type SaveReviewInput } from "./tauri-ipc";
+import { getLocalDiff, saveReview, getPreference, type SaveReviewInput } from "./tauri-ipc";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -23,6 +23,7 @@ export interface ReviewConfig {
   gatewayApiKey: string;
   gatewayModel: string;
   reviewTone: string;
+  customRules?: string[];
 }
 
 export interface ReviewProgress {
@@ -75,6 +76,35 @@ export const PROVIDER_PRESETS: Record<string, { baseUrl: string; model: string }
   },
 };
 
+// ─── Custom rules loading ───────────────────────────────────────────────────
+
+async function loadCustomRules(workspaceId?: string): Promise<string[]> {
+  try {
+    // Try workspace-specific rules first
+    if (workspaceId) {
+      const wsRules = await getPreference(`review_rules_${workspaceId}`);
+      if (wsRules) {
+        const parsed = JSON.parse(wsRules) as string[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.filter((r) => r.trim().length > 0);
+        }
+      }
+    }
+
+    // Fall back to global rules
+    const globalRules = await getPreference("review_rules_global");
+    if (globalRules) {
+      const parsed = JSON.parse(globalRules) as string[];
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.filter((r) => r.trim().length > 0);
+      }
+    }
+  } catch {
+    // Silently fall back to no rules
+  }
+  return [];
+}
+
 // ─── Review pipeline ────────────────────────────────────────────────────────
 
 function buildGatewayConfig(config: ReviewConfig): GatewayConfig {
@@ -94,6 +124,7 @@ export async function reviewLocalDiff(
   config: ReviewConfig,
   diffRange?: string,
   onProgress?: (p: ReviewProgress) => void,
+  workspaceId?: string,
 ): Promise<ReviewResult> {
   onProgress?.({ stage: "fetching_diff", message: "Getting git diff..." });
 
@@ -102,11 +133,15 @@ export async function reviewLocalDiff(
     throw new Error("No changes to review. Make some changes and try again.");
   }
 
+  // Load custom rules (from config override or preferences)
+  const customRules = config.customRules ?? await loadCustomRules(workspaceId);
+
   const request: GatewayReviewRequest = {
     diff: diffResult.diff,
     files: diffResult.files.map((f) => ({ path: f.path, status: f.status })),
     context: {
       reviewTone: config.reviewTone || "balanced",
+      ...(customRules.length > 0 ? { customRules } : {}),
     },
   };
 
@@ -170,6 +205,7 @@ export async function reviewPullRequest(
   githubPat: string,
   config: ReviewConfig,
   onProgress?: (p: ReviewProgress) => void,
+  workspaceId?: string,
 ): Promise<ReviewResult> {
   onProgress?.({ stage: "fetching_diff", message: "Fetching PR diff from GitHub..." });
 
@@ -181,6 +217,9 @@ export async function reviewPullRequest(
   if (!diff || !diff.trim()) {
     throw new Error("PR has no diff content.");
   }
+
+  // Load custom rules (from config override or preferences)
+  const customRules = config.customRules ?? await loadCustomRules(workspaceId);
 
   const request: GatewayReviewRequest = {
     diff,
@@ -195,6 +234,7 @@ export async function reviewPullRequest(
       repoFullName: `${owner}/${repo}`,
       prNumber,
       reviewTone: config.reviewTone || "balanced",
+      ...(customRules.length > 0 ? { customRules } : {}),
     },
   };
 

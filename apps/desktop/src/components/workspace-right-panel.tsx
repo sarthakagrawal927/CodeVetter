@@ -22,6 +22,7 @@ import type {
   DiffComment,
 } from "@/lib/tauri-ipc";
 import DiffViewer from "@/components/diff-viewer";
+import RulesEditor from "@/components/rules-editor";
 import PrStatusPanel from "@/components/pr-status-panel";
 import TerminalPanel from "@/components/terminal-panel";
 
@@ -600,7 +601,7 @@ function ChangesPanel({ workspace }: { workspace: WorkspaceRow }) {
 
 // ─── Right Panel: Files + Changes + Checks + PR + Terminal ──────────────
 
-type RightTab = "files" | "changes" | "checks" | "pr" | "terminal";
+type RightTab = "files" | "changes" | "checks" | "pr" | "rules" | "terminal";
 
 export default function WorkspaceRightPanel({
   workspace,
@@ -689,6 +690,12 @@ export default function WorkspaceRightPanel({
           )}
         </button>
         <button
+          onClick={() => setActiveTab("rules")}
+          className={tabClass("rules")}
+        >
+          Rules
+        </button>
+        <button
           onClick={() => setActiveTab("terminal")}
           className={tabClass("terminal")}
         >
@@ -708,7 +715,7 @@ export default function WorkspaceRightPanel({
       </div>
 
       {/* Tab content — terminal manages its own scroll */}
-      <div className={`flex-1 ${activeTab === "terminal" ? "overflow-hidden" : "overflow-y-auto"}`}>
+      <div className={`flex-1 ${activeTab === "terminal" || activeTab === "rules" ? "overflow-hidden" : "overflow-y-auto"}`}>
         {activeTab === "files" ? (
           <FileTreePanel workspace={workspace} />
         ) : activeTab === "changes" ? (
@@ -742,6 +749,8 @@ export default function WorkspaceRightPanel({
               </div>
             )}
           </div>
+        ) : activeTab === "rules" ? (
+          <RulesEditor workspaceId={workspace.id} />
         ) : (
           /* Real integrated terminal */
           <div className="flex flex-col h-full min-h-[100px]">

@@ -587,6 +587,7 @@ export default function ReviewDashboard({
           githubPat,
           config,
           setProgress,
+          workspace.id,
         );
 
         setReviewId(result.reviewId);
@@ -619,6 +620,7 @@ export default function ReviewDashboard({
           config,
           undefined,
           setProgress,
+          workspace.id,
         );
 
         setReviewId(result.reviewId);
