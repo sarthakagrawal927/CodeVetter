@@ -2095,16 +2095,17 @@ export default function Agents() {
                     onClick={() => {
                       setShowPersonaPicker(false);
                       if (pendingAssignTask) {
-                        // Launch directly with task data — pass existing task ID to avoid duplicates
                         const taskDesc = pendingAssignTask.title +
                           (pendingAssignTask.description ? `\n\n${pendingAssignTask.description}` : "");
                         const projectPath = pendingAssignTask.project_path || "";
                         if (projectPath) {
+                          // Has project path — launch immediately
                           handleAssignPersona(persona, taskDesc, projectPath, pendingAssignTask.id);
                         } else {
-                          // No project path on task — fall back to persona detail
-                          setSelectedAgentId(null);
-                          setSelectedPersona(persona);
+                          // No project path — just assign the agent to the task (mark in_progress)
+                          // User can launch manually from the persona detail
+                          updateTask(pendingAssignTask.id, "in_progress", persona.name).catch(() => {});
+                          refresh();
                         }
                         setPendingAssignTask(null);
                       } else {
