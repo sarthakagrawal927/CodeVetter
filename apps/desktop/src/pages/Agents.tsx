@@ -1679,7 +1679,9 @@ export default function Agents() {
         return;
       }
     }
-    // Otherwise just select the task's project path persona or show nothing
+    // No agent — offer to assign one
+    setPendingAssignTask(task);
+    setShowPersonaPicker(true);
   }
 
   function handleAddTask(column: string) {
