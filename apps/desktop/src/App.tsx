@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Component, type ReactNode } from "react";
 import { Routes, Route, Outlet } from "react-router-dom";
 import Sidebar from "@/components/sidebar";
 import Onboarding from "@/components/onboarding";
@@ -66,6 +66,35 @@ function useOnboarding() {
   return { showOnboarding, setShowOnboarding, ready };
 }
 
+class RouteErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null as Error | null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+          <h2 className="text-lg font-semibold text-red-400 mb-2">Something went wrong</h2>
+          <p className="text-sm text-slate-400 mb-4 max-w-md font-mono">{this.state.error.message}</p>
+          <button
+            onClick={() => this.setState({ error: null })}
+            className="px-4 py-1.5 text-sm bg-amber-600 text-white rounded hover:bg-amber-500 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 /** Main shell: floating nav + full-width content area */
 function Shell() {
   const { showOnboarding, setShowOnboarding, ready } = useOnboarding();
@@ -87,7 +116,9 @@ function Shell() {
       )}
       <Sidebar />
       <main className="flex-1 h-full overflow-y-auto pt-2">
-        <Outlet />
+        <RouteErrorBoundary>
+          <Outlet />
+        </RouteErrorBoundary>
       </main>
       <CommandPalette isOpen={isOpen} onClose={close} />
       <KeyboardShortcuts />

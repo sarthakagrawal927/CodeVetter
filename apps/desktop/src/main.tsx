@@ -25,6 +25,12 @@ class ErrorBoundary extends Component<
           <pre style={{ fontSize: 11, color: "#64748b", whiteSpace: "pre-wrap", marginTop: 12 }}>
             {this.state.error.stack}
           </pre>
+          <button
+            onClick={() => this.setState({ error: null })}
+            style={{ marginTop: 16, padding: "6px 16px", background: "#f59e0b", color: "#0e0f13", border: "none", borderRadius: 4, cursor: "pointer", fontSize: 13 }}
+          >
+            Try Again
+          </button>
         </div>
       );
     }
