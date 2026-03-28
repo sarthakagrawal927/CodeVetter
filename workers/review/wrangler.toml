@@ -1,0 +1,28 @@
+name = "code-reviewer-worker"
+main = "src/index.ts"
+compatibility_date = "2026-02-22"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[triggers]
+crons = ["* * * * *"]
+
+# Non-secret defaults
+[vars]
+GITHUB_API_BASE_URL = "https://api.github.com"
+AI_GATEWAY_MODEL = "llama-3.3-70b-versatile"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "codevetter"
+database_id = "79f405dc-aefe-495b-883c-1f7623f0f0bf"
+
+# ── Secrets ────────────────────────────────────────────────────────────────────
+# Upload each secret once with: wrangler secret put <NAME>
+#
+#   wrangler secret put GITHUB_APP_ID
+#   wrangler secret put GITHUB_APP_PRIVATE_KEY
+#   wrangler secret put AI_GATEWAY_BASE_URL
+#   wrangler secret put AI_GATEWAY_API_KEY

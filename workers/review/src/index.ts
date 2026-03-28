@@ -8,6 +8,7 @@ type Env = {
   GITHUB_API_BASE_URL?: string;
   GITHUB_APP_ID?: string;
   GITHUB_APP_PRIVATE_KEY?: string;
+  GITHUB_WEBHOOK_SECRET?: string;
   AI_GATEWAY_BASE_URL?: string;
   AI_GATEWAY_API_KEY?: string;
   AI_GATEWAY_MODEL?: string;
@@ -90,7 +91,106 @@ async function processJobs(env: Env): Promise<void> {
   }
 }
 
+// ─── Webhook signature verification ──────────────────────────────────────────
+
+async function verifyWebhookSignature(
+  secret: string,
+  payload: string,
+  signature: string | null,
+): Promise<boolean> {
+  if (!signature) return false;
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const sig = new Uint8Array(
+    await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload)),
+  );
+  const hex = Array.from(sig).map((b) => b.toString(16).padStart(2, '0')).join('');
+  return signature === `sha256=${hex}`;
+}
+
+// ─── GitHub App Webhook Handler ──────────────────────────────────────────────
+
+async function handleWebhook(request: Request, env: Env): Promise<Response> {
+  const event = request.headers.get('x-github-event');
+  const body = await request.text();
+
+  // Verify signature if secret is configured
+  if (env.GITHUB_WEBHOOK_SECRET) {
+    const signature = request.headers.get('x-hub-signature-256');
+    const valid = await verifyWebhookSignature(env.GITHUB_WEBHOOK_SECRET, body, signature);
+    if (!valid) {
+      return new Response('Invalid signature', { status: 401 });
+    }
+  }
+
+  // Only handle pull_request events
+  if (event !== 'pull_request') {
+    return new Response('OK', { status: 200 });
+  }
+
+  const payload = JSON.parse(body);
+  const action = payload.action;
+
+  // Only review on opened or synchronize (new push to PR)
+  if (action !== 'opened' && action !== 'synchronize') {
+    return new Response('OK', { status: 200 });
+  }
+
+  const pr = payload.pull_request;
+  const repo = payload.repository;
+  const installationId = payload.installation?.id;
+
+  if (!pr || !repo || !installationId) {
+    return new Response('Missing PR/repo/installation data', { status: 400 });
+  }
+
+  console.log(
+    `[webhook] PR ${action}: ${repo.full_name}#${pr.number} (installation=${installationId})`,
+  );
+
+  // Enqueue a review job
+  try {
+    const jobId = crypto.randomUUID();
+    await env.DB.prepare(
+      `INSERT INTO review_jobs (id, repository_id, pr_number, head_sha, installation_id, status, created_at)
+       VALUES (?, ?, ?, ?, ?, 'queued', datetime('now'))`,
+    )
+      .bind(jobId, repo.id.toString(), pr.number, pr.head.sha, installationId.toString())
+      .run();
+
+    console.log(`[webhook] Enqueued review job ${jobId} for ${repo.full_name}#${pr.number}`);
+    return new Response(JSON.stringify({ job_id: jobId }), {
+      status: 202,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (err) {
+    console.error(`[webhook] Failed to enqueue: ${err}`);
+    return new Response('Internal error', { status: 500 });
+  }
+}
+
+// ─── Worker Export ───────────────────────────────────────────────────────────
+
 export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+
+    if (url.pathname === '/webhook' && request.method === 'POST') {
+      return handleWebhook(request, env);
+    }
+
+    if (url.pathname === '/health') {
+      return new Response('OK', { status: 200 });
+    }
+
+    return new Response('Not Found', { status: 404 });
+  },
+
   async scheduled(_event: unknown, env: Env, ctx: { waitUntil: (p: Promise<unknown>) => void }): Promise<void> {
     ctx.waitUntil(processJobs(env));
   },
