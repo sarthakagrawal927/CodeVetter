@@ -32,9 +32,7 @@ jobs:
           workspaces: apps/desktop/src-tauri
 
       - name: Install dependencies
-        run: |
-          cd apps/desktop
-          npm install
+        run: npm install --ignore-scripts && cd apps/desktop && npm install
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
