@@ -2,15 +2,15 @@
 
 ## P0 — Critical
 
-- [ ] **Session secret fallback to hardcoded string**
+- [x] **Session secret fallback to hardcoded string**
   `workers/api/src/index.ts:118` — `getSessionSecret()` falls back to `'local-dev-session-secret'` when `SESSION_SECRET` is unset. In production this means sessions are signed with a known, predictable key.
   **Fix:** Remove fallback, throw if `SESSION_SECRET` is not configured.
 
-- [ ] **API worker missing D1 database binding**
+- [x] **API worker missing D1 database binding**
   `workers/api/wrangler.toml` — No `[[d1_databases]]` section. The review worker has it (`database_id = "79f405dc-aefe-495b-883c-1f7623f0f0bf"`), but the API worker does not. Any D1 query from the API worker will fail at runtime.
   **Fix:** Add matching `[[d1_databases]]` binding.
 
-- [ ] **Tauri updater pubkey is empty**
+- [x] **Tauri updater pubkey is empty**
   `apps/desktop/src-tauri/tauri.conf.json:33` — `"pubkey": ""` means update signature verification is effectively bypassed. Without a real key, the updater plugin should be disabled entirely.
   **Fix:** Remove updater plugin config and revoke updater capability permissions.
 
@@ -20,15 +20,15 @@
 
 ## P1 — High
 
-- [ ] **CSP disabled (null) in Tauri**
+- [x] **CSP disabled (null) in Tauri**
   `apps/desktop/src-tauri/tauri.conf.json:26` — `"csp": null` disables all Content Security Policy. The webview is open to XSS if any user-controlled content is rendered.
   **Fix:** Set restrictive CSP: `default-src 'self'; script-src 'self'; connect-src 'self' https://api.codevetter.com https://api.github.com; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:`.
 
-- [ ] **No React ErrorBoundary in desktop app**
-  `apps/desktop/src/App.tsx` — Unhandled render errors crash the entire app with a white screen. No error boundary exists.
-  **Fix:** Add ErrorBoundary wrapping the Shell component.
+- [x] **No React ErrorBoundary in desktop app**
+  `apps/desktop/src/App.tsx` — Route-level ErrorBoundary added wrapping Outlet. Root-level boundary already existed in main.tsx (enhanced with retry button).
+  **Fix:** Added `RouteErrorBoundary` in App.tsx around `<Outlet />`.
 
-- [ ] **CORS origin falls back to wildcard `*`**
+- [x] **CORS origin falls back to wildcard `*`**
   `workers/api/src/config.ts:20` — `corsOrigin` defaults to `'*'` when `API_WORKER_CORS_ORIGIN` is unset. In local dev this may be fine, but if the env var is ever missing in prod, CORS is wide open.
   **Fix:** Default to `'https://app.codevetter.com'` instead of `'*'`.
 
@@ -56,5 +56,5 @@
 
 ## Deployment Gaps
 
-- **Updater plugin enabled without signing key** — builds will produce unsigned updates. CI has `TAURI_SIGNING_PRIVATE_KEY` in secrets, but the config pubkey is empty, so even if CI signs, clients can't verify.
-- **API worker has no D1 binding** — any DB-dependent routes will error in production.
+- ~~**Updater plugin enabled without signing key**~~ — Fixed: updater plugin removed from config and capabilities.
+- ~~**API worker has no D1 binding**~~ — Fixed: D1 binding added to API worker wrangler.toml.
