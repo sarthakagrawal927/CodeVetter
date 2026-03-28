@@ -635,6 +635,7 @@ pub async fn import_linear_issues(
             description: Some(task_description),
             acceptance_criteria: Some(format!("Source: Linear {}", identifier)),
             project_path: None,
+            workspace_id: None,
             status: Some("backlog".to_string()),
         };
 

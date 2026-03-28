@@ -9,6 +9,7 @@ pub fn run_migrations(conn: &Connection) -> Result<(), rusqlite::Error> {
     let _ = conn.execute("ALTER TABLE agent_tasks ADD COLUMN project_path TEXT", []);
     let _ = conn.execute("ALTER TABLE provider_accounts ADD COLUMN plan TEXT", []);
     let _ = conn.execute("ALTER TABLE provider_accounts ADD COLUMN weekly_limit REAL", []);
+    let _ = conn.execute("ALTER TABLE agent_tasks ADD COLUMN workspace_id TEXT REFERENCES workspaces(id)", []);
 
     Ok(())
 }

@@ -1973,6 +1973,7 @@ export default function Agents() {
             <KanbanBoard
               tasks={tasks}
               loopStates={loopStates}
+              runningAgents={agents}
               onTaskClick={handleTaskClick}
               onAddTask={handleAddTask}
               onAssignAgent={(task) => {

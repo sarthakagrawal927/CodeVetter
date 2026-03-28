@@ -1,4 +1,4 @@
-import type { Task } from "@/lib/tauri-ipc";
+import type { Task, AgentProcess } from "@/lib/tauri-ipc";
 import type { LoopState } from "@/lib/review-loop";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 interface KanbanBoardProps {
   tasks: Task[];
   loopStates?: Map<string, LoopState>;
+  runningAgents?: AgentProcess[];
   onTaskClick?: (task: Task) => void;
   onAddTask?: (column: string) => void;
   onAssignAgent?: (task: Task) => void;
@@ -70,11 +71,13 @@ function ScoreTrend({ history }: { history: LoopState["reviewHistory"] }) {
 function TaskCard({
   task,
   loopState,
+  isAgentRunning,
   onClick,
   onAssign,
 }: {
   task: Task;
   loopState?: LoopState;
+  isAgentRunning?: boolean;
   onClick?: () => void;
   onAssign?: () => void;
 }) {
@@ -102,10 +105,15 @@ function TaskCard({
         <div className="mt-2 flex items-center gap-2">
           {task.assigned_agent ? (
             <div className="flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-              <span className="mono text-[10px] text-amber-400">
+              <span className={`h-1.5 w-1.5 rounded-full ${isAgentRunning ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
+              <span className={`mono text-[10px] ${isAgentRunning ? "text-emerald-400" : "text-amber-400"}`}>
                 {task.assigned_agent.slice(0, 8)}
               </span>
+              {isAgentRunning && (
+                <span className="text-[9px] font-semibold uppercase tracking-wider text-emerald-400/80">
+                  Live
+                </span>
+              )}
             </div>
           ) : onAssign ? (
             <Button
@@ -128,7 +136,17 @@ function TaskCard({
   );
 }
 
-export default function KanbanBoard({ tasks, loopStates, onTaskClick, onAddTask, onAssignAgent }: KanbanBoardProps) {
+/** Check if a task's assigned agent is currently running by matching project_path. */
+function isTaskAgentRunning(task: Task, runningAgents?: AgentProcess[]): boolean {
+  if (!task.assigned_agent || !runningAgents) return false;
+  return runningAgents.some(
+    (a) =>
+      a.status === "running" &&
+      a.project_path === task.project_path
+  );
+}
+
+export default function KanbanBoard({ tasks, loopStates, runningAgents, onTaskClick, onAddTask, onAssignAgent }: KanbanBoardProps) {
   return (
     <div className="grid grid-cols-5 gap-3 min-w-[750px]">
       {columns.map((col) => {
@@ -176,6 +194,7 @@ export default function KanbanBoard({ tasks, loopStates, onTaskClick, onAddTask,
                     key={task.id}
                     task={task}
                     loopState={loopStates?.get(task.id)}
+                    isAgentRunning={isTaskAgentRunning(task, runningAgents)}
                     onClick={() => onTaskClick?.(task)}
                     onAssign={onAssignAgent ? () => onAssignAgent(task) : undefined}
                   />

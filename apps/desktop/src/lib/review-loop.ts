@@ -9,9 +9,9 @@
  * 5. If score >= threshold OR max attempts reached → task moves to "Done"
  */
 
-import { reviewLocalDiff, loadReviewConfig, type ReviewResult } from "./review-service";
-import { updateTask, launchAgent, getLocalDiff } from "./tauri-ipc";
-import type { Task } from "./tauri-ipc";
+import { reviewLocalDiff, reviewPullRequest, loadReviewConfig, type ReviewResult } from "./review-service";
+import { updateTask, launchAgent, getLocalDiff, listWorkspaces, getPreference, getGitRemoteInfo } from "./tauri-ipc";
+import type { Task, WorkspaceRow } from "./tauri-ipc";
 
 // ─── Config ─────────────────────────────────────────────────────────────────
 
@@ -116,6 +116,29 @@ export async function startReviewLoop(
   }
 }
 
+/** Find a workspace matching this task's project path that has a PR linked. */
+async function findLinkedPr(
+  projectPath: string
+): Promise<{ workspace: WorkspaceRow; owner: string; repo: string; pat: string } | null> {
+  try {
+    const workspaces = await listWorkspaces();
+    const ws = workspaces.find(
+      (w) => w.repo_path === projectPath && w.pr_number != null
+    );
+    if (!ws || !ws.pr_number) return null;
+
+    const pat = await getPreference("github_token");
+    if (!pat) return null;
+
+    const remote = await getGitRemoteInfo(projectPath);
+    if (!remote?.owner || !remote?.repo) return null;
+
+    return { workspace: ws, owner: remote.owner, repo: remote.repo, pat };
+  } catch {
+    return null;
+  }
+}
+
 async function runLoop(
   task: Task,
   config: ReturnType<typeof loadReviewConfig>,
@@ -124,24 +147,38 @@ async function runLoop(
 ): Promise<LoopState> {
   if (!config || !task.project_path) throw new Error("Missing config or project path");
 
-  // Step 1: Check if there's a diff to review
-  const diff = await getLocalDiff(task.project_path);
-  if (diff.empty) {
-    // No changes — pass with perfect score
-    state.status = "passed";
-    state.lastScore = 100;
-    state.lastFindingsCount = 0;
-    await updateTask(task.id, "done").catch(() => {});
-    onStateChange?.(state);
-    activeLoops.delete(task.id);
-    return state;
+  // Step 1: Check if workspace has a linked PR → use PR review
+  const linkedPr = await findLinkedPr(task.project_path);
+
+  if (!linkedPr) {
+    // No PR — check if there's a local diff to review
+    const diff = await getLocalDiff(task.project_path);
+    if (diff.empty) {
+      state.status = "passed";
+      state.lastScore = 100;
+      state.lastFindingsCount = 0;
+      await updateTask(task.id, "done").catch(() => {});
+      onStateChange?.(state);
+      activeLoops.delete(task.id);
+      return state;
+    }
   }
 
-  // Step 2: Run review
+  // Step 2: Run review (PR or local diff)
   state.status = "reviewing";
   onStateChange?.(state);
 
-  const result = await reviewLocalDiff(task.project_path, config);
+  const result: ReviewResult = linkedPr
+    ? await reviewPullRequest(
+        linkedPr.owner,
+        linkedPr.repo,
+        linkedPr.workspace.pr_number!,
+        linkedPr.pat,
+        config,
+        undefined,
+        linkedPr.workspace.id,
+      )
+    : await reviewLocalDiff(task.project_path, config);
 
   state.lastScore = result.score;
   state.lastFindingsCount = result.findings.length;

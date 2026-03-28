@@ -26,16 +26,34 @@ pub async fn launch_agent(
     role: Option<String>,
     task: Option<String>,
     review_id: Option<String>,
+    resume_session_id: Option<String>,
 ) -> Result<Value, String> {
+    // ── Concurrency check ─────────────────────────────────────────────────
+    {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        let running = queries::count_running_agents(&conn).unwrap_or(0);
+        let max = queries::get_preference(&conn, "max_concurrent_agents")
+            .ok()
+            .flatten()
+            .and_then(|v| v.parse::<i64>().ok())
+            .unwrap_or(3);
+        if running >= max {
+            return Err(format!(
+                "Concurrency limit reached ({running}/{max} agents running). \
+                 Wait for an agent to finish or increase the limit in Settings."
+            ));
+        }
+    }
+
     let handle = match adapter.as_str() {
         "claude-code" => {
             let a = ClaudeCodeAdapter::new();
-            a.launch(PathBuf::from(&project_path), role.clone(), task.clone())
+            a.launch(PathBuf::from(&project_path), role.clone(), task.clone(), resume_session_id.clone())
                 .await?
         }
         "codex" => {
             let a = CodexAdapter::new();
-            a.launch(PathBuf::from(&project_path), role.clone(), task.clone())
+            a.launch(PathBuf::from(&project_path), role.clone(), task.clone(), resume_session_id.clone())
                 .await?
         }
         other => return Err(format!("Unknown adapter: {other}")),

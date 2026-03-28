@@ -46,6 +46,7 @@ impl AgentAdapter for ClaudeCodeAdapter {
         project_path: PathBuf,
         role: Option<String>,
         task: Option<String>,
+        resume_session_id: Option<String>,
     ) -> Result<AgentHandle, String> {
         let cli_path =
             Self::detect_cli().ok_or("Claude Code CLI not found. Install it first.")?;
@@ -58,6 +59,12 @@ impl AgentAdapter for ClaudeCodeAdapter {
         });
 
         let mut cmd = Command::new(&cli_path);
+
+        if let Some(ref session_id) = resume_session_id {
+            // Resume a previous session with a new prompt
+            cmd.arg("--resume").arg(session_id);
+        }
+
         cmd.arg("-p")
             .arg(&task_prompt)
             .arg("--output-format")

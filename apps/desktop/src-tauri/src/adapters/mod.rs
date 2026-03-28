@@ -28,11 +28,13 @@ pub trait AgentAdapter: Send + Sync {
 
     /// Spawn an agent process in the given project directory, optionally
     /// scoped to a role and initial task prompt.
+    /// If `resume_session_id` is provided, continue a previous session.
     async fn launch(
         &self,
         project_path: PathBuf,
         role: Option<String>,
         task: Option<String>,
+        resume_session_id: Option<String>,
     ) -> Result<AgentHandle, String>;
 
     /// Gracefully stop a running agent by its ID / PID.

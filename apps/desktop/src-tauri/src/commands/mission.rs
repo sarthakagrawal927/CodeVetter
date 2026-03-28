@@ -11,12 +11,14 @@ pub async fn create_task(
     description: Option<String>,
     acceptance_criteria: Option<String>,
     project_path: Option<String>,
+    workspace_id: Option<String>,
 ) -> Result<Value, String> {
     let input = AgentTaskInput {
         title: title.clone(),
         description,
         acceptance_criteria,
         project_path: project_path.clone(),
+        workspace_id: workspace_id.clone(),
         status: Some("backlog".to_string()),
     };
 

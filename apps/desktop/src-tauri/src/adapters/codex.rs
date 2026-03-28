@@ -43,6 +43,7 @@ impl AgentAdapter for CodexAdapter {
         project_path: PathBuf,
         role: Option<String>,
         task: Option<String>,
+        _resume_session_id: Option<String>,
     ) -> Result<AgentHandle, String> {
         let cli_path =
             Self::detect_cli().ok_or("Codex CLI not found. Install it first.")?;
