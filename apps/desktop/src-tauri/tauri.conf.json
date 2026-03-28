@@ -22,17 +22,10 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; connect-src 'self' https://api.codevetter.com https://api.github.com; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:"
     }
   },
-  "plugins": {
-    "updater": {
-      "endpoints": [
-        "https://github.com/sarthakagrawal927/CodeVetter/releases/latest/download/latest.json"
-      ],
-      "pubkey": ""
-    }
-  },
+  "plugins": {},
   "bundle": {
     "active": true,
     "targets": "all",
