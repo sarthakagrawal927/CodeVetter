@@ -115,7 +115,11 @@ function getSessionCookieName(env: ApiWorkerBindings): string {
 }
 
 function getSessionSecret(env: ApiWorkerBindings): string {
-  return env.SESSION_SECRET?.trim() || 'local-dev-session-secret';
+  const secret = env.SESSION_SECRET?.trim();
+  if (!secret) {
+    throw new Error('SESSION_SECRET is required but not set');
+  }
+  return secret;
 }
 
 function getSessionTtlHours(env: ApiWorkerBindings): number {
