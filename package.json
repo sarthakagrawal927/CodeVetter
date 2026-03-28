@@ -15,7 +15,7 @@
     "build:packages": "npm run build:types && npm run build:db && npm run build:gateway && npm run build:review-core",
     "deploy:api": "npm run -w workers/api deploy",
     "deploy:review": "npm run -w workers/review deploy",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "license": "ISC",
   "lint-staged": {
