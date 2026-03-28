@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useRef } from 'react';
 
-const GITHUB_URL = 'https://github.com/sarthakagrawal/codevetter';
-const DOWNLOAD_URL = 'https://github.com/sarthakagrawal/codevetter/releases/latest';
+const GITHUB_URL = 'https://github.com/sarthakagrawal927/CodeVetter';
+const DOWNLOAD_URL = 'https://github.com/sarthakagrawal927/CodeVetter/releases/latest';
 
 function useFadeIn() {
   const ref = useRef(null);
