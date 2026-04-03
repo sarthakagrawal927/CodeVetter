@@ -7,6 +7,7 @@ import {
   PullRequestRecord,
   RepositoryConnection,
   RepositoryRuleOverride,
+  RepositoryUsageRecord,
   ReviewFindingRecord,
   ReviewRunRecord,
   SemanticChunkRecord,
@@ -193,6 +194,7 @@ function mapWorkspace(row: Row): WorkspaceRecord {
     slug: String(row.slug),
     name: String(row.name),
     kind: row.kind as WorkspaceRecord['kind'],
+    tier: (row.tier as WorkspaceRecord['tier']) || 'free',
     githubAccountType: (row.github_account_type as WorkspaceRecord['githubAccountType']) || undefined,
     githubAccountId: toOptionalString(row.github_account_id),
     createdByUserId: String(row.created_by_user_id),
@@ -1493,6 +1495,51 @@ export class D1ControlPlaneDatabase implements ControlPlaneDatabase {
       languages,
       lastIndexedAt: lastRow?.last_indexed as string | undefined
     };
+  }
+  async getRepositoryUsage(repositoryId: string, period: string): Promise<RepositoryUsageRecord | undefined> {
+    const row = await this.queryOne<Row>(
+      `SELECT * FROM repository_usage WHERE repository_id = ?1 AND period = ?2 LIMIT 1`,
+      [repositoryId, period]
+    );
+    if (!row) return undefined;
+    return {
+      id: String(row.id),
+      repositoryId: String(row.repository_id),
+      period: String(row.period),
+      reviewCount: toNumber(row.review_count),
+      lastReviewAt: toOptionalString(row.last_review_at)
+    };
+  }
+
+  async incrementRepositoryUsage(repositoryId: string, period: string): Promise<RepositoryUsageRecord> {
+    const row = await this.queryOne<Row>(
+      `INSERT INTO repository_usage (id, repository_id, period, review_count, last_review_at)
+       VALUES (?1, ?2, ?3, 1, ?4)
+       ON CONFLICT (repository_id, period)
+       DO UPDATE SET review_count = review_count + 1, last_review_at = ?4
+       RETURNING *`,
+      [id('ru'), repositoryId, period, nowIso()]
+    );
+    if (!row) {
+      throw new Error('Failed to increment repository usage.');
+    }
+    return {
+      id: String(row.id),
+      repositoryId: String(row.repository_id),
+      period: String(row.period),
+      reviewCount: toNumber(row.review_count),
+      lastReviewAt: toOptionalString(row.last_review_at)
+    };
+  }
+
+  async getWorkspaceForRepository(repositoryId: string): Promise<WorkspaceRecord | undefined> {
+    const row = await this.queryOne<Row>(
+      `SELECT w.* FROM workspaces w
+       JOIN repositories r ON r.workspace_id = w.id
+       WHERE r.id = ?1 LIMIT 1`,
+      [repositoryId]
+    );
+    return row ? mapWorkspace(row) : undefined;
   }
 }
 

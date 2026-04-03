@@ -15,7 +15,8 @@ export const TABLES = {
   indexingRuns: 'indexing_runs',
   webhookEvents: 'webhook_events',
   auditLogs: 'audit_logs',
-  workspaceSecrets: 'workspace_secrets'
+  workspaceSecrets: 'workspace_secrets',
+  repositoryUsage: 'repository_usage'
 } as const;
 
 export type TableName = (typeof TABLES)[keyof typeof TABLES];

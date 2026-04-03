@@ -7,6 +7,7 @@ import {
   PullRequestRecord,
   RepositoryConnection,
   RepositoryRuleOverride,
+  RepositoryUsageRecord,
   ReviewFindingRecord,
   ReviewRunRecord,
   SemanticChunkRecord,
@@ -253,6 +254,11 @@ export interface ControlPlaneDatabase {
   listSemanticChunks(repositoryId: string, sourceRef: string): Promise<SemanticChunkRecord[]>;
   deleteIndexedData(repositoryId: string, sourceRef?: string): Promise<{ filesDeleted: number; chunksDeleted: number }>;
   getIndexingStats(repositoryId: string): Promise<{ totalFiles: number; totalChunks: number; languages: Record<string, number>; lastIndexedAt?: string }>;
+
+  getRepositoryUsage(repositoryId: string, period: string): Promise<RepositoryUsageRecord | undefined>;
+  incrementRepositoryUsage(repositoryId: string, period: string): Promise<RepositoryUsageRecord>;
+
+  getWorkspaceForRepository(repositoryId: string): Promise<WorkspaceRecord | undefined>;
 }
 
 export class InMemoryControlPlaneDatabase implements ControlPlaneDatabase {
@@ -274,6 +280,7 @@ export class InMemoryControlPlaneDatabase implements ControlPlaneDatabase {
   private workspaceSecrets = new Map<string, WorkspaceSecretRecord>();
   private indexedFiles = new Map<string, IndexedFileRecord>();
   private semanticChunks = new Map<string, SemanticChunkRecord>();
+  private repositoryUsage = new Map<string, RepositoryUsageRecord>();
 
   async upsertUserFromGithub(input: UpsertGithubUserInput): Promise<UserRecord> {
     const existing = Array.from(this.users.values()).find(user => user.githubUserId === input.githubUserId);
@@ -375,6 +382,7 @@ export class InMemoryControlPlaneDatabase implements ControlPlaneDatabase {
       slug: input.slug,
       name: input.name,
       kind: input.kind,
+      tier: input.kind === 'oss_free' ? 'free' : 'free',
       githubAccountType: input.githubAccountType,
       githubAccountId: input.githubAccountId,
       createdByUserId: input.createdByUserId,
@@ -965,5 +973,31 @@ export class InMemoryControlPlaneDatabase implements ControlPlaneDatabase {
     }
 
     return { totalFiles: files.length, totalChunks: chunks.length, languages, lastIndexedAt };
+  }
+
+  async getRepositoryUsage(repositoryId: string, period: string): Promise<RepositoryUsageRecord | undefined> {
+    const key = `${repositoryId}:${period}`;
+    const record = this.repositoryUsage.get(key);
+    return record ? clone(record) : undefined;
+  }
+
+  async incrementRepositoryUsage(repositoryId: string, period: string): Promise<RepositoryUsageRecord> {
+    const key = `${repositoryId}:${period}`;
+    const existing = this.repositoryUsage.get(key);
+    const record: RepositoryUsageRecord = {
+      id: existing?.id || id('ru'),
+      repositoryId,
+      period,
+      reviewCount: (existing?.reviewCount || 0) + 1,
+      lastReviewAt: nowIso()
+    };
+    this.repositoryUsage.set(key, record);
+    return clone(record);
+  }
+
+  async getWorkspaceForRepository(repositoryId: string): Promise<WorkspaceRecord | undefined> {
+    const repo = this.repositories.get(repositoryId);
+    if (!repo) return undefined;
+    return this.getWorkspaceById(repo.workspaceId);
   }
 }
