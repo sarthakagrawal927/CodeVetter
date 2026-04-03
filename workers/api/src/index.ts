@@ -2080,9 +2080,9 @@ app.post('/v1/webhooks/github', async c => {
       const account = installation && isObject(installation.account) ? installation.account : null;
       const accountLogin = account && typeof account.login === 'string' ? account.login : null;
       const accountId = account && typeof account.id === 'number' ? String(account.id) : null;
-      const accountType = account && typeof account.type === 'string'
-        ? (account.type.toLowerCase() === 'organization' ? 'organization' : 'user') as const
-        : 'user' as const;
+      const accountType: 'organization' | 'user' = account && typeof account.type === 'string'
+        ? (account.type.toLowerCase() === 'organization' ? 'organization' : 'user')
+        : 'user';
 
       if (installationId && accountLogin && accountId) {
         // Check if a workspace already exists for this GitHub account
