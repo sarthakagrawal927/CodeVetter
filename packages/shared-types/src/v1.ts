@@ -58,7 +58,9 @@ export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'viewer';
 
 export type WorkspaceMemberStatus = 'active' | 'invited' | 'suspended' | 'removed';
 
-export type WorkspaceKind = 'organization' | 'personal';
+export type WorkspaceKind = 'organization' | 'personal' | 'oss_free';
+
+export type WorkspaceTier = 'free' | 'paid';
 
 export type GitHubAccountType = 'organization' | 'user';
 
@@ -90,6 +92,7 @@ export type WorkspaceRecord = {
   slug: string;
   name: string;
   kind: WorkspaceKind;
+  tier: WorkspaceTier;
   githubAccountType?: GitHubAccountType;
   githubAccountId?: string;
   createdByUserId: string;
@@ -453,7 +456,16 @@ export type ReviewJob = {
     prNumber: number;
     headSha: string;
     triggeredBy: 'webhook' | 'manual' | 'action';
+    reviewTier?: WorkspaceTier;
   };
+};
+
+export type RepositoryUsageRecord = {
+  id: string;
+  repositoryId: string;
+  period: string;
+  reviewCount: number;
+  lastReviewAt?: string;
 };
 
 export type IndexingJob = {
