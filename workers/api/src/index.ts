@@ -13,7 +13,8 @@ import {
   UpdateWorkspaceMemberRequest,
   UserRecord,
   WorkspaceMemberRecord,
-  WorkspaceRuleDefaults
+  WorkspaceRuleDefaults,
+  WorkspaceTier
 } from '@code-reviewer/shared-types';
 import {
   ControlPlaneDatabase,
@@ -83,6 +84,13 @@ const DEFAULT_RULE_THRESHOLDS = {
   high: true,
   critical: true
 } as const;
+
+const FREE_TIER_PR_LIMIT = 10;
+
+function currentPeriod(): string {
+  const now = new Date();
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+}
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -2061,8 +2069,74 @@ app.post('/v1/webhooks/github', async c => {
 
   let processingStatus: GitHubWebhookEnvelope['processingStatus'] = 'processed';
   let createdReviewRunId: string | null = null;
+  let reviewTier: WorkspaceTier = 'free';
 
-  if (eventName === 'pull_request' && isObject(payload)) {
+  if (eventName === 'installation' && isObject(payload)) {
+    // Auto-provision free workspace when GitHub App is installed
+    const action = typeof payload.action === 'string' ? payload.action : '';
+    if (action === 'created') {
+      const installation = isObject(payload.installation) ? payload.installation : null;
+      const installationId = installation && typeof installation.id === 'number' ? String(installation.id) : null;
+      const account = installation && isObject(installation.account) ? installation.account : null;
+      const accountLogin = account && typeof account.login === 'string' ? account.login : null;
+      const accountId = account && typeof account.id === 'number' ? String(account.id) : null;
+      const accountType = account && typeof account.type === 'string'
+        ? (account.type.toLowerCase() === 'organization' ? 'organization' : 'user') as const
+        : 'user' as const;
+
+      if (installationId && accountLogin && accountId) {
+        // Check if a workspace already exists for this GitHub account
+        const allWorkspaces = await db.listAllWorkspaces();
+        const existingWorkspace = allWorkspaces.find(ws => ws.githubAccountId === accountId);
+
+        if (!existingWorkspace) {
+          const slug = `oss-${accountLogin.toLowerCase().replace(/[^a-z0-9-]/g, '-')}`;
+          const workspace = await db.createWorkspace({
+            slug,
+            name: accountLogin,
+            kind: 'oss_free',
+            githubAccountType: accountType,
+            githubAccountId: accountId,
+            createdByUserId: 'system'
+          });
+
+          await db.upsertGitHubInstallation({
+            workspaceId: workspace.id,
+            installationId,
+            accountType,
+            accountId,
+            accountLogin
+          });
+
+          // Sync repositories from the installation payload
+          const repos = Array.isArray(payload.repositories) ? payload.repositories : [];
+          for (const repo of repos) {
+            if (!isObject(repo)) continue;
+            const repoName = typeof repo.name === 'string' ? repo.name : '';
+            const repoFullName = typeof repo.full_name === 'string' ? repo.full_name : '';
+            const repoPrivate = typeof repo.private === 'boolean' ? repo.private : false;
+            const repoId = typeof repo.id === 'number' ? String(repo.id) : undefined;
+
+            if (repoName && repoFullName) {
+              await db.upsertRepository({
+                workspaceId: workspace.id,
+                provider: 'github',
+                owner: accountLogin,
+                name: repoName,
+                fullName: repoFullName,
+                githubRepoId: repoId,
+                installationId,
+                isPrivate: repoPrivate,
+                isActive: true
+              });
+            }
+          }
+
+          console.log(`[webhook] auto-provisioned oss_free workspace=${workspace.id} for ${accountLogin}`);
+        }
+      }
+    }
+  } else if (eventName === 'pull_request' && isObject(payload)) {
     const repositoryRef = parseGitHubRepositoryReference(payload);
     const pullRequestPayload = parsePullRequestPayload(payload);
 
@@ -2070,58 +2144,85 @@ app.post('/v1/webhooks/github', async c => {
       const repositories = await getAllRepositories();
       const repository = repositories.find(item => item.fullName === repositoryRef.fullName);
       if (repository) {
-        // Detect agent-authored PRs
-        const prBodyRaw = isObject(payload.pull_request) && typeof (payload.pull_request as Record<string, unknown>).body === 'string'
-          ? (payload.pull_request as Record<string, unknown>).body as string
-          : undefined;
-        const agentResult = detectAgent({
-          authorLogin: pullRequestPayload.authorGithubLogin,
-          prBody: prBodyRaw,
-          headRef: pullRequestPayload.headRef,
-        });
+        // Resolve workspace tier for this repository
+        const workspace = await db.getWorkspaceForRepository(repository.id);
+        reviewTier = workspace?.tier || 'free';
 
-        const pullRequest = await db.upsertPullRequest({
-          repositoryId: repository.id,
-          githubPrId: pullRequestPayload.githubPrId,
-          prNumber: pullRequestPayload.prNumber,
-          title: pullRequestPayload.title,
-          authorGithubLogin: pullRequestPayload.authorGithubLogin,
-          baseRef: pullRequestPayload.baseRef,
-          headRef: pullRequestPayload.headRef,
-          headSha: pullRequestPayload.headSha,
-          state: pullRequestPayload.state,
-          isAgentAuthored: agentResult.isAgentAuthored,
-          agentName: agentResult.agentName,
-          mergedAt: pullRequestPayload.state === 'merged' ? nowIso() : undefined,
-          closedAt: pullRequestPayload.state === 'closed' ? nowIso() : undefined
-        });
+        // Visibility gate: private repo on free tier — skip review
+        if (repository.isPrivate && reviewTier === 'free') {
+          processingStatus = 'ignored';
+          console.log(`[webhook] skipped private repo ${repository.fullName} on free tier`);
+        } else {
+          // Detect agent-authored PRs
+          const prBodyRaw = isObject(payload.pull_request) && typeof (payload.pull_request as Record<string, unknown>).body === 'string'
+            ? (payload.pull_request as Record<string, unknown>).body as string
+            : undefined;
+          const agentResult = detectAgent({
+            authorLogin: pullRequestPayload.authorGithubLogin,
+            prBody: prBodyRaw,
+            headRef: pullRequestPayload.headRef,
+          });
 
-        const action = typeof payload.action === 'string' ? payload.action : '';
-        if (actionCanTriggerReview(action)) {
-          const reviewMode = pullRequest.isAgentAuthored ? 'agent' : 'standard';
+          const pullRequest = await db.upsertPullRequest({
+            repositoryId: repository.id,
+            githubPrId: pullRequestPayload.githubPrId,
+            prNumber: pullRequestPayload.prNumber,
+            title: pullRequestPayload.title,
+            authorGithubLogin: pullRequestPayload.authorGithubLogin,
+            baseRef: pullRequestPayload.baseRef,
+            headRef: pullRequestPayload.headRef,
+            headSha: pullRequestPayload.headSha,
+            state: pullRequestPayload.state,
+            isAgentAuthored: agentResult.isAgentAuthored,
+            agentName: agentResult.agentName,
+            mergedAt: pullRequestPayload.state === 'merged' ? nowIso() : undefined,
+            closedAt: pullRequestPayload.state === 'closed' ? nowIso() : undefined
+          });
 
-          // On synchronize (push), link to previous completed review run
-          let parentReviewRunId: string | undefined;
-          if (action === 'synchronize' && pullRequest.id) {
-            const latestRun = await db.getLatestCompletedReviewRun(pullRequest.id);
-            if (latestRun) {
-              parentReviewRunId = latestRun.id;
+          const action = typeof payload.action === 'string' ? payload.action : '';
+          if (actionCanTriggerReview(action)) {
+            // Rate limit: check monthly usage for free tier
+            if (reviewTier === 'free') {
+              const period = currentPeriod();
+              const usage = await db.getRepositoryUsage(repository.id, period);
+              if (usage && usage.reviewCount >= FREE_TIER_PR_LIMIT) {
+                processingStatus = 'ignored';
+                console.log(`[webhook] rate limited ${repository.fullName}: ${usage.reviewCount}/${FREE_TIER_PR_LIMIT} reviews in ${period}`);
+              }
+            }
+
+            if (processingStatus !== 'ignored') {
+              const reviewMode = pullRequest.isAgentAuthored ? 'agent' : 'standard';
+
+              // On synchronize (push), link to previous completed review run
+              let parentReviewRunId: string | undefined;
+              if (action === 'synchronize' && pullRequest.id) {
+                const latestRun = await db.getLatestCompletedReviewRun(pullRequest.id);
+                if (latestRun) {
+                  parentReviewRunId = latestRun.id;
+                }
+              }
+
+              // Increment usage counter for free tier
+              if (reviewTier === 'free') {
+                await db.incrementRepositoryUsage(repository.id, currentPeriod());
+              }
+
+              const reviewRun = await db.createReviewRun({
+                repositoryId: repository.id,
+                pullRequestId: pullRequest.id,
+                prNumber: pullRequest.prNumber,
+                headSha: pullRequest.headSha || `webhook-${Date.now()}`,
+                triggerSource: 'webhook',
+                status: 'queued',
+                reviewMode,
+                parentReviewRunId,
+                scoreVersion: ACTION_SCORE_VERSION,
+                startedAt: nowIso()
+              });
+              createdReviewRunId = reviewRun.id;
             }
           }
-
-          const reviewRun = await db.createReviewRun({
-            repositoryId: repository.id,
-            pullRequestId: pullRequest.id,
-            prNumber: pullRequest.prNumber,
-            headSha: pullRequest.headSha || `webhook-${Date.now()}`,
-            triggerSource: 'webhook',
-            status: 'queued',
-            reviewMode,
-            parentReviewRunId,
-            scoreVersion: ACTION_SCORE_VERSION,
-            startedAt: nowIso()
-          });
-          createdReviewRunId = reviewRun.id;
         }
       } else {
         processingStatus = 'ignored';
@@ -2145,27 +2246,53 @@ app.post('/v1/webhooks/github', async c => {
         const repositories = await getAllRepositories();
         const repository = repositories.find(item => item.fullName === repositoryRef.fullName);
         if (repository) {
-          // Find existing PR record
-          const pullRequests = await db.listPullRequestsByRepository(repository.id);
-          const pullRequest = pullRequests.find(pr => pr.prNumber === prNumber);
+          // Resolve workspace tier
+          const workspace = await db.getWorkspaceForRepository(repository.id);
+          reviewTier = workspace?.tier || 'free';
 
-          if (pullRequest) {
-            const reviewMode = pullRequest.isAgentAuthored ? 'agent' : 'standard';
-            const latestRun = await db.getLatestCompletedReviewRun(pullRequest.id);
+          // Visibility gate: private repo on free tier
+          if (repository.isPrivate && reviewTier === 'free') {
+            processingStatus = 'ignored';
+          } else {
+            // Find existing PR record
+            const pullRequests = await db.listPullRequestsByRepository(repository.id);
+            const pullRequest = pullRequests.find(pr => pr.prNumber === prNumber);
 
-            const reviewRun = await db.createReviewRun({
-              repositoryId: repository.id,
-              pullRequestId: pullRequest.id,
-              prNumber: pullRequest.prNumber,
-              headSha: pullRequest.headSha || `mention-${Date.now()}`,
-              triggerSource: 'webhook',
-              status: 'queued',
-              reviewMode,
-              parentReviewRunId: latestRun?.id,
-              scoreVersion: ACTION_SCORE_VERSION,
-              startedAt: nowIso()
-            });
-            createdReviewRunId = reviewRun.id;
+            if (pullRequest) {
+              // Rate limit check for free tier
+              let rateLimited = false;
+              if (reviewTier === 'free') {
+                const period = currentPeriod();
+                const usage = await db.getRepositoryUsage(repository.id, period);
+                if (usage && usage.reviewCount >= FREE_TIER_PR_LIMIT) {
+                  rateLimited = true;
+                  processingStatus = 'ignored';
+                }
+              }
+
+              if (!rateLimited) {
+                const reviewMode = pullRequest.isAgentAuthored ? 'agent' : 'standard';
+                const latestRun = await db.getLatestCompletedReviewRun(pullRequest.id);
+
+                if (reviewTier === 'free') {
+                  await db.incrementRepositoryUsage(repository.id, currentPeriod());
+                }
+
+                const reviewRun = await db.createReviewRun({
+                  repositoryId: repository.id,
+                  pullRequestId: pullRequest.id,
+                  prNumber: pullRequest.prNumber,
+                  headSha: pullRequest.headSha || `mention-${Date.now()}`,
+                  triggerSource: 'webhook',
+                  status: 'queued',
+                  reviewMode,
+                  parentReviewRunId: latestRun?.id,
+                  scoreVersion: ACTION_SCORE_VERSION,
+                  startedAt: nowIso()
+                });
+                createdReviewRunId = reviewRun.id;
+              }
+            }
           }
         }
       }
@@ -2188,7 +2315,8 @@ app.post('/v1/webhooks/github', async c => {
       event: eventName,
       deliveryId,
       processingStatus,
-      reviewRunId: createdReviewRunId
+      reviewRunId: createdReviewRunId,
+      reviewTier
     },
     202
   );
