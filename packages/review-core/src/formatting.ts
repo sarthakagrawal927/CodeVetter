@@ -1,4 +1,4 @@
-import { ReviewAction, ReviewFindingRecord } from '@code-reviewer/shared-types';
+import { ReviewAction, ReviewFindingRecord, WorkspaceTier } from '@code-reviewer/shared-types';
 import { computeFindingFingerprint } from './scoring';
 
 type StructuredReviewData = {
@@ -27,7 +27,8 @@ export function buildOverallBody(
   score: number,
   reviewRunId: string | undefined,
   action: ReviewAction,
-  resolvedFindings?: ReviewFindingRecord[]
+  resolvedFindings?: ReviewFindingRecord[],
+  reviewTier?: WorkspaceTier
 ): string {
   const counts: Record<string, number> = {
     critical: 0,
@@ -53,7 +54,17 @@ export function buildOverallBody(
     }
   }
 
-  body += `\n\n*Automated review by CodeVetter*`;
+  // Footer: badge + CTA for free tier, clean for paid
+  const tier = reviewTier || 'free';
+  if (tier === 'free') {
+    const scoreColor = score >= 80 ? 'brightgreen' : score >= 60 ? 'yellow' : 'red';
+    body += `\n\n---\n`;
+    body += `\n![Score](https://img.shields.io/badge/score-${score.toFixed(0)}%2F100-${scoreColor}) `;
+    body += `**[Reviewed by CodeVetter](https://codevetter.com)**\n\n`;
+    body += `*Free automated PR review for open source — [get CodeVetter for your repo](https://codevetter.com/install)*`;
+  } else {
+    body += `\n\n*Automated review by CodeVetter*`;
+  }
 
   // Embed structured data for agents
   if (reviewRunId) {
