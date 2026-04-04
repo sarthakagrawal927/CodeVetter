@@ -31,11 +31,12 @@ Monorepo with:
 - review-core is pure functions — no side effects, no I/O (except GitHub API reads)
 
 ## Current Focus
-Desktop app — four pillars:
-1. Usage/session history (done)
-2. Local code review via review-core (building)
-3. Conductor / mission control (partial)
-4. PR review via GitHub PAT (planned)
+Desktop app — three active tabs only:
+1. **Dashboard** — provider usage (Claude rate limits, Gemini local token counts, Codex)
+2. **History** — session indexing + full-text search (Claude + Codex)
+3. **Review** (`/review`) — CLI-agent-powered code review with findings, code viewer, fix with AI, diff view, revert
+
+Other tabs (Board, Workspaces, old Reviews) are legacy — do not invest in them.
 
 ## What NOT to do
 - Don't add server dependencies to desktop features — desktop works offline
@@ -43,3 +44,5 @@ Desktop app — four pillars:
 - Don't modify apps/landing-page without explicit request
 - Don't add Supabase, Webpack, or yarn
 - Don't commit .env files, API keys, or the Rust target/ directory
+- Don't invest in Board, Workspaces, or old Reviews pages — they are legacy
+- Don't add features to review-core API pipeline — the active review flow uses CLI agents (claude -p, gemini -p)
