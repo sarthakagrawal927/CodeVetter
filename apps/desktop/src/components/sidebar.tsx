@@ -86,6 +86,7 @@ export default function Sidebar() {
       if (e.clientY < 50) {
         setVisible(true);
         clearTimeout(hideTimer.current);
+        hideTimer.current = setTimeout(() => setVisible(false), 2000);
       }
     }
     window.addEventListener("mousemove", handleMouseMove);

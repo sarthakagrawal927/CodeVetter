@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from "react-resizable-panels";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -476,9 +477,9 @@ export default function QuickReview() {
         )}
 
         {/* Two-column body */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* Left column: findings list + past reviews */}
-          <div className="flex w-[40%] shrink-0 flex-col border-r border-[#1a1a1a]">
+        <PanelGroup direction="horizontal" className="flex-1">
+          <Panel defaultSize={40} minSize={25}>
+          <div className="flex h-full flex-col">
             <div className="flex-1 overflow-y-auto">
               {sortedFindings.length === 0 ? (
                 <div className="flex items-center gap-2 px-4 py-6 text-sm text-emerald-400">
@@ -545,51 +546,25 @@ export default function QuickReview() {
                 </div>
               )}
 
-              {/* Past reviews (in view mode, at bottom of findings column) */}
-              {pastReviews.length > 0 && (
+              {/* Metadata at bottom of findings column */}
+              {result.duration_ms > 0 && (
                 <div className="border-t border-[#1a1a1a] px-3 py-3">
-                  <button
-                    onClick={() => setShowHistory(!showHistory)}
-                    className="flex w-full items-center justify-between text-[11px] font-medium text-slate-400 hover:text-slate-200"
-                  >
-                    <span>Past Reviews ({pastReviews.length})</span>
-                    <span className="text-slate-600">{showHistory ? "▼" : "▶"}</span>
-                  </button>
-                  {showHistory && (
-                    <div className="mt-2 space-y-1">
-                      {pastReviews.map((r) => (
-                        <button
-                          key={r.id}
-                          onClick={() => handleLoadPastReview(r.id)}
-                          className={cn(
-                            "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors",
-                            result?.review_id === r.id
-                              ? "bg-amber-500/10 text-amber-400"
-                              : "text-slate-400 hover:bg-[#111111] hover:text-slate-200",
-                          )}
-                        >
-                          <ScoreBadge score={Math.round(r.score_composite ?? 0)} size="sm" />
-                          <div className="flex-1 min-w-0">
-                            <div className="truncate">
-                              {r.repo_path
-                                ? shortenPath(r.repo_path).split("/").pop()
-                                : r.source_label ?? "Review"}
-                            </div>
-                            <div className="text-[10px] text-slate-600">
-                              {r.findings_count ?? 0} findings · {formatRelativeTime(r.completed_at ?? r.created_at)}
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-600">
+                    <span>Model: {result.agent}</span>
+                    <span>Time: {formatDuration(result.duration_ms)}</span>
+                    <span className="font-mono">{result.diff_range}</span>
+                  </div>
                 </div>
               )}
             </div>
           </div>
+          </Panel>
 
+          <PanelResizeHandle className="w-1.5 bg-[#1a1a1a] hover:bg-amber-500/30 transition-colors cursor-col-resize" />
+
+          <Panel defaultSize={60} minSize={30}>
           {/* Right column: code viewer */}
-          <div className="flex flex-1 flex-col bg-[#0a0a0a]">
+          <div className="flex h-full flex-col bg-[#0a0a0a]">
             {selectedFindingIdx !== null && codeFilePath ? (
               <>
                 {/* File path header */}
@@ -632,7 +607,8 @@ export default function QuickReview() {
               </div>
             )}
           </div>
-        </div>
+          </Panel>
+        </PanelGroup>
       </div>
     );
   }
