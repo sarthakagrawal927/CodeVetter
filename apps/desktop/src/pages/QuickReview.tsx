@@ -12,6 +12,8 @@ import {
   Loader2,
   AlertTriangle,
   CheckCircle,
+  ArrowLeft,
+  Plus,
 } from "lucide-react";
 import {
   isTauriAvailable,
@@ -111,6 +113,9 @@ function shortenPath(path: string): string {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function QuickReview() {
+  // Mode: "create" shows the form, "view" shows past review results
+  const [mode, setMode] = useState<"create" | "view">("create");
+
   const [repoPath, setRepoPath] = useState("");
   const [branches, setBranches] = useState<string[]>([]);
   const [currentBranch, setCurrentBranch] = useState("");
@@ -121,22 +126,70 @@ export default function QuickReview() {
   const [projectDesc, setProjectDesc] = useState("");
   const [changeDesc, setChangeDesc] = useState("");
   const [isReviewing, setIsReviewing] = useState(false);
-  const [isFixing, setIsFixing] = useState<string | null>(null); // null | "all" | finding index
+  const [isFixing, setIsFixing] = useState<string | null>(null);
   const [result, setResult] = useState<CliReviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Past reviews
   const [pastReviews, setPastReviews] = useState<LocalReviewRow[]>([]);
-  const [showHistory, setShowHistory] = useState(false);
+  const [showHistory, setShowHistory] = useState(true);
 
   // Diff range derived from selection
   const [diffRange, setDiffRange] = useState("");
+
+  // ─── Load saved folder + branches on mount ───────────────────────────────
+
+  const loadFolderData = useCallback(async (dir: string) => {
+    setRepoPath(dir);
+    const [branchResult, prs] = await Promise.allSettled([
+      listGitBranches(dir),
+      listPullRequests(dir),
+    ]);
+    if (branchResult.status === "fulfilled") {
+      const { branches: brList, current } = branchResult.value;
+      setBranches(brList);
+      setCurrentBranch(current ?? "");
+      if (brList.includes("main")) setBaseBranch("main");
+      else if (brList.includes("master")) setBaseBranch("master");
+      else if (brList.length > 0) setBaseBranch(brList[0]);
+    } else {
+      setBranches([]);
+      setCurrentBranch("");
+    }
+    if (prs.status === "fulfilled") {
+      setPullRequests(prs.value);
+    } else {
+      setPullRequests([]);
+    }
+    // Load persisted project description
+    try {
+      const saved = await getPreference(`quick_review_desc_${btoa(dir)}`);
+      if (saved != null) setProjectDesc(saved);
+      else setProjectDesc("");
+    } catch {
+      setProjectDesc("");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isTauriAvailable()) return;
+    getPreference("quick_review_last_folder")
+      .then((dir) => {
+        if (dir) loadFolderData(dir);
+      })
+      .catch(() => {});
+  }, [loadFolderData]);
 
   // ─── Load past reviews ───────────────────────────────────────────────────
 
   useEffect(() => {
     if (!isTauriAvailable()) return;
-    listReviews(20, 0).then(setPastReviews).catch(() => {});
+    listReviews(20, 0)
+      .then((reviews) => {
+        console.log("[Review] loaded past reviews:", reviews.length);
+        setPastReviews(reviews);
+      })
+      .catch((e) => console.error("[Review] failed to load past reviews:", e));
   }, [result]); // reload after new review completes
 
   const handleLoadPastReview = useCallback(async (id: string) => {
@@ -163,6 +216,7 @@ export default function QuickReview() {
         findings_count: findings.length,
       });
       if (review.repo_path) setRepoPath(review.repo_path);
+      setMode("view");
     } catch (e) {
       setError(String(e));
     }
@@ -179,47 +233,16 @@ export default function QuickReview() {
       const dir = await pickDirectory("Select a git repository");
       if (!dir) return;
 
-      setRepoPath(dir);
       setResult(null);
       setError(null);
       setSelectedBranch("");
       setDiffRange("");
+      setMode("create");
 
-      // Load branches + PRs in parallel
-      const [branchResult, prs] = await Promise.allSettled([
-        listGitBranches(dir),
-        listPullRequests(dir),
-      ]);
+      await loadFolderData(dir);
 
-      if (branchResult.status === "fulfilled") {
-        const { branches: brList, current } = branchResult.value;
-        setBranches(brList);
-        setCurrentBranch(current ?? "");
-
-        // Auto-detect base branch
-        if (brList.includes("main")) setBaseBranch("main");
-        else if (brList.includes("master")) setBaseBranch("master");
-        else if (brList.length > 0) setBaseBranch(brList[0]);
-      } else {
-        setBranches([]);
-        setCurrentBranch("");
-      }
-
-      if (prs.status === "fulfilled") {
-        setPullRequests(prs.value);
-      } else {
-        setPullRequests([]);
-      }
-
-      // Load persisted project description
-      const prefKey = `quick_review_desc_${btoa(dir)}`;
-      try {
-        const saved = await getPreference(prefKey);
-        if (saved != null) setProjectDesc(saved);
-        else setProjectDesc("");
-      } catch {
-        setProjectDesc("");
-      }
+      // Persist last used folder
+      setPreference("quick_review_last_folder", dir).catch(() => {});
     } catch (e) {
       const msg = String(e);
       if (msg.includes("TAURI_NOT_AVAILABLE")) {
@@ -228,7 +251,7 @@ export default function QuickReview() {
         setError(msg);
       }
     }
-  }, []);
+  }, [loadFolderData]);
 
   // ─── Branch/PR selection ─────────────────────────────────────────────────
 
@@ -275,6 +298,7 @@ export default function QuickReview() {
         "claude",
       );
       setResult(res);
+      setMode("view");
     } catch (e) {
       const msg = String(e);
       if (msg.includes("TAURI_NOT_AVAILABLE")) {
@@ -286,6 +310,18 @@ export default function QuickReview() {
       setIsReviewing(false);
     }
   }, [repoPath, diffRange, projectDesc, changeDesc]);
+
+  // ─── Back to create mode ─────────────────────────────────────────────────
+
+  const handleNewReview = useCallback(() => {
+    setMode("create");
+    setResult(null);
+    setError(null);
+    // Re-fetch branches for the current folder
+    if (repoPath) {
+      loadFolderData(repoPath);
+    }
+  }, [repoPath, loadFolderData]);
 
   // ─── Fix handlers ───────────────────────────────────────────────────────
 
@@ -333,9 +369,9 @@ export default function QuickReview() {
   return (
     <div className="flex h-full">
       {/* Left panel */}
-      <div className="flex w-[400px] shrink-0 flex-col border-r border-[#1e2231]">
+      <div className="flex w-[400px] shrink-0 flex-col border-r border-[#1a1a1a]">
         {/* Header */}
-        <div className="shrink-0 border-b border-[#1e2231] px-4 py-3">
+        <div className="shrink-0 border-b border-[#1a1a1a] px-4 py-3">
           <div className="flex items-center gap-2">
             <Zap size={16} className="text-amber-400" />
             <h1 className="text-sm font-semibold text-slate-200">
@@ -346,10 +382,23 @@ export default function QuickReview() {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+          {/* Back / New Review button when viewing a past review */}
+          {mode === "view" && (
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-2 border-[#1a1a1a] bg-[#0a0a0a] text-slate-300 hover:bg-[#111111] hover:text-slate-100"
+              onClick={handleNewReview}
+            >
+              <Plus size={16} />
+              New Review
+            </Button>
+          )}
+
           {/* Folder picker */}
+          {mode === "create" && (<>
           <Button
             variant="outline"
-            className="w-full justify-start gap-2 border-[#1e2231] bg-[#13151c] text-slate-300 hover:bg-[#1a1d27] hover:text-slate-100"
+            className="w-full justify-start gap-2 border-[#1a1a1a] bg-[#0a0a0a] text-slate-300 hover:bg-[#111111] hover:text-slate-100"
             onClick={handlePickFolder}
           >
             <FolderOpen size={16} />
@@ -360,13 +409,13 @@ export default function QuickReview() {
           {repoPath && (
             <>
               {/* Tabs */}
-              <div className="flex gap-1 rounded-lg bg-[#13151c] p-1">
+              <div className="flex gap-1 rounded-lg bg-[#0a0a0a] p-1">
                 <button
                   onClick={() => setActiveTab("branches")}
                   className={cn(
                     "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
                     activeTab === "branches"
-                      ? "bg-[#1e2231] text-slate-100"
+                      ? "bg-[#1a1a1a] text-slate-100"
                       : "text-slate-500 hover:text-slate-300",
                   )}
                 >
@@ -378,7 +427,7 @@ export default function QuickReview() {
                   className={cn(
                     "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
                     activeTab === "prs"
-                      ? "bg-[#1e2231] text-slate-100"
+                      ? "bg-[#1a1a1a] text-slate-100"
                       : "text-slate-500 hover:text-slate-300",
                   )}
                 >
@@ -393,7 +442,7 @@ export default function QuickReview() {
               </div>
 
               {/* List */}
-              <div className="max-h-[200px] overflow-y-auto rounded-lg border border-[#1e2231] bg-[#13151c]">
+              <div className="max-h-[200px] overflow-y-auto rounded-lg border border-[#1a1a1a] bg-[#0a0a0a]">
                 {activeTab === "branches" ? (
                   branches.length === 0 ? (
                     <div className="px-3 py-4 text-center text-xs text-slate-500">
@@ -408,7 +457,7 @@ export default function QuickReview() {
                           "flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors",
                           selectedBranch === branch
                             ? "bg-amber-500/10 text-amber-400"
-                            : "text-slate-400 hover:bg-[#1a1d27] hover:text-slate-200",
+                            : "text-slate-400 hover:bg-[#111111] hover:text-slate-200",
                         )}
                       >
                         <GitBranch size={12} className="shrink-0" />
@@ -437,7 +486,7 @@ export default function QuickReview() {
                         "flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors",
                         selectedBranch === pr.headRefName
                           ? "bg-amber-500/10 text-amber-400"
-                          : "text-slate-400 hover:bg-[#1a1d27] hover:text-slate-200",
+                          : "text-slate-400 hover:bg-[#111111] hover:text-slate-200",
                       )}
                     >
                       <GitPullRequest size={12} className="shrink-0" />
@@ -452,12 +501,12 @@ export default function QuickReview() {
 
               {/* Diff range indicator */}
               {diffRange && (
-                <div className="rounded-md bg-[#13151c] px-3 py-2 font-mono text-[11px] text-slate-500">
+                <div className="rounded-md bg-[#0a0a0a] px-3 py-2 font-mono text-[11px] text-slate-500">
                   {diffRange}
                 </div>
               )}
 
-              <Separator className="bg-[#1e2231]" />
+              <Separator className="bg-[#1a1a1a]" />
 
               {/* Project description */}
               <div className="space-y-1.5">
@@ -469,7 +518,7 @@ export default function QuickReview() {
                   onChange={(e) => setProjectDesc(e.target.value)}
                   onBlur={handleProjectDescBlur}
                   placeholder="Describe the project so the reviewer has context..."
-                  className="w-full resize-none rounded-md border border-[#1e2231] bg-[#13151c] px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:border-amber-500/40 focus:outline-none"
+                  className="w-full resize-none rounded-md border border-[#1a1a1a] bg-[#0a0a0a] px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:border-amber-500/40 focus:outline-none"
                   rows={3}
                 />
               </div>
@@ -483,7 +532,7 @@ export default function QuickReview() {
                   value={changeDesc}
                   onChange={(e) => setChangeDesc(e.target.value)}
                   placeholder="What does this change do?"
-                  className="w-full resize-none rounded-md border border-[#1e2231] bg-[#13151c] px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:border-amber-500/40 focus:outline-none"
+                  className="w-full resize-none rounded-md border border-[#1a1a1a] bg-[#0a0a0a] px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:border-amber-500/40 focus:outline-none"
                   rows={2}
                 />
               </div>
@@ -510,11 +559,12 @@ export default function QuickReview() {
               )}
             </>
           )}
+          </>)}
 
           {/* Past reviews */}
           {pastReviews.length > 0 && (
             <>
-              <Separator className="bg-[#1e2231]" />
+              <Separator className="bg-[#1a1a1a]" />
               <button
                 onClick={() => setShowHistory(!showHistory)}
                 className="flex w-full items-center justify-between text-[11px] font-medium text-slate-400 hover:text-slate-200"
@@ -532,7 +582,7 @@ export default function QuickReview() {
                         "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors",
                         result?.review_id === r.id
                           ? "bg-amber-500/10 text-amber-400"
-                          : "text-slate-400 hover:bg-[#1a1d27] hover:text-slate-200",
+                          : "text-slate-400 hover:bg-[#111111] hover:text-slate-200",
                       )}
                     >
                       <ScoreBadge score={Math.round(r.score_composite ?? 0)} size="sm" />
@@ -611,7 +661,7 @@ export default function QuickReview() {
               </div>
             </div>
 
-            <Separator className="my-5 bg-[#1e2231]" />
+            <Separator className="my-5 bg-[#1a1a1a]" />
 
             {/* Findings list */}
             {sortedFindings.length === 0 ? (
@@ -660,7 +710,7 @@ function FindingItem({
   onFix: () => void;
 }) {
   return (
-    <div className="rounded-lg border border-[#1e2231] bg-[#13151c] p-4">
+    <div className="rounded-lg border border-[#1a1a1a] bg-[#0a0a0a] p-4">
       {/* Header: severity badge + title + fix button */}
       <div className="flex items-start gap-2">
         <Badge
