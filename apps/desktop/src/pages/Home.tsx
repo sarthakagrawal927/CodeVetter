@@ -160,6 +160,13 @@ function AccountUsageRow({
   const sevenD = liveUsage?.seven_d;
   const isRateLimited = liveUsage?.status === "rate_limited";
 
+  // Gemini-specific live data
+  const geminiToday = liveUsage?.today;
+  const geminiRateLimit = liveUsage?.api?.rate_limit;
+  const geminiUtilPct = geminiRateLimit
+    ? ((geminiRateLimit.limit - geminiRateLimit.remaining) / geminiRateLimit.limit) * 100
+    : null;
+
   // Determine bar color based on utilization
   function barColor(pct: number): "amber" | "red" {
     if (pct >= 90) return "red";
@@ -255,6 +262,32 @@ function AccountUsageRow({
             windowTotalSecs={7 * 24 * 3600}
             resetsInSecs={sevenD.resets_in_secs ?? undefined}
           />
+        )}
+
+        {/* ── Gemini-specific usage display ────────────────────── */}
+        {account.provider === "google" && hasLive && geminiToday && (
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-blue-400/80 font-medium">Today</span>
+              <span className="text-[10px] text-slate-400 tabular-nums">
+                {geminiToday.sessions} sessions
+              </span>
+              <span className="text-[10px] text-slate-400 tabular-nums">
+                {geminiToday.messages} messages
+              </span>
+              <span className="text-[10px] text-slate-400 tabular-nums">
+                {formatTokens(geminiToday.tokens.total)} tokens
+              </span>
+            </div>
+            {geminiRateLimit && geminiUtilPct != null && (
+              <UsageBar
+                pct={geminiUtilPct}
+                label="API rate limit"
+                resetLabel={`${geminiRateLimit.remaining}/${geminiRateLimit.limit} remaining`}
+                color={barColor(geminiUtilPct)}
+              />
+            )}
+          </div>
         )}
 
         {/* Rate limited warning */}
