@@ -15,6 +15,8 @@ export default [
     rules: {
       "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
       "@typescript-eslint/no-explicit-any": "warn",
+      "no-use-before-define": "off",
+      "@typescript-eslint/no-use-before-define": ["warn", { "functions": false, "classes": false, "variables": true }],
       "no-console": "off",
     },
   },
