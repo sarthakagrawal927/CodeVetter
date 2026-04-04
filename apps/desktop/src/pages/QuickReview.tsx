@@ -282,7 +282,7 @@ export default function QuickReview() {
           <div className="flex items-center gap-2">
             <Zap size={16} className="text-amber-400" />
             <h1 className="text-sm font-semibold text-slate-200">
-              Quick Review
+              Review
             </h1>
           </div>
         </div>

@@ -13,7 +13,6 @@ import Sessions from "@/pages/Sessions";
 import Agents from "@/pages/Agents";
 import Workspaces from "@/pages/Workspaces";
 
-import Reviews from "@/pages/Reviews";
 import QuickReview from "@/pages/QuickReview";
 import Settings from "@/pages/Settings";
 
@@ -136,7 +135,6 @@ export default function App() {
         <Route path="/history" element={<Sessions />} />
 
         <Route path="/board" element={<Agents />} />
-        <Route path="/reviews" element={<Reviews />} />
         <Route path="/review" element={<QuickReview />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
