@@ -18,12 +18,14 @@ import {
   pickDirectory,
   listGitBranches,
   listPullRequests,
+  listReviews,
+  getReview,
   getPreference,
   setPreference,
   runCliReview,
   fixFindings,
 } from "@/lib/tauri-ipc";
-import type { PullRequest, CliReviewResult, CliReviewFinding } from "@/lib/tauri-ipc";
+import type { PullRequest, CliReviewResult, CliReviewFinding, LocalReviewRow } from "@/lib/tauri-ipc";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -72,6 +74,21 @@ function severityIcon(s: string) {
   }
 }
 
+function formatRelativeTime(dateStr: string | null): string {
+  if (!dateStr) return "";
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  if (isNaN(then)) return "";
+  const diffMs = now - then;
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  return `${diffDay}d ago`;
+}
+
 function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   const secs = Math.round(ms / 1000);
@@ -108,8 +125,48 @@ export default function QuickReview() {
   const [result, setResult] = useState<CliReviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Past reviews
+  const [pastReviews, setPastReviews] = useState<LocalReviewRow[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+
   // Diff range derived from selection
   const [diffRange, setDiffRange] = useState("");
+
+  // ─── Load past reviews ───────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!isTauriAvailable()) return;
+    listReviews(20, 0).then(setPastReviews).catch(() => {});
+  }, [result]); // reload after new review completes
+
+  const handleLoadPastReview = useCallback(async (id: string) => {
+    try {
+      const data = await getReview(id);
+      const review = data.review;
+      const findings = (data.findings ?? []).map((f: { severity: string; title: string; summary: string; suggestion?: string; file_path?: string; line?: number; confidence?: number }) => ({
+        severity: f.severity,
+        title: f.title,
+        summary: f.summary,
+        suggestion: f.suggestion ?? undefined,
+        filePath: f.file_path ?? undefined,
+        line: f.line ?? undefined,
+        confidence: f.confidence ?? undefined,
+      }));
+      setResult({
+        review_id: review.id,
+        score: review.score_composite ?? 0,
+        findings,
+        summary: review.summary_markdown ?? "",
+        agent: review.agent_used ?? "claude",
+        duration_ms: 0,
+        diff_range: review.source_label ?? "",
+        findings_count: findings.length,
+      });
+      if (review.repo_path) setRepoPath(review.repo_path);
+    } catch (e) {
+      setError(String(e));
+    }
+  }, []);
 
   // ─── Folder picker ───────────────────────────────────────────────────────
 
@@ -449,6 +506,48 @@ export default function QuickReview() {
               {error && (
                 <div className="rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-400">
                   {error}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Past reviews */}
+          {pastReviews.length > 0 && (
+            <>
+              <Separator className="bg-[#1e2231]" />
+              <button
+                onClick={() => setShowHistory(!showHistory)}
+                className="flex w-full items-center justify-between text-[11px] font-medium text-slate-400 hover:text-slate-200"
+              >
+                <span>Past Reviews ({pastReviews.length})</span>
+                <span className="text-slate-600">{showHistory ? "▼" : "▶"}</span>
+              </button>
+              {showHistory && (
+                <div className="space-y-1">
+                  {pastReviews.map((r) => (
+                    <button
+                      key={r.id}
+                      onClick={() => handleLoadPastReview(r.id)}
+                      className={cn(
+                        "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors",
+                        result?.review_id === r.id
+                          ? "bg-amber-500/10 text-amber-400"
+                          : "text-slate-400 hover:bg-[#1a1d27] hover:text-slate-200",
+                      )}
+                    >
+                      <ScoreBadge score={Math.round(r.score_composite ?? 0)} size="sm" />
+                      <div className="flex-1 min-w-0">
+                        <div className="truncate">
+                          {r.repo_path
+                            ? shortenPath(r.repo_path).split("/").pop()
+                            : r.source_label ?? "Review"}
+                        </div>
+                        <div className="text-[10px] text-slate-600">
+                          {r.findings_count ?? 0} findings · {formatRelativeTime(r.completed_at ?? r.created_at)}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
                 </div>
               )}
             </>
