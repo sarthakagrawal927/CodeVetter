@@ -647,7 +647,7 @@ export default function QuickReview() {
           {/* Right column: code viewer OR fix diff */}
           <div className="flex h-full flex-col bg-[#050505]">
             {/* Fix results view */}
-            {fixResult && fixResult.changed_files.length > 0 ? (
+            {fixResult ? (
               <>
                 <div className="shrink-0 border-b border-[#1a1a1a] px-4 py-2 flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -703,25 +703,34 @@ export default function QuickReview() {
                     </div>
                   ))}
                 </div>
-                {/* Diff view */}
+                {/* Diff view or agent output */}
                 <div className="flex-1 overflow-y-auto">
-                  <div className="py-1">
-                    {fixResult.diff.split("\n").map((line, i) => (
-                      <div
-                        key={i}
-                        className={cn(
-                          "font-mono text-[12px] leading-[20px] px-4",
-                          line.startsWith("+") && !line.startsWith("+++") && "bg-emerald-500/8 text-emerald-400",
-                          line.startsWith("-") && !line.startsWith("---") && "bg-red-500/8 text-red-400",
-                          line.startsWith("@@") && "text-cyan-500/60 bg-cyan-500/5",
-                          line.startsWith("diff ") && "text-slate-500 font-semibold mt-2",
-                          !line.startsWith("+") && !line.startsWith("-") && !line.startsWith("@@") && !line.startsWith("diff ") && "text-slate-500",
-                        )}
-                      >
-                        {line}
-                      </div>
-                    ))}
-                  </div>
+                  {fixResult.diff.trim() ? (
+                    <div className="py-1">
+                      {fixResult.diff.split("\n").map((line, i) => (
+                        <div
+                          key={i}
+                          className={cn(
+                            "font-mono text-[12px] leading-[20px] px-4",
+                            line.startsWith("+") && !line.startsWith("+++") && "bg-emerald-500/8 text-emerald-400",
+                            line.startsWith("-") && !line.startsWith("---") && "bg-red-500/8 text-red-400",
+                            line.startsWith("@@") && "text-cyan-500/60 bg-cyan-500/5",
+                            line.startsWith("diff ") && "text-slate-500 font-semibold mt-2",
+                            !line.startsWith("+") && !line.startsWith("-") && !line.startsWith("@@") && !line.startsWith("diff ") && "text-slate-500",
+                          )}
+                        >
+                          {line}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4">
+                      <div className="mb-2 text-xs font-medium text-yellow-400">No file changes detected — agent output:</div>
+                      <pre className="whitespace-pre-wrap font-mono text-[12px] leading-5 text-slate-400">
+                        {fixResult.agent_output || "No output captured"}
+                      </pre>
+                    </div>
+                  )}
                 </div>
               </>
             ) : isFixing ? (

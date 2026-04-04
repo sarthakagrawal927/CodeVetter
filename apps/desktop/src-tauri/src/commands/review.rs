@@ -450,7 +450,7 @@ pub async fn fix_findings(
     }
 
     let prompt = format!(
-        "Fix the following code review issues in this repository. Make the minimal changes needed. Do not refactor unrelated code.\n{issues}"
+        "Fix the following code review issues by editing the files directly. Use your tools to read and write the actual source files. Do NOT just describe the changes — actually make the edits. Make the minimal changes needed. Do not refactor unrelated code.\n{issues}"
     );
 
     let cli_cmd = match agent.as_str() {
@@ -507,14 +507,22 @@ pub async fn fix_findings(
         })
         .collect();
 
+    // Truncate agent output for display (max 5KB)
+    let agent_output = if stdout.len() > 5000 {
+        format!("{}...\n[truncated]", &stdout[..5000])
+    } else {
+        stdout
+    };
+
     Ok(json!({
         "success": true,
         "agent": agent,
         "duration_ms": duration_ms,
-        "output_length": stdout.len(),
+        "output_length": agent_output.len(),
         "findings_fixed": findings.len(),
         "diff": diff_text,
         "changed_files": changed_files,
+        "agent_output": agent_output,
     }))
 }
 

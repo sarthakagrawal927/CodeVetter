@@ -396,6 +396,7 @@ export interface FixFindingsResult {
   findings_fixed: number;
   diff: string;
   changed_files: FixChangedFile[];
+  agent_output: string;
 }
 
 export interface RevertFilesResult {
@@ -904,6 +905,18 @@ export interface LiveUsageResult {
   overage_disabled_reason?: string;
   fallback_pct?: number;
   checked_at?: string;
+  // Gemini-specific fields
+  source?: string;
+  today?: {
+    sessions: number;
+    messages: number;
+    tokens: { input: number; output: number; total: number };
+  };
+  api?: {
+    supported: boolean;
+    source: string;
+    rate_limit?: { limit: number; remaining: number; reset?: string };
+  };
 }
 
 export async function checkLiveUsage(provider: string, credentialKey?: string): Promise<LiveUsageResult> {
