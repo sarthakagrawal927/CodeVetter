@@ -378,6 +378,17 @@ export interface CliReviewResult {
   score: number;
   findings: CliReviewFinding[];
   summary: string;
+  agent: string;
+  duration_ms: number;
+  diff_range: string;
+  findings_count: number;
+}
+
+export interface FixFindingsResult {
+  success: boolean;
+  agent: string;
+  duration_ms: number;
+  findings_fixed: number;
 }
 
 export async function runCliReview(
@@ -392,6 +403,18 @@ export async function runCliReview(
     diffRange,
     projectDescription,
     changeDescription,
+    agent: agent ?? null,
+  });
+}
+
+export async function fixFindings(
+  repoPath: string,
+  findings: CliReviewFinding[],
+  agent?: string,
+): Promise<FixFindingsResult> {
+  return safeInvoke("fix_findings", {
+    repoPath,
+    findings,
     agent: agent ?? null,
   });
 }

@@ -196,6 +196,7 @@ pub async fn run_cli_review(
     agent: Option<String>,
 ) -> Result<Value, String> {
     let agent = agent.unwrap_or_else(|| "claude".to_string());
+    let start_time = std::time::Instant::now();
 
     // 1. Get the diff
     let mut cmd = StdCommand::new("git");
@@ -401,12 +402,83 @@ Diff:
     )
     .map_err(|e| e.to_string())?;
 
+    let duration_ms = start_time.elapsed().as_millis() as u64;
+
     // 10. Return result
     Ok(json!({
         "review_id": review_id,
         "score": score,
         "findings": findings_val,
         "summary": summary,
+        "agent": agent,
+        "duration_ms": duration_ms,
+        "diff_range": diff_range,
+        "findings_count": findings_val.len(),
+    }))
+}
+
+/// Fix one or more review findings by sending them to a CLI agent.
+/// Runs the agent in the repo directory with a prompt describing the issues to fix.
+#[tauri::command]
+pub async fn fix_findings(
+    repo_path: String,
+    findings: Vec<Value>,
+    agent: Option<String>,
+) -> Result<Value, String> {
+    let agent = agent.unwrap_or_else(|| "claude".to_string());
+    let start_time = std::time::Instant::now();
+
+    // Build fix prompt
+    let mut issues = String::new();
+    for (i, f) in findings.iter().enumerate() {
+        let severity = f.get("severity").and_then(|v| v.as_str()).unwrap_or("medium");
+        let title = f.get("title").and_then(|v| v.as_str()).unwrap_or("Issue");
+        let summary = f.get("summary").and_then(|v| v.as_str()).unwrap_or("");
+        let suggestion = f.get("suggestion").and_then(|v| v.as_str()).unwrap_or("");
+        let file_path = f.get("filePath").and_then(|v| v.as_str()).unwrap_or("unknown");
+        let line = f.get("line").and_then(|v| v.as_i64());
+
+        issues.push_str(&format!("\n{}. [{severity}] {title}\n", i + 1));
+        issues.push_str(&format!("   File: {file_path}"));
+        if let Some(l) = line {
+            issues.push_str(&format!(":{l}"));
+        }
+        issues.push_str(&format!("\n   Problem: {summary}\n"));
+        if !suggestion.is_empty() {
+            issues.push_str(&format!("   Fix: {suggestion}\n"));
+        }
+    }
+
+    let prompt = format!(
+        "Fix the following code review issues in this repository. Make the minimal changes needed. Do not refactor unrelated code.\n{issues}"
+    );
+
+    let cli_cmd = match agent.as_str() {
+        "gemini" => "gemini",
+        _ => "claude",
+    };
+
+    let cli_output = StdCommand::new(cli_cmd)
+        .args(["-p", &prompt])
+        .current_dir(&repo_path)
+        .output()
+        .map_err(|e| format!("Failed to spawn {cli_cmd}: {e}"))?;
+
+    let duration_ms = start_time.elapsed().as_millis() as u64;
+
+    if !cli_output.status.success() {
+        let stderr = String::from_utf8_lossy(&cli_output.stderr);
+        return Err(format!("{cli_cmd} fix failed: {stderr}"));
+    }
+
+    let stdout = String::from_utf8_lossy(&cli_output.stdout).to_string();
+
+    Ok(json!({
+        "success": true,
+        "agent": agent,
+        "duration_ms": duration_ms,
+        "output_length": stdout.len(),
+        "findings_fixed": findings.len(),
     }))
 }
 

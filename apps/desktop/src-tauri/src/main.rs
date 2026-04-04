@@ -29,7 +29,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
+        // .plugin(tauri_plugin_updater::Builder::new().build()) // disabled — no pubkey configured
         .setup(|app| {
             // Resolve the app-local data directory for storing the SQLite DB.
             let app_data_dir = app
@@ -141,6 +141,7 @@ fn main() {
             commands::review::get_review,
             commands::review::list_reviews,
             commands::review::run_cli_review,
+            commands::review::fix_findings,
             // Session commands
             commands::sessions::list_sessions,
             commands::sessions::get_session,

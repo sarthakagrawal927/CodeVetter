@@ -21,6 +21,7 @@ import {
   getPreference,
   setPreference,
   runCliReview,
+  fixFindings,
 } from "@/lib/tauri-ipc";
 import type { PullRequest, CliReviewResult, CliReviewFinding } from "@/lib/tauri-ipc";
 
@@ -71,6 +72,15 @@ function severityIcon(s: string) {
   }
 }
 
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const secs = Math.round(ms / 1000);
+  if (secs < 60) return `${secs}s`;
+  const mins = Math.floor(secs / 60);
+  const remSecs = secs % 60;
+  return `${mins}m ${remSecs}s`;
+}
+
 function shortenPath(path: string): string {
   const home = "/Users/";
   if (path.startsWith(home)) {
@@ -94,6 +104,7 @@ export default function QuickReview() {
   const [projectDesc, setProjectDesc] = useState("");
   const [changeDesc, setChangeDesc] = useState("");
   const [isReviewing, setIsReviewing] = useState(false);
+  const [isFixing, setIsFixing] = useState<string | null>(null); // null | "all" | finding index
   const [result, setResult] = useState<CliReviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -218,6 +229,37 @@ export default function QuickReview() {
       setIsReviewing(false);
     }
   }, [repoPath, diffRange, projectDesc, changeDesc]);
+
+  // ─── Fix handlers ───────────────────────────────────────────────────────
+
+  const handleFixAll = useCallback(async () => {
+    if (!repoPath || !result) return;
+    setIsFixing("all");
+    setError(null);
+    try {
+      await fixFindings(repoPath, result.findings, result.agent);
+    } catch (e) {
+      setError(`Fix failed: ${String(e)}`);
+    } finally {
+      setIsFixing(null);
+    }
+  }, [repoPath, result]);
+
+  const handleFixOne = useCallback(
+    async (finding: CliReviewFinding, idx: number) => {
+      if (!repoPath || !result) return;
+      setIsFixing(String(idx));
+      setError(null);
+      try {
+        await fixFindings(repoPath, [finding], result.agent);
+      } catch (e) {
+        setError(`Fix failed: ${String(e)}`);
+      } finally {
+        setIsFixing(null);
+      }
+    },
+    [repoPath, result],
+  );
 
   // ─── Sorted findings ────────────────────────────────────────────────────
 
@@ -429,20 +471,43 @@ export default function QuickReview() {
             <div className="flex items-start gap-4">
               <ScoreBadge score={Math.round(result.score)} size="lg" />
               <div className="flex-1 min-w-0">
-                <h2 className="text-lg font-semibold text-slate-200">
-                  Review Results
-                </h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-slate-200">
+                    Review Results
+                  </h2>
+                  {sortedFindings.length > 0 && (
+                    <Button
+                      size="sm"
+                      onClick={handleFixAll}
+                      disabled={isFixing !== null}
+                      className="gap-1.5 bg-amber-600 text-xs text-white hover:bg-amber-500 disabled:opacity-50"
+                    >
+                      {isFixing === "all" ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Zap size={14} />
+                      )}
+                      {isFixing === "all" ? "Fixing..." : `Fix All (${sortedFindings.length})`}
+                    </Button>
+                  )}
+                </div>
                 {result.summary && (
                   <p className="mt-1 text-sm text-slate-400">
                     {result.summary}
                   </p>
                 )}
-                <div className="mt-2 flex items-center gap-2 text-[11px] text-slate-500">
-                  <Badge variant="outline" className="text-[10px]">
-                    {sortedFindings.length} finding
-                    {sortedFindings.length !== 1 ? "s" : ""}
-                  </Badge>
-                  <span className="font-mono">{diffRange}</span>
+                {/* Metadata row */}
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
+                  <span className="flex items-center gap-1">
+                    <Badge variant="outline" className="text-[10px]">
+                      {sortedFindings.length} finding{sortedFindings.length !== 1 ? "s" : ""}
+                    </Badge>
+                  </span>
+                  <span className="font-mono">{result.diff_range || diffRange}</span>
+                  <span>Model: <span className="text-slate-400">{result.agent || "claude"}</span></span>
+                  {result.duration_ms > 0 && (
+                    <span>Time: <span className="text-slate-400">{formatDuration(result.duration_ms)}</span></span>
+                  )}
                 </div>
               </div>
             </div>
@@ -458,7 +523,13 @@ export default function QuickReview() {
             ) : (
               <div className="space-y-3">
                 {sortedFindings.map((finding, idx) => (
-                  <FindingItem key={idx} finding={finding} />
+                  <FindingItem
+                    key={idx}
+                    finding={finding}
+                    isFixing={isFixing === String(idx)}
+                    anyFixing={isFixing !== null}
+                    onFix={() => handleFixOne(finding, idx)}
+                  />
                 ))}
               </div>
             )}
@@ -478,10 +549,20 @@ export default function QuickReview() {
 
 // ─── FindingItem ──────────────────────────────────────────────────────────────
 
-function FindingItem({ finding }: { finding: CliReviewFinding }) {
+function FindingItem({
+  finding,
+  isFixing,
+  anyFixing,
+  onFix,
+}: {
+  finding: CliReviewFinding;
+  isFixing: boolean;
+  anyFixing: boolean;
+  onFix: () => void;
+}) {
   return (
     <div className="rounded-lg border border-[#1e2231] bg-[#13151c] p-4">
-      {/* Header: severity badge + title */}
+      {/* Header: severity badge + title + fix button */}
       <div className="flex items-start gap-2">
         <Badge
           variant="outline"
@@ -492,7 +573,21 @@ function FindingItem({ finding }: { finding: CliReviewFinding }) {
         >
           {finding.severity}
         </Badge>
-        <h3 className="text-sm font-medium text-slate-200">{finding.title}</h3>
+        <h3 className="flex-1 text-sm font-medium text-slate-200">{finding.title}</h3>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onFix}
+          disabled={anyFixing}
+          className="shrink-0 gap-1 text-[11px] text-slate-500 hover:text-amber-400 disabled:opacity-40"
+        >
+          {isFixing ? (
+            <Loader2 size={12} className="animate-spin" />
+          ) : (
+            <Zap size={12} />
+          )}
+          {isFixing ? "Fixing..." : "Fix"}
+        </Button>
       </div>
 
       {/* Summary */}
