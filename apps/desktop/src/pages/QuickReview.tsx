@@ -422,53 +422,6 @@ export default function QuickReview() {
   if (mode === "view" && result) {
     return (
       <div className="flex h-full flex-col">
-        {/* Top bar */}
-        <div className="flex shrink-0 items-center gap-3 border-b border-[#1a1a1a] px-4 py-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 text-slate-400 hover:text-slate-100"
-            onClick={handleNewReview}
-          >
-            <ArrowLeft size={16} />
-            Back
-          </Button>
-          <div className="flex flex-1 items-center justify-center gap-3">
-            <ScoreBadge score={Math.round(result.score)} size="sm" />
-            <span className="max-w-md truncate text-sm text-slate-300">
-              {result.summary || "Review complete"}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={toggleSelectAll}
-              className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300"
-            >
-              {selectedFindings.size === sortedFindings.length && sortedFindings.length > 0 ? (
-                <CheckSquare2 size={14} className="text-amber-400" />
-              ) : (
-                <Square size={14} />
-              )}
-              {selectedFindings.size === sortedFindings.length && sortedFindings.length > 0 ? "Deselect" : "Select All"}
-            </button>
-            <Button
-              size="sm"
-              onClick={handleFixSelected}
-              disabled={isFixing !== null || selectedFindings.size === 0}
-              className="gap-1.5 bg-amber-600 text-xs text-white hover:bg-amber-500 disabled:opacity-50"
-            >
-              {isFixing === "selected" ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Zap size={14} />
-              )}
-              {isFixing === "selected"
-                ? "Fixing..."
-                : `Fix${selectedFindings.size > 0 ? ` (${selectedFindings.size})` : ""}`}
-            </Button>
-          </div>
-        </div>
-
         {/* Error banner */}
         {error && (
           <div className="shrink-0 bg-red-500/10 px-4 py-2 text-xs text-red-400">
@@ -480,6 +433,7 @@ export default function QuickReview() {
         <PanelGroup direction="horizontal" className="flex-1">
           <Panel defaultSize={40} minSize={25}>
           <div className="flex h-full flex-col">
+            {/* Scrollable findings list */}
             <div className="flex-1 overflow-y-auto">
               {sortedFindings.length === 0 ? (
                 <div className="flex items-center gap-2 px-4 py-6 text-sm text-emerald-400">
@@ -545,17 +499,55 @@ export default function QuickReview() {
                   ))}
                 </div>
               )}
+            </div>
 
-              {/* Metadata at bottom of findings column */}
-              {result.duration_ms > 0 && (
-                <div className="border-t border-[#1a1a1a] px-3 py-3">
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-slate-600">
-                    <span>Model: {result.agent}</span>
-                    <span>Time: {formatDuration(result.duration_ms)}</span>
-                    <span className="font-mono">{result.diff_range}</span>
-                  </div>
+            {/* Sticky bottom bar: back, score, select all, fix */}
+            <div className="shrink-0 border-t border-[#1a1a1a] bg-[#0a0a0a] px-3 py-2">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1 text-slate-500 hover:text-slate-100"
+                  onClick={handleNewReview}
+                >
+                  <ArrowLeft size={14} />
+                  Back
+                </Button>
+                <ScoreBadge score={Math.round(result.score)} size="sm" />
+                <span className="text-[10px] text-slate-600">
+                  {sortedFindings.length} finding{sortedFindings.length !== 1 ? "s" : ""}
+                  {result.duration_ms > 0 && ` · ${formatDuration(result.duration_ms)}`}
+                  {` · ${result.agent}`}
+                </span>
+                <div className="ml-auto flex items-center gap-2">
+                  <button
+                    onClick={toggleSelectAll}
+                    className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300"
+                  >
+                    {selectedFindings.size === sortedFindings.length && sortedFindings.length > 0 ? (
+                      <CheckSquare2 size={14} className="text-amber-400" />
+                    ) : (
+                      <Square size={14} />
+                    )}
+                    All
+                  </button>
+                  <Button
+                    size="sm"
+                    onClick={handleFixSelected}
+                    disabled={isFixing !== null || selectedFindings.size === 0}
+                    className="gap-1.5 bg-amber-600 text-xs text-white hover:bg-amber-500 disabled:opacity-50"
+                  >
+                    {isFixing === "selected" ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Zap size={14} />
+                    )}
+                    {isFixing === "selected"
+                      ? "Fixing..."
+                      : `Fix${selectedFindings.size > 0 ? ` (${selectedFindings.size})` : ""}`}
+                  </Button>
                 </div>
-              )}
+              </div>
             </div>
           </div>
           </Panel>
@@ -564,30 +556,51 @@ export default function QuickReview() {
 
           <Panel defaultSize={60} minSize={30}>
           {/* Right column: code viewer */}
-          <div className="flex h-full flex-col bg-[#0a0a0a]">
+          <div className="flex h-full flex-col bg-[#050505]">
             {selectedFindingIdx !== null && codeFilePath ? (
               <>
-                {/* File path header */}
-                <div className="shrink-0 border-b border-[#1a1a1a] px-4 py-2 font-mono text-[11px] text-slate-500">
-                  {codeFilePath}
+                {/* File path header + finding context */}
+                <div className="shrink-0 border-b border-[#1a1a1a] px-4 py-2">
+                  <div className="font-mono text-[11px] text-slate-400">
+                    {codeFilePath}
+                    {codeLanguage && <span className="ml-2 text-slate-600">({codeLanguage})</span>}
+                  </div>
+                  {sortedFindings[selectedFindingIdx] && (
+                    <div className="mt-1">
+                      <span className="text-xs font-medium text-slate-300">
+                        {sortedFindings[selectedFindingIdx].title}
+                      </span>
+                      {sortedFindings[selectedFindingIdx].suggestion && (
+                        <p className="mt-0.5 text-[11px] text-amber-400/70">
+                          {sortedFindings[selectedFindingIdx].suggestion}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
                 {/* Code lines */}
                 <div className="flex-1 overflow-y-auto">
                   {codeLines.length > 0 ? (
-                    <div className="py-2">
+                    <div className="py-1">
                       {codeLines.map((cl) => (
                         <div
                           key={cl.line}
                           className={cn(
-                            "flex font-mono text-[13px] leading-6",
-                            cl.highlight && "border-l-2 border-amber-500 bg-amber-500/10",
-                            !cl.highlight && "border-l-2 border-transparent",
+                            "flex font-mono text-[13px] leading-[22px]",
+                            cl.highlight && "bg-amber-500/10 border-l-2 border-amber-400",
+                            !cl.highlight && "border-l-2 border-transparent hover:bg-[#0e0e0e]",
                           )}
                         >
-                          <span className="w-12 shrink-0 select-none pr-3 text-right text-slate-600">
+                          <span className={cn(
+                            "w-14 shrink-0 select-none pr-4 text-right",
+                            cl.highlight ? "text-amber-500/60" : "text-[#333]",
+                          )}>
                             {cl.line}
                           </span>
-                          <pre className="flex-1 whitespace-pre text-slate-300">
+                          <pre className={cn(
+                            "flex-1 whitespace-pre pr-4",
+                            cl.highlight ? "text-slate-200" : "text-slate-400",
+                          )}>
                             {cl.text}
                           </pre>
                         </div>
@@ -602,7 +615,7 @@ export default function QuickReview() {
               </>
             ) : (
               <div className="flex h-full flex-col items-center justify-center gap-2 text-slate-600">
-                <Zap size={24} />
+                <Zap size={24} className="text-slate-700" />
                 <span className="text-sm">Click a finding to view the code</span>
               </div>
             )}
