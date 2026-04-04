@@ -615,7 +615,7 @@ export default function QuickReview() {
             </span>
           </div>
         ) : result ? (
-          <div className="max-w-3xl p-6">
+          <div className="max-w-3xl p-6 pt-12">
             {/* Score + summary header */}
             <div className="flex items-start gap-4">
               <ScoreBadge score={Math.round(result.score)} size="lg" />
