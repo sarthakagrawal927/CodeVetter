@@ -1,6 +1,6 @@
 import { ControlPlaneDatabase } from '@code-reviewer/db';
 import { AIGatewayClient } from '@code-reviewer/ai-gateway-client';
-import { IndexingJob, ReviewFindingRecord, ReviewJob, ReviewMode, WorkerJob } from '@code-reviewer/shared-types';
+import { IndexingJob, ReviewFindingRecord, ReviewJob, ReviewMode, WorkerJob, WorkspaceTier } from '@code-reviewer/shared-types';
 import {
   computeScore,
   computeFindingFingerprint,
@@ -207,7 +207,7 @@ async function handleIndexingJob(job: IndexingJob, config: HandlerConfig): Promi
 }
 
 async function handleReviewJob(job: ReviewJob, config: HandlerConfig): Promise<void> {
-  const { reviewRunId, repositoryId, prNumber, headSha } = job.payload;
+  const { reviewRunId, repositoryId, prNumber, headSha, reviewTier: jobTier } = job.payload;
   const wc = config.workerConfig;
 
   if (!wc.githubAppId || !wc.githubAppPrivateKey) {
@@ -235,6 +235,13 @@ async function handleReviewJob(job: ReviewJob, config: HandlerConfig): Promise<v
   const installationId = repository.installationId;
   if (!installationId) {
     throw new Error(`Repository ${repository.fullName} has no installationId`);
+  }
+
+  // Resolve workspace tier
+  let reviewTier: WorkspaceTier = jobTier || 'free';
+  if (!jobTier) {
+    const workspace = await db.getWorkspaceForRepository(repositoryId);
+    reviewTier = workspace?.tier || 'free';
   }
 
   // Load review run to get agent mode and parent linking
@@ -360,7 +367,8 @@ async function handleReviewJob(job: ReviewJob, config: HandlerConfig): Promise<v
     scoreComposite,
     reviewRunId,
     reviewAction,
-    resolvedFindings.length > 0 ? resolvedFindings : undefined
+    resolvedFindings.length > 0 ? resolvedFindings : undefined,
+    reviewTier
   );
   const ghEvent: ReviewEvent = reviewAction;
   try {
