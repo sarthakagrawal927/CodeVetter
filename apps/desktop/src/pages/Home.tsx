@@ -270,23 +270,21 @@ function AccountUsageRow({
             <div className="flex items-center gap-3">
               <span className="text-[11px] text-blue-400/80 font-medium">Today</span>
               <span className="text-[10px] text-slate-400 tabular-nums">
-                {geminiToday.sessions} sessions
+                {geminiToday.sessions} session{geminiToday.sessions !== 1 ? "s" : ""}
               </span>
               <span className="text-[10px] text-slate-400 tabular-nums">
-                {geminiToday.messages} messages
+                {geminiToday.messages} msg{geminiToday.messages !== 1 ? "s" : ""}
               </span>
               <span className="text-[10px] text-slate-400 tabular-nums">
                 {formatTokens(geminiToday.tokens.total)} tokens
               </span>
             </div>
-            {geminiRateLimit && geminiUtilPct != null && (
-              <UsageBar
-                pct={geminiUtilPct}
-                label="API rate limit"
-                resetLabel={`${geminiRateLimit.remaining}/${geminiRateLimit.limit} remaining`}
-                color={barColor(geminiUtilPct)}
-              />
-            )}
+            <UsageBar
+              pct={Math.min(100, (geminiToday.tokens.total / 1_000_000) * 100)}
+              label="Estimated usage"
+              resetLabel={`${formatTokens(geminiToday.tokens.total)} / 1M daily budget`}
+              color={barColor(Math.min(100, (geminiToday.tokens.total / 1_000_000) * 100))}
+            />
           </div>
         )}
 

@@ -146,6 +146,7 @@ export default function QuickReview() {
 
   // Past reviews
   const [pastReviews, setPastReviews] = useState<LocalReviewRow[]>([]);
+  const [pastReviewsLoading, setPastReviewsLoading] = useState(true);
   const [showHistory, setShowHistory] = useState(true);
 
   // Code viewer state (view mode)
@@ -204,12 +205,13 @@ export default function QuickReview() {
 
   useEffect(() => {
     if (!isTauriAvailable()) return;
+    setPastReviewsLoading(true);
     listReviews(20, 0)
       .then((reviews) => {
-        console.log("[Review] loaded past reviews:", reviews.length);
         setPastReviews(reviews);
       })
-      .catch((e) => console.error("[Review] failed to load past reviews:", e));
+      .catch((e) => console.error("[Review] failed to load past reviews:", e))
+      .finally(() => setPastReviewsLoading(false));
   }, [result]); // reload after new review completes
 
   const handleLoadPastReview = useCallback(async (id: string) => {
@@ -992,7 +994,15 @@ export default function QuickReview() {
           )}
 
           {/* Past reviews */}
-          {pastReviews.length > 0 && (
+          {pastReviewsLoading ? (
+            <>
+              <Separator className="bg-[#1a1a1a]" />
+              <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                <Loader2 size={12} className="animate-spin" />
+                Loading past reviews...
+              </div>
+            </>
+          ) : pastReviews.length > 0 ? (
             <>
               <Separator className="bg-[#1a1a1a]" />
               <button
@@ -1031,7 +1041,7 @@ export default function QuickReview() {
                 </div>
               )}
             </>
-          )}
+          ) : null}
         </div>
       </div>
 
