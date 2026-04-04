@@ -266,25 +266,26 @@ function AccountUsageRow({
 
         {/* ── Gemini-specific usage display ────────────────────── */}
         {account.provider === "google" && hasLive && geminiToday && (
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center gap-3">
-              <span className="text-[11px] text-blue-400/80 font-medium">Today</span>
-              <span className="text-[10px] text-slate-400 tabular-nums">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2 text-[11px]">
+              <span className="text-blue-400/80 font-medium">Today</span>
+              <span className="rounded bg-[#111111] px-1.5 py-0.5 text-[10px] text-slate-300 tabular-nums">
                 {geminiToday.sessions} session{geminiToday.sessions !== 1 ? "s" : ""}
               </span>
-              <span className="text-[10px] text-slate-400 tabular-nums">
+              <span className="rounded bg-[#111111] px-1.5 py-0.5 text-[10px] text-slate-300 tabular-nums">
                 {geminiToday.messages} msg{geminiToday.messages !== 1 ? "s" : ""}
               </span>
-              <span className="text-[10px] text-slate-400 tabular-nums">
-                {formatTokens(geminiToday.tokens.total)} tokens
-              </span>
             </div>
-            <UsageBar
-              pct={Math.min(100, (geminiToday.tokens.total / 1_000_000) * 100)}
-              label="Estimated usage"
-              resetLabel={`${formatTokens(geminiToday.tokens.total)} / 1M daily budget`}
-              color={barColor(Math.min(100, (geminiToday.tokens.total / 1_000_000) * 100))}
-            />
+            <div className="flex items-baseline gap-2">
+              <span className="text-lg font-semibold text-blue-400 tabular-nums">
+                {formatTokens(geminiToday.tokens.total)}
+              </span>
+              <span className="text-[10px] text-slate-500">tokens used</span>
+            </div>
+            <div className="flex gap-3 text-[10px] text-slate-500">
+              <span>In: {formatTokens(geminiToday.tokens.input)}</span>
+              <span>Out: {formatTokens(geminiToday.tokens.output)}</span>
+            </div>
           </div>
         )}
 
