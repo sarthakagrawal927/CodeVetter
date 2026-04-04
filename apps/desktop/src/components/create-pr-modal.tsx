@@ -79,11 +79,11 @@ export default function CreatePrModal({
   }
 
   const inputClass =
-    "w-full rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-2 text-[13px] text-slate-200 placeholder-slate-600 outline-none focus:border-amber-500/50";
+    "w-full rounded-lg border border-[#1a1a1a] bg-[#0f1117] px-3 py-2 text-[13px] text-slate-200 placeholder-slate-600 outline-none focus:border-amber-500/50";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-xl border border-[#1e2231] bg-[#13151c] p-5">
+      <div className="w-full max-w-lg rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-semibold text-slate-200">
             Create Pull Request

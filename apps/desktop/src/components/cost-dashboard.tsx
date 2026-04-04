@@ -23,7 +23,7 @@ function CostBar({ agent, maxCost }: { agent: AgentCostSummary; maxCost: number 
         <p className="text-[10px] text-slate-600">{agent.agent_type}</p>
       </div>
       <div className="flex-1">
-        <div className="h-3 rounded-full bg-[#1e2231] overflow-hidden">
+        <div className="h-3 rounded-full bg-[#1a1a1a] overflow-hidden">
           <div
             className="h-full rounded-full bg-amber-500/60 transition-all duration-500"
             style={{ width: `${Math.max(pct, 2)}%` }}
@@ -55,7 +55,7 @@ export default function CostDashboard() {
 
   if (!data) {
     return (
-      <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-6">
+      <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-6">
         <p className="text-xs text-slate-600">Loading cost data...</p>
       </div>
     );
@@ -67,7 +67,7 @@ export default function CostDashboard() {
     <div className="flex flex-col gap-6">
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-4">
+        <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-4">
           <p className="text-[10px] uppercase tracking-wider text-slate-500">
             Total Spend
           </p>
@@ -75,7 +75,7 @@ export default function CostDashboard() {
             ${data.total_cost_usd.toFixed(4)}
           </p>
         </div>
-        <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-4">
+        <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-4">
           <p className="text-[10px] uppercase tracking-wider text-slate-500">
             Input Tokens
           </p>
@@ -83,7 +83,7 @@ export default function CostDashboard() {
             {formatTokens(data.total_input_tokens)}
           </p>
         </div>
-        <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-4">
+        <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-4">
           <p className="text-[10px] uppercase tracking-wider text-slate-500">
             Output Tokens
           </p>
@@ -94,7 +94,7 @@ export default function CostDashboard() {
       </div>
 
       {/* Per-agent breakdown */}
-      <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-5">
+      <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-5">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
           Cost by Agent
         </h3>
@@ -103,7 +103,7 @@ export default function CostDashboard() {
             No cost data yet. Launch agents to see spend tracking.
           </p>
         ) : (
-          <div className="flex flex-col divide-y divide-[#1e2231]">
+          <div className="flex flex-col divide-y divide-[#1a1a1a]">
             {data.agents.map((agent) => (
               <CostBar key={agent.agent_id} agent={agent} maxCost={maxCost} />
             ))}
@@ -113,7 +113,7 @@ export default function CostDashboard() {
 
       {/* Token detail table */}
       {data.agents.length > 0 && (
-        <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-5">
+        <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-5">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
             Token Breakdown
           </h3>
@@ -127,7 +127,7 @@ export default function CostDashboard() {
                 <th className="pb-2 text-right">Entries</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#1e2231]">
+            <tbody className="divide-y divide-[#1a1a1a]">
               {data.agents.map((a) => (
                 <tr key={a.agent_id}>
                   <td className="py-2 text-slate-300">

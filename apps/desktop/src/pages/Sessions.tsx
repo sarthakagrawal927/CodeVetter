@@ -474,9 +474,9 @@ export default function Sessions() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* Left panel: session list */}
-      <div className="flex w-[400px] min-w-[250px] shrink-0 flex-col border-r border-[#1e2231] overflow-hidden">
+      <div className="flex w-[400px] min-w-[250px] shrink-0 flex-col border-r border-[#1a1a1a] overflow-hidden">
         {/* Header */}
-        <div className="flex flex-col gap-2 border-b border-[#1e2231] px-3 py-3">
+        <div className="flex flex-col gap-2 border-b border-[#1a1a1a] px-3 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h1 className="text-sm font-semibold text-slate-100">History</h1>
@@ -507,7 +507,7 @@ export default function Sessions() {
                 }
               }}
               disabled={isReindexing}
-              className="h-auto px-2 py-1 text-[11px] font-medium text-slate-500 hover:text-slate-300 hover:bg-[#1a1d27]"
+              className="h-auto px-2 py-1 text-[11px] font-medium text-slate-500 hover:text-slate-300 hover:bg-[#111111]"
             >
               {isReindexing ? "Indexing..." : "Re-index"}
             </Button>
@@ -533,7 +533,7 @@ export default function Sessions() {
                   className={cn(
                     "h-auto px-2 py-0.5 text-[11px] font-medium border-0",
                     agentFilter === filter
-                      ? "bg-[#1e2231] text-slate-200"
+                      ? "bg-[#1a1a1a] text-slate-200"
                       : "bg-transparent text-slate-500 hover:text-slate-300"
                   )}
                 >
@@ -546,7 +546,7 @@ export default function Sessions() {
               )
             )}
 
-            <span className="mx-1 h-3 w-px bg-[#1e2231]" />
+            <span className="mx-1 h-3 w-px bg-[#1a1a1a]" />
 
             {(["30d", "90d", "all"] as TimeRange[]).map((range) => (
               <Button
@@ -557,7 +557,7 @@ export default function Sessions() {
                 className={cn(
                   "h-auto px-2 py-0.5 text-[11px] font-medium border-0",
                   timeRange === range
-                    ? "bg-[#1e2231] text-slate-200"
+                    ? "bg-[#1a1a1a] text-slate-200"
                     : "bg-transparent text-slate-500 hover:text-slate-300"
                 )}
               >
@@ -583,7 +583,7 @@ export default function Sessions() {
         </div>
 
         {/* Column headers */}
-        <div className="flex items-center gap-3 border-b border-[#1e2231] px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-slate-600 overflow-hidden shrink-0">
+        <div className="flex items-center gap-3 border-b border-[#1a1a1a] px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-slate-600 overflow-hidden shrink-0">
           <span className="w-2" />
           <span className="min-w-0 max-w-[140px]">Project</span>
           <span>Branch</span>
@@ -645,7 +645,7 @@ export default function Sessions() {
                   <div key={session.id}>
                     <div
                       data-session-index={i}
-                      className="group flex items-center border-b border-[#1e2231]/50"
+                      className="group flex items-center border-b border-[#1a1a1a]/50"
                     >
                       <div className="flex-1 min-w-0">
                         <SessionCard
@@ -703,11 +703,11 @@ export default function Sessions() {
           <div className="flex h-full flex-col items-center justify-center text-slate-600">
             <p className="text-[13px] text-slate-500">Select a session</p>
             <p className="text-[11px] text-slate-600 mt-1">
-              <kbd className="rounded bg-[#1e2231] px-1.5 py-0.5 text-[10px] font-mono text-slate-500">j</kbd>
+              <kbd className="rounded bg-[#1a1a1a] px-1.5 py-0.5 text-[10px] font-mono text-slate-500">j</kbd>
               {" / "}
-              <kbd className="rounded bg-[#1e2231] px-1.5 py-0.5 text-[10px] font-mono text-slate-500">k</kbd>
+              <kbd className="rounded bg-[#1a1a1a] px-1.5 py-0.5 text-[10px] font-mono text-slate-500">k</kbd>
               {" to navigate, "}
-              <kbd className="rounded bg-[#1e2231] px-1.5 py-0.5 text-[10px] font-mono text-slate-500">/</kbd>
+              <kbd className="rounded bg-[#1a1a1a] px-1.5 py-0.5 text-[10px] font-mono text-slate-500">/</kbd>
               {" to search"}
             </p>
           </div>

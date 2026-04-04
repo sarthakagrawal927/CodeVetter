@@ -126,14 +126,14 @@ function InlineCommentForm({
   }, [text, onSubmit]);
 
   return (
-    <div className="border-l-2 border-amber-400 bg-[#13151c] rounded-r-lg p-3 my-1 mx-2">
+    <div className="border-l-2 border-amber-400 bg-[#0a0a0a] rounded-r-lg p-3 my-1 mx-2">
       <textarea
         ref={textareaRef}
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="Add a comment..."
         autoFocus
-        className="w-full bg-[#0a0b0f] border border-[#1e2231] rounded-md p-2 text-[12px] text-slate-300 font-mono resize-none focus:outline-none focus:border-amber-500/40 placeholder:text-slate-600"
+        className="w-full bg-[#0a0b0f] border border-[#1a1a1a] rounded-md p-2 text-[12px] text-slate-300 font-mono resize-none focus:outline-none focus:border-amber-500/40 placeholder:text-slate-600"
         rows={3}
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -208,7 +208,7 @@ function CommentCard({
     ) : null;
 
   return (
-    <div className="border-l-2 border-amber-400 bg-[#13151c] rounded-r-lg p-3 my-1 mx-2">
+    <div className="border-l-2 border-amber-400 bg-[#0a0a0a] rounded-r-lg p-3 my-1 mx-2">
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-medium text-amber-400">
@@ -341,7 +341,7 @@ export default function DiffViewer({
 
   return (
     <div
-      className="font-mono text-[12px] bg-[#0a0b0f] rounded-lg border border-[#1e2231] overflow-x-auto select-none"
+      className="font-mono text-[12px] bg-[#0a0b0f] rounded-lg border border-[#1a1a1a] overflow-x-auto select-none"
       onMouseUp={handleMouseUp}
       onMouseLeave={() => {
         if (isDragging.current) {
@@ -376,7 +376,7 @@ export default function DiffViewer({
             return (
               <div key={line.index}>
                 {line.type === "hunk-header" ? (
-                  <div className="bg-[#1a1d27] px-3 py-1 text-[11px] text-slate-500 border-y border-[#1e2231]">
+                  <div className="bg-[#111111] px-3 py-1 text-[11px] text-slate-500 border-y border-[#1a1a1a]">
                     {line.content}
                   </div>
                 ) : (
@@ -408,7 +408,7 @@ export default function DiffViewer({
                     </div>
                     {/* New line number gutter */}
                     <div
-                      className="w-12 text-right pr-2 text-[11px] text-slate-600 font-mono select-none cursor-pointer hover:bg-amber-500/10 shrink-0 border-r border-[#1e2231] leading-[20px]"
+                      className="w-12 text-right pr-2 text-[11px] text-slate-600 font-mono select-none cursor-pointer hover:bg-amber-500/10 shrink-0 border-r border-[#1a1a1a] leading-[20px]"
                       onMouseDown={(e) => {
                         e.preventDefault();
                         if (effectiveLine != null) {

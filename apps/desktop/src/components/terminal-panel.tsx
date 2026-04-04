@@ -19,7 +19,7 @@ const THEME = {
   cursor: "#d4a039",
   cursorAccent: "#0a0b0f",
   selectionBackground: "#d4a03930",
-  black: "#1e2231",
+  black: "#1a1a1a",
   red: "#f87171",
   green: "#4ade80",
   yellow: "#fbbf24",

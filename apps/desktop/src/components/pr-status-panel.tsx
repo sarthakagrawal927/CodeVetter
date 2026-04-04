@@ -175,7 +175,7 @@ export default function PrStatusPanel({ workspace, onPrUpdate }: PrStatusPanelPr
         <div className="text-[10px] font-medium uppercase tracking-wider text-slate-500 mb-2">
           Pull Request
         </div>
-        <div className="rounded-md bg-slate-500/5 border border-[#1e2231] px-3 py-2">
+        <div className="rounded-md bg-slate-500/5 border border-[#1a1a1a] px-3 py-2">
           <span className="text-[11px] text-slate-500">
             No PR linked to this workspace
           </span>
@@ -275,7 +275,7 @@ export default function PrStatusPanel({ workspace, onPrUpdate }: PrStatusPanelPr
 
         {/* Branch labels */}
         <div className="flex items-center gap-1.5 mt-2 text-[10px]">
-          <span className="rounded bg-[#1a1d27] px-1.5 py-0.5 text-[9px] text-slate-400 font-mono">
+          <span className="rounded bg-[#111111] px-1.5 py-0.5 text-[9px] text-slate-400 font-mono">
             {prInfo?.baseRefName ?? "main"}
           </span>
           <svg className="h-2.5 w-2.5 text-slate-600" viewBox="0 0 20 20" fill="currentColor">
@@ -285,7 +285,7 @@ export default function PrStatusPanel({ workspace, onPrUpdate }: PrStatusPanelPr
               clipRule="evenodd"
             />
           </svg>
-          <span className="rounded bg-[#1a1d27] px-1.5 py-0.5 text-[9px] text-amber-400/70 font-mono">
+          <span className="rounded bg-[#111111] px-1.5 py-0.5 text-[9px] text-amber-400/70 font-mono">
             {prInfo?.headRefName ?? workspace.branch}
           </span>
         </div>
@@ -293,7 +293,7 @@ export default function PrStatusPanel({ workspace, onPrUpdate }: PrStatusPanelPr
 
       {/* ── Merge Section ─────────────────────────────────────────────── */}
       {isOpen && (
-        <div className="border-t border-[#1e2231] pt-2">
+        <div className="border-t border-[#1a1a1a] pt-2">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <button
@@ -314,7 +314,7 @@ export default function PrStatusPanel({ workspace, onPrUpdate }: PrStatusPanelPr
             <div className="relative">
               <button
                 onClick={() => setShowMergeDropdown(!showMergeDropdown)}
-                className="rounded-lg border border-[#1e2231] bg-[#1a1d27] px-2 py-1.5 text-[11px] text-slate-400 hover:text-slate-200 transition-colors"
+                className="rounded-lg border border-[#1a1a1a] bg-[#111111] px-2 py-1.5 text-[11px] text-slate-400 hover:text-slate-200 transition-colors"
               >
                 <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                   <path
@@ -325,7 +325,7 @@ export default function PrStatusPanel({ workspace, onPrUpdate }: PrStatusPanelPr
                 </svg>
               </button>
               {showMergeDropdown && (
-                <div className="absolute right-0 top-full mt-1 z-20 rounded-lg border border-[#1e2231] bg-[#13151c] py-1 shadow-xl min-w-[120px]">
+                <div className="absolute right-0 top-full mt-1 z-20 rounded-lg border border-[#1a1a1a] bg-[#0a0a0a] py-1 shadow-xl min-w-[120px]">
                   {(["squash", "merge", "rebase"] as MergeMethod[]).map((m) => (
                     <button
                       key={m}
@@ -336,7 +336,7 @@ export default function PrStatusPanel({ workspace, onPrUpdate }: PrStatusPanelPr
                       className={`w-full px-3 py-1.5 text-left text-[11px] transition-colors ${
                         mergeMethod === m
                           ? "text-amber-400 bg-amber-500/5"
-                          : "text-slate-400 hover:text-slate-200 hover:bg-[#1a1d27]"
+                          : "text-slate-400 hover:text-slate-200 hover:bg-[#111111]"
                       }`}
                     >
                       {m.charAt(0).toUpperCase() + m.slice(1)}
@@ -371,7 +371,7 @@ export default function PrStatusPanel({ workspace, onPrUpdate }: PrStatusPanelPr
       )}
 
       {/* ── CI Checks Section ─────────────────────────────────────────── */}
-      <div className="border-t border-[#1e2231] pt-2">
+      <div className="border-t border-[#1a1a1a] pt-2">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">
@@ -405,7 +405,7 @@ export default function PrStatusPanel({ workspace, onPrUpdate }: PrStatusPanelPr
         </div>
 
         {checks.length === 0 ? (
-          <div className="rounded-md bg-slate-500/5 border border-[#1e2231] px-3 py-2">
+          <div className="rounded-md bg-slate-500/5 border border-[#1a1a1a] px-3 py-2">
             <span className="text-[11px] text-slate-500">No CI checks found</span>
           </div>
         ) : (
@@ -413,7 +413,7 @@ export default function PrStatusPanel({ workspace, onPrUpdate }: PrStatusPanelPr
             {checks.map((check, i) => (
               <div
                 key={`${check.name}-${i}`}
-                className="flex items-center gap-2 rounded px-2 py-1.5 hover:bg-[#1a1d27] transition-colors group"
+                className="flex items-center gap-2 rounded px-2 py-1.5 hover:bg-[#111111] transition-colors group"
               >
                 <CheckIcon conclusion={check.conclusion} state={check.state} />
                 <button

@@ -39,11 +39,11 @@ export default function CreateWorkspaceModal({
   }, [name]);
 
   const inputClass =
-    "rounded-lg border-[#1e2231] bg-[#0f1117] text-[13px] text-slate-200 placeholder-slate-600 focus-visible:ring-amber-500/50";
+    "rounded-lg border-[#1a1a1a] bg-[#0f1117] text-[13px] text-slate-200 placeholder-slate-600 focus-visible:ring-amber-500/50";
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-w-md bg-[#13151c] border-[#1e2231] p-5">
+      <DialogContent className="max-w-md bg-[#0a0a0a] border-[#1a1a1a] p-5">
         <DialogHeader className="mb-4">
           <DialogTitle className="text-sm font-semibold text-slate-200">
             New Workspace
@@ -81,7 +81,7 @@ export default function CreateWorkspaceModal({
                   const dir = await pickDirectory("Select project directory");
                   if (dir) setRepoPath(dir);
                 }}
-                className="shrink-0 border-[#1e2231] bg-[#0f1117] text-[12px] text-slate-400 hover:text-slate-200"
+                className="shrink-0 border-[#1a1a1a] bg-[#0f1117] text-[12px] text-slate-400 hover:text-slate-200"
               >
                 Browse
               </Button>

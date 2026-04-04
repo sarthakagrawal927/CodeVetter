@@ -143,10 +143,10 @@ function WorkspaceGroup({
               key={ws.id}
               variant="ghost"
               onClick={() => onSelect(ws.id)}
-              className={`flex flex-col gap-1 px-3 py-2.5 h-auto rounded-none text-left border-b border-[#1e2231]/50 transition-colors w-full ${
+              className={`flex flex-col gap-1 px-3 py-2.5 h-auto rounded-none text-left border-b border-[#1a1a1a]/50 transition-colors w-full ${
                 selectedId === ws.id
                   ? "bg-amber-500/5 border-l-2 border-l-amber-500"
-                  : "hover:bg-[#1a1d27] border-l-2 border-l-transparent"
+                  : "hover:bg-[#111111] border-l-2 border-l-transparent"
               }`}
             >
               <div className="flex items-center gap-2 min-w-0 w-full">
@@ -282,9 +282,9 @@ export default function Workspaces() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* Left panel: workspace list */}
-      <div className="flex w-[280px] min-w-[200px] shrink-0 flex-col border-r border-[#1e2231] overflow-hidden">
+      <div className="flex w-[280px] min-w-[200px] shrink-0 flex-col border-r border-[#1a1a1a] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#1e2231] px-3 py-3">
+        <div className="flex items-center justify-between border-b border-[#1a1a1a] px-3 py-3">
           <div className="flex items-center gap-2">
             <h1 className="text-sm font-semibold text-slate-100">
               Workspaces
@@ -348,10 +348,10 @@ export default function Workspaces() {
                   key={ws.id}
                   variant="ghost"
                   onClick={() => setSelectedId(ws.id)}
-                  className={`flex flex-col gap-1 px-3 py-2.5 h-auto rounded-none text-left border-b border-[#1e2231]/50 transition-colors w-full ${
+                  className={`flex flex-col gap-1 px-3 py-2.5 h-auto rounded-none text-left border-b border-[#1a1a1a]/50 transition-colors w-full ${
                     selectedId === ws.id
                       ? "bg-amber-500/5 border-l-2 border-l-amber-500"
-                      : "hover:bg-[#1a1d27] border-l-2 border-l-transparent"
+                      : "hover:bg-[#111111] border-l-2 border-l-transparent"
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0 w-full">
@@ -427,7 +427,7 @@ export default function Workspaces() {
 
               {/* Right panel toggle + panel */}
               <div
-                className={`shrink-0 border-l border-[#1e2231] transition-all ${
+                className={`shrink-0 border-l border-[#1a1a1a] transition-all ${
                   showRightPanel ? "w-[280px] min-w-[200px]" : "w-0"
                 } overflow-hidden`}
               >
@@ -446,7 +446,7 @@ export default function Workspaces() {
                 variant="ghost"
                 size="icon"
                 onClick={() => setShowRightPanel(!showRightPanel)}
-                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 rounded-l-md rounded-r-none bg-[#1a1d27] border border-r-0 border-[#1e2231] px-1 py-3 h-auto w-auto text-slate-500 hover:text-slate-300 transition-colors"
+                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 rounded-l-md rounded-r-none bg-[#111111] border border-r-0 border-[#1a1a1a] px-1 py-3 h-auto w-auto text-slate-500 hover:text-slate-300 transition-colors"
                 title={showRightPanel ? "Hide panel" : "Show panel"}
               >
                 <svg

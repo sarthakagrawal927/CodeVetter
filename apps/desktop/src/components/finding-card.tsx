@@ -79,7 +79,7 @@ export default function FindingCard({ finding }: FindingCardProps) {
 
       {/* Suggestion */}
       {finding.suggestion && (
-        <div className="mono mt-3 rounded-lg border border-[#1e2231] bg-[#0f1117] p-3 text-xs leading-relaxed text-slate-300">
+        <div className="mono mt-3 rounded-lg border border-[#1a1a1a] bg-[#0f1117] p-3 text-xs leading-relaxed text-slate-300">
           {finding.suggestion}
         </div>
       )}

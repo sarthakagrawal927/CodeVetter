@@ -82,7 +82,7 @@ function TaskCard({
   onAssign?: () => void;
 }) {
   return (
-    <Card className="group/task w-full border-[#1e2231] bg-[#0f1117] transition-all hover:border-[#2d3348] hover:bg-[#13151c] overflow-hidden">
+    <Card className="group/task w-full border-[#1a1a1a] bg-[#0f1117] transition-all hover:border-[#2d3348] hover:bg-[#0a0a0a] overflow-hidden">
       <CardContent className="p-3 min-w-0">
         <div className="cursor-pointer" onClick={onClick}>
           <h5 className="text-xs font-medium text-slate-200 line-clamp-2">
@@ -167,7 +167,7 @@ export default function KanbanBoard({ tasks, loopStates, runningAgents, onTaskCl
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                 {col.label}
               </span>
-              <span className="rounded-full bg-[#1a1d27] px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+              <span className="rounded-full bg-[#111111] px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
                 {colTasks.length}
               </span>
               {onAddTask && (
@@ -183,7 +183,7 @@ export default function KanbanBoard({ tasks, loopStates, runningAgents, onTaskCl
             </div>
 
             {/* Cards */}
-            <div className="flex flex-col gap-2 rounded-xl border border-[#1e2231] bg-[#13151c] p-2 min-h-[120px]">
+            <div className="flex flex-col gap-2 rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-2 min-h-[120px]">
               {colTasks.length === 0 ? (
                 <p className="py-6 text-center text-[11px] text-slate-600">
                   No tasks

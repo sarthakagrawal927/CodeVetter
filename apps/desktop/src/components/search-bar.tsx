@@ -158,7 +158,7 @@ export default function SearchBar({
           setTimeout(() => setShowDropdown(false), 200);
         }}
         placeholder={placeholder}
-        className="w-full rounded border border-[#1e2231] bg-[#0f1117] py-1.5 pl-8 pr-8 text-[13px] text-slate-200 placeholder-slate-600 outline-none transition-colors focus:border-amber-500/40"
+        className="w-full rounded border border-[#1a1a1a] bg-[#0f1117] py-1.5 pl-8 pr-8 text-[13px] text-slate-200 placeholder-slate-600 outline-none transition-colors focus:border-amber-500/40"
       />
 
       {/* Clear button */}
@@ -173,7 +173,7 @@ export default function SearchBar({
 
       {/* Search results dropdown */}
       {showDropdown && value.trim().length > 0 && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-[320px] overflow-y-auto rounded-lg border border-[#1e2231] bg-[#13151c] shadow-xl">
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-[320px] overflow-y-auto rounded-lg border border-[#1a1a1a] bg-[#0a0a0a] shadow-xl">
           {isSearching && !hasResults && (
             <div className="px-4 py-6 text-center text-xs text-slate-500">
               Searching...
@@ -189,7 +189,7 @@ export default function SearchBar({
               <button
                 key={result.message_id}
                 onClick={() => handleResultClick(result)}
-                className="flex w-full flex-col gap-1 border-b border-[#1e2231] px-4 py-3 text-left transition-colors hover:bg-[#1a1d27] last:border-b-0"
+                className="flex w-full flex-col gap-1 border-b border-[#1a1a1a] px-4 py-3 text-left transition-colors hover:bg-[#111111] last:border-b-0"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">

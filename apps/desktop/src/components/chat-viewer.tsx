@@ -230,7 +230,7 @@ function MessageBubble({ message }: { message: MessageRow }) {
       </div>
 
       {message.content_text && (
-        <div className="text-sm leading-relaxed text-slate-300 prose prose-invert prose-sm max-w-none prose-pre:bg-[#0d0f16] prose-pre:border prose-pre:border-[#1e2231] prose-pre:rounded-lg prose-code:text-amber-300 prose-code:before:content-[''] prose-code:after:content-[''] prose-a:text-amber-400 prose-strong:text-slate-200 prose-headings:text-slate-200 prose-li:marker:text-slate-500">
+        <div className="text-sm leading-relaxed text-slate-300 prose prose-invert prose-sm max-w-none prose-pre:bg-[#0d0f16] prose-pre:border prose-pre:border-[#1a1a1a] prose-pre:rounded-lg prose-code:text-amber-300 prose-code:before:content-[''] prose-code:after:content-[''] prose-a:text-amber-400 prose-strong:text-slate-200 prose-headings:text-slate-200 prose-li:marker:text-slate-500">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
             {message.content_text}
           </ReactMarkdown>
@@ -330,7 +330,7 @@ export default function ChatViewer({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="shrink-0 border-b border-[#1e2231] px-4 py-3">
+      <div className="shrink-0 border-b border-[#1a1a1a] px-4 py-3">
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
@@ -398,7 +398,7 @@ export default function ChatViewer({
               <button
                 onClick={handleCopyResume}
                 title={resumeCommand}
-                className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-[11px] font-medium text-slate-400 transition-colors hover:bg-[#1a1d27] hover:text-slate-200"
+                className="flex items-center gap-1.5 rounded px-2.5 py-1.5 text-[11px] font-medium text-slate-400 transition-colors hover:bg-[#111111] hover:text-slate-200"
               >
                 {copied ? (
                   <>
@@ -425,7 +425,7 @@ export default function ChatViewer({
                 placeholder="Search..."
                 value={searchInSession}
                 onChange={(e) => setSearchInSession(e.target.value)}
-                className="w-36 rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-1.5 text-[11px] text-slate-300 placeholder-slate-600 outline-none focus:border-amber-500/50 focus:w-52 transition-all"
+                className="w-36 rounded-lg border border-[#1a1a1a] bg-[#0f1117] px-3 py-1.5 text-[11px] text-slate-300 placeholder-slate-600 outline-none focus:border-amber-500/50 focus:w-52 transition-all"
               />
               {searchInSession && (
                 <button
@@ -440,7 +440,7 @@ export default function ChatViewer({
             </div>
 
             {/* View mode toggle */}
-            <div className="flex rounded-lg border border-[#1e2231] overflow-hidden">
+            <div className="flex rounded-lg border border-[#1a1a1a] overflow-hidden">
               <button
                 onClick={() => setViewMode("conversation")}
                 className={`px-3 py-1.5 text-[11px] font-medium transition-colors ${
@@ -453,7 +453,7 @@ export default function ChatViewer({
               </button>
               <button
                 onClick={() => setViewMode("full")}
-                className={`px-3 py-1.5 text-[11px] font-medium transition-colors border-l border-[#1e2231] ${
+                className={`px-3 py-1.5 text-[11px] font-medium transition-colors border-l border-[#1a1a1a] ${
                   viewMode === "full"
                     ? "bg-amber-500/20 text-amber-400"
                     : "text-slate-500 hover:text-slate-300"
@@ -528,7 +528,7 @@ export default function ChatViewer({
         <div className="absolute bottom-16 right-6">
           <button
             onClick={scrollToBottom}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-[#1e2231] bg-[#13151c] text-slate-400 shadow-lg transition-all hover:border-amber-500/40 hover:text-amber-400"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-[#1a1a1a] bg-[#0a0a0a] text-slate-400 shadow-lg transition-all hover:border-amber-500/40 hover:text-amber-400"
             title="Scroll to bottom"
           >
             <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">

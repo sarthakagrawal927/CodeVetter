@@ -174,13 +174,13 @@ export default function WorkspaceChat({
   // ─── Markdown prose classes (matching chat-viewer.tsx) ─────────────────────
 
   const proseClasses =
-    "text-sm leading-relaxed text-slate-300 prose prose-invert prose-sm max-w-none prose-pre:bg-[#0d0f16] prose-pre:border prose-pre:border-[#1e2231] prose-pre:rounded-lg prose-code:text-amber-300 prose-code:before:content-[''] prose-code:after:content-[''] prose-a:text-amber-400 prose-strong:text-slate-200 prose-headings:text-slate-200 prose-li:marker:text-slate-500";
+    "text-sm leading-relaxed text-slate-300 prose prose-invert prose-sm max-w-none prose-pre:bg-[#0d0f16] prose-pre:border prose-pre:border-[#1a1a1a] prose-pre:rounded-lg prose-code:text-amber-300 prose-code:before:content-[''] prose-code:after:content-[''] prose-a:text-amber-400 prose-strong:text-slate-200 prose-headings:text-slate-200 prose-li:marker:text-slate-500";
 
   return (
     <div className="flex h-full flex-col">
       {/* Chat header */}
-      <div className="flex items-center gap-2 border-b border-[#1e2231] px-4 py-2.5 shrink-0 overflow-hidden">
-        <div className="flex items-center gap-1.5 rounded-md bg-[#1a1d27] px-2.5 py-1 text-[11px] text-slate-300 font-medium min-w-0">
+      <div className="flex items-center gap-2 border-b border-[#1a1a1a] px-4 py-2.5 shrink-0 overflow-hidden">
+        <div className="flex items-center gap-1.5 rounded-md bg-[#111111] px-2.5 py-1 text-[11px] text-slate-300 font-medium min-w-0">
           <span className="text-slate-500 shrink-0">#</span>
           <span className="truncate">{workspace.name}</span>
         </div>
@@ -245,7 +245,7 @@ export default function WorkspaceChat({
                       Claude
                     </span>
                   </div>
-                  <div className="rounded-lg bg-[#161922] border border-[#1e2231] px-4 py-3 overflow-hidden">
+                  <div className="rounded-lg bg-[#161922] border border-[#1a1a1a] px-4 py-3 overflow-hidden">
                     <div className={proseClasses}>
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>
                         {msg.content}
@@ -265,7 +265,7 @@ export default function WorkspaceChat({
                     Claude
                   </span>
                 </div>
-                <div className="rounded-lg bg-[#161922] border border-[#1e2231] px-4 py-3">
+                <div className="rounded-lg bg-[#161922] border border-[#1a1a1a] px-4 py-3">
                   {chatState === "streaming" && streamingText ? (
                     <div className={proseClasses}>
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -310,7 +310,7 @@ export default function WorkspaceChat({
       </div>
 
       {/* Input bar */}
-      <div className="shrink-0 border-t border-[#1e2231] px-3 py-2.5 overflow-hidden">
+      <div className="shrink-0 border-t border-[#1a1a1a] px-3 py-2.5 overflow-hidden">
         <div className="flex items-end gap-2 min-w-0">
           <textarea
             ref={inputRef}
@@ -329,7 +329,7 @@ export default function WorkspaceChat({
             }
             disabled={isBusy}
             rows={1}
-            className="flex-1 min-w-0 resize-none rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-2 text-[13px] text-slate-200 placeholder-slate-600 outline-none focus:border-amber-500/50 disabled:opacity-50 max-h-24"
+            className="flex-1 min-w-0 resize-none rounded-lg border border-[#1a1a1a] bg-[#0f1117] px-3 py-2 text-[13px] text-slate-200 placeholder-slate-600 outline-none focus:border-amber-500/50 disabled:opacity-50 max-h-24"
             style={{ height: "auto", minHeight: "36px" }}
             onInput={(e) => {
               const t = e.target as HTMLTextAreaElement;
@@ -352,7 +352,7 @@ export default function WorkspaceChat({
             value={model}
             onChange={(e) => setModel(e.target.value)}
             disabled={isBusy}
-            className="rounded border border-[#1e2231] bg-[#0f1117] px-2 py-1 text-[10px] text-slate-400 outline-none focus:border-amber-500/50 cursor-pointer"
+            className="rounded border border-[#1a1a1a] bg-[#0f1117] px-2 py-1 text-[10px] text-slate-400 outline-none focus:border-amber-500/50 cursor-pointer"
           >
             <option value="sonnet">Sonnet</option>
             <option value="opus">Opus</option>
@@ -365,7 +365,7 @@ export default function WorkspaceChat({
             className={`rounded px-2 py-1 text-[10px] font-medium transition-colors ${
               thinkingEnabled
                 ? "bg-violet-500/20 text-violet-400 border border-violet-500/30"
-                : "text-slate-500 hover:text-slate-300 border border-[#1e2231]"
+                : "text-slate-500 hover:text-slate-300 border border-[#1a1a1a]"
             }`}
           >
             Thinking
@@ -377,7 +377,7 @@ export default function WorkspaceChat({
             className={`rounded px-2 py-1 text-[10px] font-medium transition-colors ${
               planMode
                 ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                : "text-slate-500 hover:text-slate-300 border border-[#1e2231]"
+                : "text-slate-500 hover:text-slate-300 border border-[#1a1a1a]"
             }`}
           >
             Plan

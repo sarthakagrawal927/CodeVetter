@@ -65,10 +65,10 @@ function CreateTaskPanel({
   const [projectPath, setProjectPath] = useState("");
 
   const inputClass =
-    "rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-amber-500/50";
+    "rounded-lg border border-[#1a1a1a] bg-[#0f1117] px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-amber-500/50";
 
   return (
-    <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-5 fade-in">
+    <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-5 fade-in">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-slate-200">New Task</h3>
         <button onClick={onClose} className="text-slate-500 hover:text-slate-300 text-sm">
@@ -234,14 +234,14 @@ function LaunchAgentForm({
   }
 
   const inputClass =
-    "rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-amber-500/50";
+    "rounded-lg border border-[#1a1a1a] bg-[#0f1117] px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-amber-500/50";
   const selectClass =
-    "rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-2 text-sm text-slate-200 outline-none focus:border-amber-500/50 appearance-none";
+    "rounded-lg border border-[#1a1a1a] bg-[#0f1117] px-3 py-2 text-sm text-slate-200 outline-none focus:border-amber-500/50 appearance-none";
   const labelClass = "text-xs font-medium text-slate-300";
   const checkboxRowClass = "flex items-center gap-2";
 
   return (
-    <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-5 fade-in">
+    <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-5 fade-in">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-slate-200">Launch Agent</h3>
         <button onClick={onClose} className="text-slate-500 hover:text-slate-300 text-sm">
@@ -260,7 +260,7 @@ function LaunchAgentForm({
                 className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
                   selectedPresetId === null
                     ? "border-amber-500/40 bg-amber-500/10 text-amber-400"
-                    : "border-[#1e2231] text-slate-400 hover:border-[#2d3348]"
+                    : "border-[#1a1a1a] text-slate-400 hover:border-[#2d3348]"
                 }`}
               >
                 Custom
@@ -272,7 +272,7 @@ function LaunchAgentForm({
                     className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
                       selectedPresetId === p.id
                         ? "border-amber-500/40 bg-amber-500/10 text-amber-400"
-                        : "border-[#1e2231] text-slate-400 hover:border-[#2d3348]"
+                        : "border-[#1a1a1a] text-slate-400 hover:border-[#2d3348]"
                     }`}
                   >
                     {p.name}
@@ -285,7 +285,7 @@ function LaunchAgentForm({
                       e.stopPropagation();
                       handleDeletePreset(p.id);
                     }}
-                    className="absolute -right-1.5 -top-1.5 hidden rounded-full bg-[#1e2231] px-1 text-[10px] text-slate-500 hover:text-red-400 group-hover:block"
+                    className="absolute -right-1.5 -top-1.5 hidden rounded-full bg-[#1a1a1a] px-1 text-[10px] text-slate-500 hover:text-red-400 group-hover:block"
                     title="Delete preset"
                   >
                     {"\u2715"}
@@ -307,7 +307,7 @@ function LaunchAgentForm({
                 className={`rounded-lg border px-4 py-2 text-xs font-medium transition-colors ${
                   adapter === a
                     ? "border-amber-500/40 bg-amber-500/10 text-amber-400"
-                    : "border-[#1e2231] text-slate-400 hover:border-[#2d3348]"
+                    : "border-[#1a1a1a] text-slate-400 hover:border-[#2d3348]"
                 }`}
               >
                 {a === "claude-code" ? "Claude Code" : "Codex"}
@@ -334,7 +334,7 @@ function LaunchAgentForm({
                 className={`rounded-lg border px-3 py-1.5 text-xs font-medium capitalize transition-colors ${
                   role === r
                     ? "border-amber-500/40 bg-amber-500/10 text-amber-400"
-                    : "border-[#1e2231] text-slate-400 hover:border-[#2d3348]"
+                    : "border-[#1a1a1a] text-slate-400 hover:border-[#2d3348]"
                 }`}
               >
                 {r}
@@ -376,7 +376,7 @@ function LaunchAgentForm({
 
         {/* Advanced CLI Options */}
         {showAdvanced && (
-          <div className="flex flex-col gap-3 rounded-lg border border-[#1e2231] bg-[#0f1117] p-4">
+          <div className="flex flex-col gap-3 rounded-lg border border-[#1a1a1a] bg-[#0f1117] p-4">
             {adapter === "claude-code" ? (
               <>
                 <div className="flex flex-col gap-1.5">
@@ -440,7 +440,7 @@ function LaunchAgentForm({
                       type="checkbox"
                       checked={printMode}
                       onChange={(e) => setPrintMode(e.target.checked)}
-                      className="rounded border-[#1e2231] bg-[#0f1117] text-amber-500 focus:ring-amber-500/30"
+                      className="rounded border-[#1a1a1a] bg-[#0f1117] text-amber-500 focus:ring-amber-500/30"
                     />
                     <span className="text-xs text-slate-300">Print mode (--print)</span>
                   </label>
@@ -449,7 +449,7 @@ function LaunchAgentForm({
                       type="checkbox"
                       checked={noSessionPersist}
                       onChange={(e) => setNoSessionPersist(e.target.checked)}
-                      className="rounded border-[#1e2231] bg-[#0f1117] text-amber-500 focus:ring-amber-500/30"
+                      className="rounded border-[#1a1a1a] bg-[#0f1117] text-amber-500 focus:ring-amber-500/30"
                     />
                     <span className="text-xs text-slate-300">No session persistence</span>
                   </label>
@@ -487,7 +487,7 @@ function LaunchAgentForm({
                       type="checkbox"
                       checked={quietMode}
                       onChange={(e) => setQuietMode(e.target.checked)}
-                      className="rounded border-[#1e2231] bg-[#0f1117] text-amber-500 focus:ring-amber-500/30"
+                      className="rounded border-[#1a1a1a] bg-[#0f1117] text-amber-500 focus:ring-amber-500/30"
                     />
                     <span className="text-xs text-slate-300">Quiet mode</span>
                   </label>
@@ -512,7 +512,7 @@ function LaunchAgentForm({
           {!showSavePreset && (
             <button
               onClick={() => setShowSavePreset(true)}
-              className="rounded-lg border border-[#1e2231] px-3 py-2 text-xs text-slate-400 transition-colors hover:border-[#2d3348] hover:text-slate-200"
+              className="rounded-lg border border-[#1a1a1a] px-3 py-2 text-xs text-slate-400 transition-colors hover:border-[#2d3348] hover:text-slate-200"
             >
               Save as Preset
             </button>
@@ -624,7 +624,7 @@ function ImportLinearModal({
   }
 
   return (
-    <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-5 fade-in w-full max-w-lg">
+    <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-5 fade-in w-full max-w-lg">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-slate-200">Import from Linear</h3>
         <button onClick={onClose} className="text-slate-500 hover:text-slate-300 text-sm">
@@ -655,17 +655,17 @@ function ImportLinearModal({
             </span>
           </div>
 
-          <div className="max-h-64 overflow-y-auto rounded-lg border border-[#1e2231] bg-[#0f1117]">
+          <div className="max-h-64 overflow-y-auto rounded-lg border border-[#1a1a1a] bg-[#0f1117]">
             {issues.map((issue) => (
               <label
                 key={issue.id}
-                className="flex items-start gap-3 px-3 py-2.5 border-b border-[#1e2231] last:border-b-0 cursor-pointer hover:bg-[#1a1d27] transition-colors"
+                className="flex items-start gap-3 px-3 py-2.5 border-b border-[#1a1a1a] last:border-b-0 cursor-pointer hover:bg-[#111111] transition-colors"
               >
                 <input
                   type="checkbox"
                   checked={selected.has(issue.id)}
                   onChange={() => toggleIssue(issue.id)}
-                  className="mt-0.5 rounded border-[#1e2231] bg-[#0f1117] text-amber-500 focus:ring-amber-500/30"
+                  className="mt-0.5 rounded border-[#1a1a1a] bg-[#0f1117] text-amber-500 focus:ring-amber-500/30"
                 />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -695,7 +695,7 @@ function ImportLinearModal({
       <div className="flex items-center justify-end gap-2 mt-4">
         <button
           onClick={onClose}
-          className="rounded-lg border border-[#1e2231] px-4 py-2 text-sm text-slate-400 transition-colors hover:border-[#2d3348] hover:text-slate-200"
+          className="rounded-lg border border-[#1a1a1a] px-4 py-2 text-sm text-slate-400 transition-colors hover:border-[#2d3348] hover:text-slate-200"
         >
           Cancel
         </button>
@@ -752,7 +752,7 @@ function ReviewModal({
   }
 
   return (
-    <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-5 fade-in">
+    <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-5 fade-in">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-slate-200">Start Review</h3>
         <button onClick={onClose} className="text-slate-500 hover:text-slate-300 text-sm">
@@ -789,7 +789,7 @@ function TestGenModal({
   const [error, setError] = useState<string | null>(null);
 
   const inputClass =
-    "rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-amber-500/50";
+    "rounded-lg border border-[#1a1a1a] bg-[#0f1117] px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-amber-500/50";
 
   async function handleGenerate() {
     if (!url.trim() || !description.trim()) {
@@ -821,7 +821,7 @@ function TestGenModal({
   }
 
   return (
-    <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-5 fade-in">
+    <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-5 fade-in">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-slate-200">Generate Test</h3>
         <button onClick={onClose} className="text-slate-500 hover:text-slate-300 text-sm">
@@ -921,7 +921,7 @@ function PersonaModal({
   const id = existingPersona?.id ?? slugify(name);
 
   const inputClass =
-    "rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-amber-500/50";
+    "rounded-lg border border-[#1a1a1a] bg-[#0f1117] px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-amber-500/50";
 
   async function handleSave() {
     if (!name.trim() || !department.trim()) return;
@@ -948,7 +948,7 @@ function PersonaModal({
   }
 
   return (
-    <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-6 shadow-2xl">
+    <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-6 shadow-2xl">
       <h2 className="text-base font-semibold text-slate-100 mb-4">
         {isEdit ? "Edit Persona" : "Create Persona"}
       </h2>
@@ -1016,7 +1016,7 @@ function PersonaModal({
                 className="h-6 w-6 rounded-full transition-all"
                 style={{
                   backgroundColor: PERSONA_COLOR_HEX[c],
-                  boxShadow: color === c ? `0 0 0 2px #13151c, 0 0 0 4px ${PERSONA_COLOR_HEX[c]}` : "none",
+                  boxShadow: color === c ? `0 0 0 2px #0a0a0a, 0 0 0 4px ${PERSONA_COLOR_HEX[c]}` : "none",
                 }}
                 title={c}
               />
@@ -1050,7 +1050,7 @@ function PersonaModal({
         <div className="flex items-center justify-end gap-2 mt-2">
           <button
             onClick={onClose}
-            className="rounded-lg border border-[#1e2231] px-4 py-2 text-sm text-slate-400 hover:text-slate-200 transition-colors"
+            className="rounded-lg border border-[#1a1a1a] px-4 py-2 text-sm text-slate-400 hover:text-slate-200 transition-colors"
           >
             Cancel
           </button>
@@ -1115,7 +1115,7 @@ function CompactPersonaCard({
             className={`group relative w-full cursor-pointer p-3 transition-colors overflow-hidden ${
               selected
                 ? "border-amber-500/30 bg-amber-500/5"
-                : "bg-[#13151c] hover:border-[#2d3348]"
+                : "bg-[#0a0a0a] hover:border-[#2d3348]"
             }`}
             style={{ borderLeftColor: accentColor, borderLeftWidth: 2 }}
             onClick={onClick}
@@ -1201,7 +1201,7 @@ function PersonaDetailPanel({
   const accentColor = COLOR_MAP[persona.color] || "#f59e0b";
 
   const inputClass =
-    "rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-amber-500/50";
+    "rounded-lg border border-[#1a1a1a] bg-[#0f1117] px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-amber-500/50";
 
   // If persona is busy, redirect to agent conversation view
   if (isBusy) {
@@ -1288,7 +1288,7 @@ function PersonaDetailPanel({
         </div>
       )}
 
-      <div className="rounded-lg border border-[#1e2231] bg-[#0f1117] p-4">
+      <div className="rounded-lg border border-[#1a1a1a] bg-[#0f1117] p-4">
         <h3 className="text-[12px] font-medium text-slate-300 mb-3">Assign Task</h3>
         <div className="flex flex-col gap-3">
           <DirectoryPicker
@@ -1690,8 +1690,8 @@ export default function Agents() {
   return (
     <div className="flex h-full">
       {/* Left sidebar - Agent Squad (always visible) */}
-      <div className="w-60 shrink-0 border-r border-[#1e2231] flex flex-col overflow-hidden">
-        <div className="border-b border-[#1e2231] px-4 py-3">
+      <div className="w-60 shrink-0 border-r border-[#1a1a1a] flex flex-col overflow-hidden">
+        <div className="border-b border-[#1a1a1a] px-4 py-3">
           <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
             Agent Squad
           </h2>
@@ -1837,7 +1837,7 @@ export default function Agents() {
       {/* Main area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header — minimal: task count left, actions right */}
-        <div className="flex items-center justify-between border-b border-[#1e2231] px-6 py-3">
+        <div className="flex items-center justify-between border-b border-[#1a1a1a] px-6 py-3">
           <div className="flex items-center gap-3">
             <span className="text-[13px] text-slate-400">
               {tasks.length} {tasks.length === 1 ? "task" : "tasks"}
@@ -1865,7 +1865,7 @@ export default function Agents() {
                 setShowLaunchPanel(false);
                 setShowLinearImport(false);
               }}
-              className="rounded-lg border border-[#1e2231] px-3 py-1.5 text-[12px] font-medium text-slate-300 transition-colors hover:border-[#2d3348] hover:text-white"
+              className="rounded-lg border border-[#1a1a1a] px-3 py-1.5 text-[12px] font-medium text-slate-300 transition-colors hover:border-[#2d3348] hover:text-white"
             >
               + Task
             </button>
@@ -1883,7 +1883,7 @@ export default function Agents() {
         {rightPanelMode === "agent-conversation" && selectedAgent ? (
           <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
             {/* Conversation header */}
-            <div className="shrink-0 border-b border-[#1e2231] px-4 py-3">
+            <div className="shrink-0 border-b border-[#1a1a1a] px-4 py-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <button
@@ -1895,7 +1895,7 @@ export default function Agents() {
                     </svg>
                     Back to Board
                   </button>
-                  <div className="h-4 w-px bg-[#1e2231]" />
+                  <div className="h-4 w-px bg-[#1a1a1a]" />
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-semibold text-slate-200">
@@ -2114,7 +2114,7 @@ export default function Agents() {
                         setSelectedPersona(persona);
                       }
                     }}
-                    className="flex items-center gap-3 rounded-lg border border-[#1e2231] bg-[#13151c] p-3 text-left transition-colors hover:border-[#2d3348] hover:bg-[#1a1d27]"
+                    className="flex items-center gap-3 rounded-lg border border-[#1a1a1a] bg-[#0a0a0a] p-3 text-left transition-colors hover:border-[#2d3348] hover:bg-[#111111]"
                   >
                     <span
                       className="h-2 w-2 rounded-full shrink-0"

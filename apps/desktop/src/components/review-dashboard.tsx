@@ -135,7 +135,7 @@ function SeverityBar({ findings }: { findings: ReviewFinding[] }) {
     .map((s) => ({ severity: s, count: counts[s], pct: (counts[s] / total) * 100 }));
 
   return (
-    <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-[#1e2231]">
+    <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-[#1a1a1a]">
       {segments.map((seg) => (
         <div
           key={seg.severity}
@@ -155,7 +155,7 @@ function ConfidenceBar({ value }: { value: number | null }) {
   const pct = Math.round(value * 100);
   return (
     <div className="flex items-center gap-2">
-      <div className="h-1 w-16 overflow-hidden rounded-full bg-[#1e2231]">
+      <div className="h-1 w-16 overflow-hidden rounded-full bg-[#1a1a1a]">
         <div
           className={cn(
             "h-full rounded-full transition-all",
@@ -174,8 +174,8 @@ function ConfidenceBar({ value }: { value: number | null }) {
 function SuggestionBlock({ suggestion }: { suggestion: string }) {
   const lines = suggestion.split("\n");
   return (
-    <div className="mt-3 rounded-lg border border-[#1e2231] bg-[#0a0b0f] overflow-hidden">
-      <div className="px-3 py-1.5 border-b border-[#1e2231] text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+    <div className="mt-3 rounded-lg border border-[#1a1a1a] bg-[#0a0b0f] overflow-hidden">
+      <div className="px-3 py-1.5 border-b border-[#1a1a1a] text-[10px] font-medium text-slate-500 uppercase tracking-wider">
         Suggestion
       </div>
       <div className="p-3 font-mono text-[12px] leading-relaxed overflow-x-auto">
@@ -219,7 +219,7 @@ function InlineCommentInput({
         onChange={(e) => onChange(e.target.value)}
         placeholder="Add a note about this finding..."
         autoFocus
-        className="w-full bg-[#0a0b0f] border border-[#1e2231] rounded-lg p-2.5 text-[12px] text-slate-300 font-mono resize-none focus:outline-none focus:border-amber-500/40 placeholder:text-slate-600"
+        className="w-full bg-[#0a0b0f] border border-[#1a1a1a] rounded-lg p-2.5 text-[12px] text-slate-300 font-mono resize-none focus:outline-none focus:border-amber-500/40 placeholder:text-slate-600"
         rows={3}
         onKeyDown={(e) => {
           if (e.key === "Escape") {
@@ -270,10 +270,10 @@ function FindingCard({
   return (
     <Card
       className={cn(
-        "border bg-[#13151c] transition-all cursor-pointer",
+        "border bg-[#0a0a0a] transition-all cursor-pointer",
         isSelected
           ? "border-amber-500/40 ring-1 ring-amber-500/20"
-          : "border-[#1e2231] hover:border-[#2a2e3d]",
+          : "border-[#1a1a1a] hover:border-[#2a2e3d]",
         action === "dismissed" && "opacity-50"
       )}
       onClick={onSelect}
@@ -792,9 +792,9 @@ export default function ReviewDashboard({
           {/* Main content: sidebar + findings */}
           <div className="flex flex-1 min-h-0">
             {/* ── Left Sidebar ── */}
-            <div className="w-[220px] shrink-0 border-r border-[#1e2231] flex flex-col overflow-y-auto">
+            <div className="w-[220px] shrink-0 border-r border-[#1a1a1a] flex flex-col overflow-y-auto">
               {/* Severity summary */}
-              <div className="p-3 border-b border-[#1e2231]">
+              <div className="p-3 border-b border-[#1a1a1a]">
                 <div className="text-[10px] font-medium uppercase tracking-wider text-slate-500 mb-2">
                   Severity
                 </div>
@@ -806,7 +806,7 @@ export default function ReviewDashboard({
                         <button
                           key={s}
                           onClick={() => setFilterFile(null)}
-                          className="flex items-center gap-2 text-[12px] hover:bg-[#1a1d27] rounded-md px-2 py-1 transition-colors"
+                          className="flex items-center gap-2 text-[12px] hover:bg-[#111111] rounded-md px-2 py-1 transition-colors"
                         >
                           <span className={cn("h-2 w-2 rounded-full", config.dot)} />
                           <span className={config.text}>
@@ -826,7 +826,7 @@ export default function ReviewDashboard({
 
               {/* Score */}
               {review?.score_composite !== null && review?.score_composite !== undefined && (
-                <div className="p-3 border-b border-[#1e2231]">
+                <div className="p-3 border-b border-[#1a1a1a]">
                   <div className="text-[10px] font-medium uppercase tracking-wider text-slate-500 mb-2">
                     Score
                   </div>
@@ -860,7 +860,7 @@ export default function ReviewDashboard({
                       "flex items-center gap-2 text-left px-2 py-1 rounded-md text-[11px] transition-colors",
                       filterFile === null
                         ? "bg-amber-500/10 text-amber-400"
-                        : "text-slate-500 hover:text-slate-300 hover:bg-[#1a1d27]"
+                        : "text-slate-500 hover:text-slate-300 hover:bg-[#111111]"
                     )}
                   >
                     All files
@@ -877,7 +877,7 @@ export default function ReviewDashboard({
                           "flex items-center gap-2 text-left px-2 py-1 rounded-md text-[11px] transition-colors min-w-0",
                           filterFile === file
                             ? "bg-amber-500/10 text-amber-400"
-                            : "text-slate-500 hover:text-slate-300 hover:bg-[#1a1d27]"
+                            : "text-slate-500 hover:text-slate-300 hover:bg-[#111111]"
                         )}
                       >
                         <span className="truncate">{fileName}</span>
@@ -891,7 +891,7 @@ export default function ReviewDashboard({
               </div>
 
               {/* Triage stats */}
-              <div className="p-3 border-t border-[#1e2231]">
+              <div className="p-3 border-t border-[#1a1a1a]">
                 <div className="text-[10px] font-medium uppercase tracking-wider text-slate-500 mb-2">
                   Triage Progress
                 </div>
@@ -911,7 +911,7 @@ export default function ReviewDashboard({
                 </div>
                 {/* Progress bar */}
                 {stats.total > 0 && (
-                  <div className="mt-2 flex h-1.5 w-full overflow-hidden rounded-full bg-[#1e2231]">
+                  <div className="mt-2 flex h-1.5 w-full overflow-hidden rounded-full bg-[#1a1a1a]">
                     {stats.accepted > 0 && (
                       <div
                         className="bg-emerald-500 transition-all"
@@ -933,8 +933,8 @@ export default function ReviewDashboard({
             <div className="flex-1 min-w-0 overflow-y-auto">
               {/* Summary markdown */}
               {review?.summary_markdown && (
-                <div className="p-4 border-b border-[#1e2231]">
-                  <div className="rounded-xl border border-[#1e2231] bg-[#0f1117] p-4">
+                <div className="p-4 border-b border-[#1a1a1a]">
+                  <div className="rounded-xl border border-[#1a1a1a] bg-[#0f1117] p-4">
                     <h3 className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">
                       Summary
                     </h3>
@@ -1000,7 +1000,7 @@ export default function ReviewDashboard({
           </div>
 
           {/* ── Bottom Bar ── */}
-          <div className="shrink-0 border-t border-[#1e2231] bg-[#0e0f13] px-4 py-2.5 flex items-center justify-between">
+          <div className="shrink-0 border-t border-[#1a1a1a] bg-[#0e0f13] px-4 py-2.5 flex items-center justify-between">
             <div className="flex items-center gap-3 text-[11px]">
               <span className="text-slate-400">
                 {stats.total} finding{stats.total !== 1 ? "s" : ""}
@@ -1035,7 +1035,7 @@ export default function ReviewDashboard({
                 variant="outline"
                 size="sm"
                 onClick={handleExportMarkdown}
-                className="h-auto px-3 py-1.5 text-[11px] font-medium border-[#1e2231] text-slate-400 hover:text-slate-200"
+                className="h-auto px-3 py-1.5 text-[11px] font-medium border-[#1a1a1a] text-slate-400 hover:text-slate-200"
               >
                 {exportCopied ? "Copied!" : "Export Markdown"}
               </Button>
@@ -1043,7 +1043,7 @@ export default function ReviewDashboard({
                 variant="outline"
                 size="sm"
                 onClick={handleNewReview}
-                className="h-auto px-3 py-1.5 text-[11px] font-medium border-[#1e2231] text-slate-400 hover:text-slate-200"
+                className="h-auto px-3 py-1.5 text-[11px] font-medium border-[#1a1a1a] text-slate-400 hover:text-slate-200"
               >
                 New Review
               </Button>
@@ -1082,7 +1082,7 @@ function DashboardHeader({
   const fileCount = review?.findings_count ?? 0;
 
   return (
-    <div className="shrink-0 border-b border-[#1e2231] bg-[#0e0f13] px-4 py-3 flex items-center justify-between">
+    <div className="shrink-0 border-b border-[#1a1a1a] bg-[#0e0f13] px-4 py-3 flex items-center justify-between">
       <div className="flex items-center gap-3 min-w-0">
         <div className="flex items-center gap-2">
           <h2 className="text-[14px] font-semibold text-slate-100">
@@ -1090,7 +1090,7 @@ function DashboardHeader({
           </h2>
           <Badge
             variant="outline"
-            className="text-[10px] font-mono text-slate-400 border-[#1e2231]"
+            className="text-[10px] font-mono text-slate-400 border-[#1a1a1a]"
           >
             {workspace.branch}
           </Badge>

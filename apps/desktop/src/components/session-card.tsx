@@ -73,8 +73,8 @@ export default function SessionCard({
         selected
           ? "bg-amber-500/8 border-l-amber-400"
           : focused
-          ? "bg-[#1a1d27] border-l-transparent"
-          : "border-l-transparent hover:bg-[#1a1d27]"
+          ? "bg-[#111111] border-l-transparent"
+          : "border-l-transparent hover:bg-[#111111]"
       }`}
     >
       {/* Row 1: project, branch, tokens, age */}

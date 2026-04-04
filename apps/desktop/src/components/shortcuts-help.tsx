@@ -59,7 +59,7 @@ const sections: ShortcutSection[] = [
 
 function Kbd({ children }: { children: string }) {
   return (
-    <kbd className="inline-flex items-center justify-center min-w-[20px] bg-[#1e2231] rounded px-1.5 py-0.5 text-[11px] font-mono text-slate-300">
+    <kbd className="inline-flex items-center justify-center min-w-[20px] bg-[#1a1a1a] rounded px-1.5 py-0.5 text-[11px] font-mono text-slate-300">
       {children}
     </kbd>
   );
@@ -89,11 +89,11 @@ export default function ShortcutsHelp({ isOpen, onClose }: ShortcutsHelpProps) {
       onClick={onClose}
     >
       <div
-        className="max-w-md w-full bg-[#13151c] border border-[#1e2231] rounded-xl shadow-2xl overflow-hidden"
+        className="max-w-md w-full bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#1e2231]">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#1a1a1a]">
           <h2 className="text-sm font-semibold text-slate-100">
             Keyboard Shortcuts
           </h2>
@@ -134,7 +134,7 @@ export default function ShortcutsHelp({ isOpen, onClose }: ShortcutsHelpProps) {
         </div>
 
         {/* Footer */}
-        <div className="border-t border-[#1e2231] px-5 py-2.5">
+        <div className="border-t border-[#1a1a1a] px-5 py-2.5">
           <p className="text-[10px] text-slate-600">
             Press <Kbd>Esc</Kbd> to close
           </p>

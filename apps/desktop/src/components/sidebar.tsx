@@ -112,7 +112,7 @@ export default function Sidebar() {
       <nav
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={`no-drag fixed top-3 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-full border border-[#1e2231] bg-[#13151c]/90 px-4 py-2 shadow-xl backdrop-blur-md transition-all duration-300 ease-in-out ${
+        className={`no-drag fixed top-3 left-1/2 z-50 flex -translate-x-1/2 items-center gap-1 rounded-full border border-[#1a1a1a] bg-[#0a0a0a]/90 px-4 py-2 shadow-xl backdrop-blur-md transition-all duration-300 ease-in-out ${
           visible
             ? "pointer-events-auto translate-y-0 opacity-100"
             : "pointer-events-none -translate-y-2 opacity-0"
@@ -124,7 +124,7 @@ export default function Sidebar() {
         </span>
 
         {/* Separator */}
-        <Separator orientation="vertical" className="mx-1 h-5 bg-[#1e2231]" />
+        <Separator orientation="vertical" className="mx-1 h-5 bg-[#1a1a1a]" />
 
         {/* Nav items */}
         {navItems.map((item) => {
@@ -137,7 +137,7 @@ export default function Sidebar() {
                   className={`flex h-10 w-10 items-center justify-center rounded-full text-[18px] transition-colors duration-200 ${
                     active
                       ? "bg-amber-500/15 text-amber-400"
-                      : "text-slate-500 hover:bg-[#1e2231] hover:text-slate-200"
+                      : "text-slate-500 hover:bg-[#1a1a1a] hover:text-slate-200"
                   }`}
                 >
                   {item.icon}
@@ -154,7 +154,7 @@ export default function Sidebar() {
         })}
 
         {/* Separator */}
-        <Separator orientation="vertical" className="mx-1 h-5 bg-[#1e2231]" />
+        <Separator orientation="vertical" className="mx-1 h-5 bg-[#1a1a1a]" />
 
         {/* Current page name — hidden at very narrow widths */}
         <span className="ml-1 text-[11px] font-medium text-slate-500 hidden sm:inline">

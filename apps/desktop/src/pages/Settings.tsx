@@ -62,7 +62,7 @@ function Toggle({ label, description, enabled, onToggle }: ToggleProps) {
       <button
         onClick={onToggle}
         className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${
-          enabled ? "bg-amber-500" : "bg-[#1a1d27]"
+          enabled ? "bg-amber-500" : "bg-[#111111]"
         }`}
       >
         <span
@@ -91,7 +91,7 @@ function SelectSetting({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-1.5 text-sm text-slate-200 outline-none focus:border-amber-500/50"
+        className="rounded-lg border border-[#1a1a1a] bg-[#0f1117] px-3 py-1.5 text-sm text-slate-200 outline-none focus:border-amber-500/50"
       >
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>
@@ -121,7 +121,7 @@ function TextInputSetting({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         className={cn(
-          "mt-1 rounded-lg border-[#1e2231] bg-[#0f1117] text-slate-200 placeholder-slate-600 focus-visible:ring-amber-500/50",
+          "mt-1 rounded-lg border-[#1a1a1a] bg-[#0f1117] text-slate-200 placeholder-slate-600 focus-visible:ring-amber-500/50",
           mono && "mono"
         )}
       />
@@ -130,7 +130,7 @@ function TextInputSetting({
 }
 
 function Divider() {
-  return <Separator className="bg-[#1e2231]" />;
+  return <Separator className="bg-[#1a1a1a]" />;
 }
 
 // ─── Preference hook ────────────────────────────────────────────────────────
@@ -225,7 +225,7 @@ function GitHubConnectionPanel() {
 
   return (
     <div className="py-3">
-      <Card className="border-[#1e2231] bg-[#0f1117] p-4">
+      <Card className="border-[#1a1a1a] bg-[#0f1117] p-4">
         {checking ? (
           <div className="flex items-center gap-2">
             <div className="h-3 w-3 animate-pulse rounded-full bg-slate-600" />
@@ -303,7 +303,7 @@ function GitHubConnectionPanel() {
 
         {/* Manual token input (shown on demand or if PAT method) */}
         {(showManualToken || (status?.connected && status?.method === "pat")) && (
-          <div className="mt-3 pt-3 border-t border-[#1e2231]">
+          <div className="mt-3 pt-3 border-t border-[#1a1a1a]">
             <div className="flex flex-col gap-2">
               <label className="text-xs font-medium text-slate-400">Personal Access Token</label>
               <div className="flex gap-2">
@@ -312,7 +312,7 @@ function GitHubConnectionPanel() {
                   value={manualToken}
                   onChange={(e) => setManualToken(e.target.value)}
                   placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                  className="mono flex-1 rounded-lg border-[#1e2231] bg-[#0a0c12] text-slate-200 placeholder-slate-600 focus-visible:ring-amber-500/50"
+                  className="mono flex-1 rounded-lg border-[#1a1a1a] bg-[#0a0c12] text-slate-200 placeholder-slate-600 focus-visible:ring-amber-500/50"
                 />
                 <Button
                   onClick={handleSaveToken}
@@ -400,7 +400,7 @@ function LinearConnectionPanel() {
 
   return (
     <div className="py-3">
-      <Card className="border-[#1e2231] bg-[#0f1117] p-4">
+      <Card className="border-[#1a1a1a] bg-[#0f1117] p-4">
         {checking ? (
           <div className="flex items-center gap-2">
             <div className="h-3 w-3 animate-pulse rounded-full bg-slate-600" />
@@ -454,7 +454,7 @@ function LinearConnectionPanel() {
                 value={linearClientId}
                 onChange={(e) => setLinearClientId(e.target.value)}
                 placeholder="your-linear-oauth-client-id"
-                className="mono rounded-lg border-[#1e2231] bg-[#0a0c12] text-slate-200 placeholder-slate-600 focus-visible:ring-[#5E6AD2]/50"
+                className="mono rounded-lg border-[#1a1a1a] bg-[#0a0c12] text-slate-200 placeholder-slate-600 focus-visible:ring-[#5E6AD2]/50"
               />
               <p className="text-[11px] text-slate-600">
                 From your Linear OAuth application settings. Can also be set via{" "}
@@ -582,7 +582,7 @@ export default function Settings() {
               title="General"
               description="Review defaults and indexing behavior."
             />
-            <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-6">
+            <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-6">
               <SelectSetting
                 label="Default Review Tone"
                 description="The default tone used when starting a new review."
@@ -627,7 +627,7 @@ export default function Settings() {
             <h3 className="mt-6 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
               AI Provider
             </h3>
-            <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-6">
+            <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-6">
               <SelectSetting
                 label="Provider"
                 description="Choose your AI provider for code reviews."
@@ -702,7 +702,7 @@ export default function Settings() {
               title="Appearance"
               description="Visual display and layout preferences."
             />
-            <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-6">
+            <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-6">
               <Toggle
                 label="Compact Mode"
                 description="Reduce spacing and card sizes for denser information display."
@@ -741,14 +741,14 @@ export default function Settings() {
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
               GitHub
             </h3>
-            <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-6">
+            <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-6">
               <GitHubConnectionPanel />
             </div>
 
             <h3 className="mt-6 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
               Linear
             </h3>
-            <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-6">
+            <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-6">
               <LinearConnectionPanel />
             </div>
           </div>
@@ -761,7 +761,7 @@ export default function Settings() {
               title="Agents"
               description="Default configuration for agent launches and CLI paths."
             />
-            <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-6">
+            <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-6">
               <SelectSetting
                 label="Default Adapter"
                 description="Preferred AI agent adapter for new launches."
@@ -808,7 +808,7 @@ export default function Settings() {
             <h3 className="mt-6 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
               CLI Paths
             </h3>
-            <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-6">
+            <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-6">
               <TextInputSetting
                 label="Claude Code CLI"
                 description="Path to the Claude Code CLI binary. Leave empty for auto-detection."
@@ -839,7 +839,7 @@ export default function Settings() {
               title="Notifications"
               description="Control which events trigger desktop notifications."
             />
-            <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-6">
+            <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-6">
               <Toggle
                 label="Review Completed"
                 description="Show a notification when a code review finishes."
@@ -895,7 +895,7 @@ export default function Settings() {
               title="About"
               description="Application information and links."
             />
-            <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-6">
+            <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-6">
               {/* App identity */}
               <div className="flex items-center gap-4 pb-4">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10">
@@ -982,7 +982,7 @@ export default function Settings() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* Sidebar */}
-      <nav className="flex w-48 shrink-0 flex-col border-r border-[#1e2231] bg-[#0f1117] py-6 px-3 overflow-y-auto">
+      <nav className="flex w-48 shrink-0 flex-col border-r border-[#1a1a1a] bg-[#0f1117] py-6 px-3 overflow-y-auto">
         <h1 className="mb-6 px-2 text-lg font-bold text-slate-100">Settings</h1>
         <div className="flex flex-col gap-0.5">
           {categories.map((cat) => {
@@ -996,7 +996,7 @@ export default function Settings() {
                   "justify-start gap-2.5 h-auto px-2.5 py-2 text-[13px] font-medium",
                   active
                     ? "bg-amber-500/10 text-amber-400 hover:bg-amber-500/15 hover:text-amber-400"
-                    : "text-slate-500 hover:bg-[#1a1d27] hover:text-slate-200"
+                    : "text-slate-500 hover:bg-[#111111] hover:text-slate-200"
                 )}
               >
                 <span className="w-4 text-center text-sm">{cat.icon}</span>

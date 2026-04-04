@@ -105,7 +105,7 @@ function SeverityBar({ findings }: SeverityBarProps) {
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex h-2 w-full overflow-hidden rounded-full bg-[#1e2231]">
+      <div className="flex h-2 w-full overflow-hidden rounded-full bg-[#1a1a1a]">
         {segments.map((seg) => (
           <div
             key={seg.severity}
@@ -181,7 +181,7 @@ function MergedFindingCard({ mf }: MergedFindingCardProps) {
         {mf.sources.map((src) => (
           <span
             key={src}
-            className="rounded-md bg-[#1e2231] px-1.5 py-0.5 text-[10px] text-slate-400"
+            className="rounded-md bg-[#1a1a1a] px-1.5 py-0.5 text-[10px] text-slate-400"
           >
             {src.length > 12 ? src.slice(0, 8) + "..." : src}
           </span>
@@ -225,7 +225,7 @@ export default function MergedReview({ result, onClose }: MergedReviewProps) {
       </div>
 
       {/* Summary stats */}
-      <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-6">
+      <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-6">
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
           <span className="text-lg font-bold text-amber-400">
             {result.agents_involved.length} agent{result.agents_involved.length !== 1 ? "s" : ""}
@@ -255,7 +255,7 @@ export default function MergedReview({ result, onClose }: MergedReviewProps) {
 
       {/* Summary text */}
       {result.summary && (
-        <div className="rounded-xl border border-[#1e2231] bg-[#13151c] p-4">
+        <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-4">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
             Summary
           </h3>

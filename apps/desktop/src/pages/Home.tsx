@@ -167,7 +167,7 @@ function AccountUsageRow({
   }
 
   return (
-    <div className="group px-3 py-3 border-b border-[#1e2231]/50 last:border-b-0 transition-colors hover:bg-[#1a1d27]/50 overflow-hidden">
+    <div className="group px-3 py-3 border-b border-[#1a1a1a]/50 last:border-b-0 transition-colors hover:bg-[#111111]/50 overflow-hidden">
       {/* Header: name, plan badge, delete, check button */}
       <div className="flex items-center gap-2 mb-2.5 min-w-0">
         <span
@@ -675,7 +675,7 @@ export default function Home() {
         ].map((stat) => (
           <Card
             key={stat.label}
-            className="flex items-center justify-between border-[#1e2231] bg-[#0f1117] px-4 py-3 overflow-hidden"
+            className="flex items-center justify-between border-[#1a1a1a] bg-[#0f1117] px-4 py-3 overflow-hidden"
           >
             <span className="text-[11px] text-slate-500 truncate mr-2">{stat.label}</span>
             <span className={`text-sm font-semibold tabular-nums shrink-0 ${stat.color}`}>
@@ -726,14 +726,14 @@ export default function Home() {
           </div>
         </div>
         {loading ? (
-          <Card className="flex items-center justify-center py-4 border-[#1e2231]">
+          <Card className="flex items-center justify-center py-4 border-[#1a1a1a]">
             <svg className="h-4 w-4 animate-spin text-slate-500" viewBox="0 0 24 24" fill="none">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
           </Card>
         ) : (
-          <Card className="border-[#1e2231] overflow-hidden">
+          <Card className="border-[#1a1a1a] overflow-hidden">
             {accounts.length === 0 ? (
               <CardContent className="flex flex-col items-center justify-center py-5 p-5">
                 <p className="text-[11px] text-slate-600">No CLI accounts detected</p>
@@ -814,7 +814,7 @@ export default function Home() {
               </svg>
             </div>
           ) : recentSessions.length === 0 ? (
-            <Card className="flex flex-col items-center justify-center py-8 border-[#1e2231]">
+            <Card className="flex flex-col items-center justify-center py-8 border-[#1a1a1a]">
               <p className="text-[11px] text-slate-600">No sessions yet</p>
               <Button
                 variant="ghost"
@@ -826,9 +826,9 @@ export default function Home() {
               </Button>
             </Card>
           ) : (
-            <Card className="border-[#1e2231] overflow-hidden">
+            <Card className="border-[#1a1a1a] overflow-hidden">
               {recentSessions.map((session) => (
-                <div key={session.id} className="border-b border-[#1e2231]/50 last:border-b-0">
+                <div key={session.id} className="border-b border-[#1a1a1a]/50 last:border-b-0">
                   <SessionCard
                     session={session}
                     onClick={() => navigate(`/sessions?id=${session.id}`)}
@@ -870,18 +870,18 @@ export default function Home() {
               </svg>
             </div>
           ) : recentReviews.length === 0 ? (
-            <Card className="flex flex-col items-center justify-center py-8 border-[#1e2231]">
+            <Card className="flex flex-col items-center justify-center py-8 border-[#1a1a1a]">
               <p className="text-[11px] text-slate-600">No reviews yet</p>
               <Button variant="link" size="sm" className="mt-1 h-auto px-0 py-0 text-[11px] text-slate-500 hover:text-slate-300" asChild>
                 <Link to="/board">Start a review</Link>
               </Button>
             </Card>
           ) : (
-            <Card className="border-[#1e2231] overflow-hidden">
+            <Card className="border-[#1a1a1a] overflow-hidden">
               {recentReviews.map((review) => (
                 <div
                   key={review.id}
-                  className="flex items-center gap-3 px-3 py-2 border-b border-[#1e2231]/50 last:border-b-0 transition-colors hover:bg-[#1a1d27] overflow-hidden"
+                  className="flex items-center gap-3 px-3 py-2 border-b border-[#1a1a1a]/50 last:border-b-0 transition-colors hover:bg-[#111111] overflow-hidden"
                 >
                   {review.status === "completed" &&
                   review.score_composite != null ? (
@@ -918,7 +918,7 @@ export default function Home() {
             <Link to="/board">Mission Control</Link>
           </Button>
         </div>
-        <Card className="border-[#1e2231] overflow-hidden">
+        <Card className="border-[#1a1a1a] overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-6">
               <svg
@@ -946,7 +946,7 @@ export default function Home() {
               {activeAgents.map((agent) => (
                 <div
                   key={agent.id}
-                  className="flex items-center gap-3 px-3 py-2 border-b border-[#1e2231]/50 last:border-b-0 transition-colors hover:bg-[#1a1d27] min-w-0 overflow-hidden"
+                  className="flex items-center gap-3 px-3 py-2 border-b border-[#1a1a1a]/50 last:border-b-0 transition-colors hover:bg-[#111111] min-w-0 overflow-hidden"
                 >
                   <span
                     className={`h-2 w-2 shrink-0 rounded-full ${
@@ -977,7 +977,7 @@ export default function Home() {
 
               <Link
                 to="/board"
-                className="flex items-center gap-2 px-3 py-2 text-slate-600 transition-colors hover:bg-[#1a1d27] hover:text-slate-400"
+                className="flex items-center gap-2 px-3 py-2 text-slate-600 transition-colors hover:bg-[#111111] hover:text-slate-400"
               >
                 <span className="text-sm">+</span>
                 <span className="text-[11px] font-medium">Launch Agent</span>

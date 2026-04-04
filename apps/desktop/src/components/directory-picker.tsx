@@ -21,7 +21,7 @@ interface DirectoryPickerProps {
 }
 
 const inputClass =
-  "rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-amber-500/50";
+  "rounded-lg border border-[#1a1a1a] bg-[#0f1117] px-3 py-2 text-sm text-slate-200 placeholder-slate-600 outline-none focus:border-amber-500/50";
 
 export default function DirectoryPicker({
   value,
@@ -93,7 +93,7 @@ export default function DirectoryPicker({
           <button
             type="button"
             onClick={handleBrowse}
-            className="shrink-0 rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-2 text-sm text-slate-400 transition-colors hover:border-[#2d3348] hover:text-slate-200"
+            className="shrink-0 rounded-lg border border-[#1a1a1a] bg-[#0f1117] px-3 py-2 text-sm text-slate-400 transition-colors hover:border-[#2d3348] hover:text-slate-200"
             title="Browse..."
           >
             <svg
@@ -141,7 +141,7 @@ export function BranchSelector({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-2 text-sm text-slate-200 outline-none focus:border-amber-500/50 appearance-none"
+        className="rounded-lg border border-[#1a1a1a] bg-[#0f1117] px-3 py-2 text-sm text-slate-200 outline-none focus:border-amber-500/50 appearance-none"
       >
         {branches.map((b) => (
           <option key={b} value={b}>

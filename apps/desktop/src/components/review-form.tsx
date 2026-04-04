@@ -120,7 +120,7 @@ export default function ReviewForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       {/* Mode toggle */}
-      <div className="flex gap-1 rounded-lg border border-[#1e2231] bg-[#0f1117] p-1 self-start">
+      <div className="flex gap-1 rounded-lg border border-[#1a1a1a] bg-[#0f1117] p-1 self-start">
         <button
           type="button"
           onClick={() => setMode("local")}
@@ -198,7 +198,7 @@ export default function ReviewForm({
                   setDiffTo(to || "");
                 }}
                 placeholder="HEAD~1..HEAD"
-                className="mono rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 outline-none transition-colors focus:border-amber-500/50"
+                className="mono rounded-lg border border-[#1a1a1a] bg-[#0f1117] px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 outline-none transition-colors focus:border-amber-500/50"
               />
               <p className="text-[11px] text-slate-500">
                 Git diff range, e.g. main..feature-branch or HEAD~3..HEAD
@@ -220,7 +220,7 @@ export default function ReviewForm({
               <select
                 value={selectedPr ?? ""}
                 onChange={(e) => setSelectedPr(parseInt(e.target.value, 10))}
-                className="rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-amber-500/50 appearance-none"
+                className="rounded-lg border border-[#1a1a1a] bg-[#0f1117] px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-amber-500/50 appearance-none"
               >
                 {pullRequests.map((pr) => (
                   <option key={pr.number} value={pr.number}>
@@ -248,7 +248,7 @@ export default function ReviewForm({
                     value={manualOwner}
                     onChange={(e) => setManualOwner(e.target.value)}
                     placeholder="octocat"
-                    className="mono rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 outline-none transition-colors focus:border-amber-500/50"
+                    className="mono rounded-lg border border-[#1a1a1a] bg-[#0f1117] px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 outline-none transition-colors focus:border-amber-500/50"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -258,7 +258,7 @@ export default function ReviewForm({
                     value={manualRepo}
                     onChange={(e) => setManualRepo(e.target.value)}
                     placeholder="my-project"
-                    className="mono rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 outline-none transition-colors focus:border-amber-500/50"
+                    className="mono rounded-lg border border-[#1a1a1a] bg-[#0f1117] px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 outline-none transition-colors focus:border-amber-500/50"
                   />
                 </div>
               </div>
@@ -270,7 +270,7 @@ export default function ReviewForm({
                   onChange={(e) => setManualPrNumber(e.target.value)}
                   placeholder="42"
                   min={1}
-                  className="mono w-32 rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 outline-none transition-colors focus:border-amber-500/50"
+                  className="mono w-32 rounded-lg border border-[#1a1a1a] bg-[#0f1117] px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 outline-none transition-colors focus:border-amber-500/50"
                 />
               </div>
             </>
@@ -314,7 +314,7 @@ function ToneSelector({
             className={`flex flex-col gap-0.5 rounded-lg border p-3 text-left transition-all ${
               tone === t.value
                 ? "border-amber-500/40 bg-amber-500/10"
-                : "border-[#1e2231] bg-[#0f1117] hover:border-[#2d3348]"
+                : "border-[#1a1a1a] bg-[#0f1117] hover:border-[#2d3348]"
             }`}
           >
             <span

@@ -232,9 +232,9 @@ export default function Reviews() {
   return (
     <div className="flex h-full">
       {/* Left panel: review list */}
-      <div className="flex w-[420px] shrink-0 flex-col border-r border-[#1e2231]">
+      <div className="flex w-[420px] shrink-0 flex-col border-r border-[#1a1a1a]">
         {/* Header + stats */}
-        <div className="shrink-0 border-b border-[#1e2231] px-4 py-3">
+        <div className="shrink-0 border-b border-[#1a1a1a] px-4 py-3">
           <div className="flex items-center justify-between">
             <h1 className="text-sm font-semibold text-slate-200">Reviews</h1>
             <span className="text-[11px] text-slate-500 tabular-nums">
@@ -391,8 +391,8 @@ function ReviewRow({
         selected
           ? "bg-amber-500/8 border-l-amber-400"
           : focused
-          ? "bg-[#1a1d27] border-l-transparent"
-          : "border-l-transparent hover:bg-[#1a1d27]"
+          ? "bg-[#111111] border-l-transparent"
+          : "border-l-transparent hover:bg-[#111111]"
       )}
     >
       {/* Row 1: repo, type badge, score, age */}
@@ -647,7 +647,7 @@ function SeverityBar({
   };
 
   return (
-    <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-[#1e2231]">
+    <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-[#1a1a1a]">
       {ordered.map((sev) => {
         const count = counts[sev];
         if (!count) return null;

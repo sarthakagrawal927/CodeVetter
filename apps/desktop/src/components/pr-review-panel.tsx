@@ -144,7 +144,7 @@ function PrListItem({
         "w-full flex items-start gap-3 rounded-lg border p-3 text-left transition-all",
         isSelected
           ? "border-amber-500/40 bg-amber-500/5"
-          : "border-[#1e2231] bg-[#13151c] hover:border-[#2a2e3d]",
+          : "border-[#1a1a1a] bg-[#0a0a0a] hover:border-[#2a2e3d]",
       )}
     >
       <div className="flex-1 min-w-0">
@@ -191,7 +191,7 @@ function SeverityBar({ findings }: { findings: ReviewResult["findings"] }) {
     .map((s) => ({ severity: s, count: counts[s], pct: (counts[s] / total) * 100 }));
 
   return (
-    <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-[#1e2231]">
+    <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-[#1a1a1a]">
       {segments.map((seg) => (
         <div
           key={seg.severity}
@@ -407,7 +407,7 @@ export default function PrReviewPanel({ workspace, onClose }: PrReviewPanelProps
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-[#1e2231] bg-[#0e0f13] px-4 py-3 shrink-0">
+      <div className="flex items-center justify-between border-b border-[#1a1a1a] bg-[#0e0f13] px-4 py-3 shrink-0">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
@@ -461,7 +461,7 @@ export default function PrReviewPanel({ workspace, onClose }: PrReviewPanelProps
                   value={owner}
                   onChange={(e) => setOwner(e.target.value)}
                   placeholder="octocat"
-                  className="font-mono rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 outline-none transition-colors focus:border-amber-500/50"
+                  className="font-mono rounded-lg border border-[#1a1a1a] bg-[#0f1117] px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 outline-none transition-colors focus:border-amber-500/50"
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -471,7 +471,7 @@ export default function PrReviewPanel({ workspace, onClose }: PrReviewPanelProps
                   value={repo}
                   onChange={(e) => setRepo(e.target.value)}
                   placeholder="my-project"
-                  className="font-mono rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 outline-none transition-colors focus:border-amber-500/50"
+                  className="font-mono rounded-lg border border-[#1a1a1a] bg-[#0f1117] px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 outline-none transition-colors focus:border-amber-500/50"
                 />
               </div>
             </div>
@@ -492,7 +492,7 @@ export default function PrReviewPanel({ workspace, onClose }: PrReviewPanelProps
                 size="sm"
                 onClick={handleFetchPrs}
                 disabled={!owner || !repo || !githubPat || loadingPrs}
-                className="h-auto px-3 py-1.5 text-[12px] font-medium border-[#1e2231] bg-[#0f1117] text-slate-300 hover:text-slate-100 hover:bg-[#1a1d27] disabled:opacity-50"
+                className="h-auto px-3 py-1.5 text-[12px] font-medium border-[#1a1a1a] bg-[#0f1117] text-slate-300 hover:text-slate-100 hover:bg-[#111111] disabled:opacity-50"
               >
                 {loadingPrs ? "Fetching..." : "Fetch Open PRs"}
               </Button>
@@ -532,7 +532,7 @@ export default function PrReviewPanel({ workspace, onClose }: PrReviewPanelProps
                   onChange={(e) => setManualPrNumber(e.target.value)}
                   placeholder="42"
                   min={1}
-                  className="font-mono w-32 rounded-lg border border-[#1e2231] bg-[#0f1117] px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 outline-none transition-colors focus:border-amber-500/50"
+                  className="font-mono w-32 rounded-lg border border-[#1a1a1a] bg-[#0f1117] px-3 py-2.5 text-sm text-slate-200 placeholder-slate-600 outline-none transition-colors focus:border-amber-500/50"
                 />
                 <p className="text-[11px] text-slate-500">
                   Enter a PR number directly, or fetch the list above.

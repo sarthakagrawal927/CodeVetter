@@ -151,7 +151,7 @@ function FileTreePanel({ workspace }: { workspace: WorkspaceRow }) {
     <div className="flex flex-col h-full overflow-hidden">
       {/* File preview modal */}
       {previewFile && (
-        <div className="border-b border-[#1e2231] bg-[#0a0b0f]">
+        <div className="border-b border-[#1a1a1a] bg-[#0a0b0f]">
           <div className="flex items-center justify-between px-3 py-1.5">
             <span className="text-[10px] text-slate-400 font-mono truncate">
               {previewFile}
@@ -203,7 +203,7 @@ function FileTreePanel({ workspace }: { workspace: WorkspaceRow }) {
               <button
                 key={entry.path}
                 onClick={() => handleFileClick(entry)}
-                className={`w-full flex items-center gap-1.5 px-2 py-0.5 text-[12px] hover:bg-[#1a1d27] transition-colors text-left overflow-hidden ${
+                className={`w-full flex items-center gap-1.5 px-2 py-0.5 text-[12px] hover:bg-[#111111] transition-colors text-left overflow-hidden ${
                   previewFile === entry.path
                     ? "bg-amber-500/5"
                     : ""
@@ -289,7 +289,7 @@ function ChecksPanel({ workspace }: { workspace: WorkspaceRow }) {
       </div>
 
       {/* Git status */}
-      <div className="flex items-center gap-2 rounded-md border border-[#1e2231] px-3 py-2">
+      <div className="flex items-center gap-2 rounded-md border border-[#1a1a1a] px-3 py-2">
         {loadingGit ? (
           <div className="h-3 w-3 animate-spin rounded-full border border-amber-500 border-t-transparent" />
         ) : (
@@ -319,7 +319,7 @@ function ChecksPanel({ workspace }: { workspace: WorkspaceRow }) {
               <span className="text-[11px] text-slate-500">Loading checks...</span>
             </div>
           ) : ciChecks.length === 0 ? (
-            <div className="rounded-md border border-[#1e2231] px-3 py-2">
+            <div className="rounded-md border border-[#1a1a1a] px-3 py-2">
               <span className="text-[11px] text-slate-500">
                 No CI checks found
               </span>
@@ -336,7 +336,7 @@ function ChecksPanel({ workspace }: { workspace: WorkspaceRow }) {
               return (
                 <div
                   key={i}
-                  className="flex items-center gap-2 rounded-md border border-[#1e2231] px-3 py-1.5"
+                  className="flex items-center gap-2 rounded-md border border-[#1a1a1a] px-3 py-1.5"
                 >
                   {checkIcon(passed)}
                   <div className="flex-1 min-w-0">
@@ -361,7 +361,7 @@ function ChecksPanel({ workspace }: { workspace: WorkspaceRow }) {
           )}
         </div>
       ) : (
-        <div className="rounded-md border border-[#1e2231] px-3 py-2">
+        <div className="rounded-md border border-[#1a1a1a] px-3 py-2">
           <div className="flex items-center gap-2">
             {checkIcon(null)}
             <div>
@@ -375,7 +375,7 @@ function ChecksPanel({ workspace }: { workspace: WorkspaceRow }) {
       )}
 
       {/* Review readiness summary */}
-      <div className="mt-1 pt-3 border-t border-[#1e2231]">
+      <div className="mt-1 pt-3 border-t border-[#1a1a1a]">
         <div className="text-[10px] font-medium uppercase tracking-wider text-slate-500 mb-2">
           Summary
         </div>
@@ -516,7 +516,7 @@ function ChangesPanel({ workspace }: { workspace: WorkspaceRow }) {
   return (
     <div className="flex flex-col h-full">
       {/* File list header */}
-      <div className="px-3 py-2 border-b border-[#1e2231] shrink-0">
+      <div className="px-3 py-2 border-b border-[#1a1a1a] shrink-0">
         {selectedFile ? (
           <div className="flex items-center gap-2">
             <button
@@ -574,7 +574,7 @@ function ChangesPanel({ workspace }: { workspace: WorkspaceRow }) {
                 <button
                   key={i}
                   onClick={() => setSelectedFile(file.path)}
-                  className="flex items-center gap-2 px-3 py-1.5 w-full text-left hover:bg-[#1a1d27] transition-colors"
+                  className="flex items-center gap-2 px-3 py-1.5 w-full text-left hover:bg-[#111111] transition-colors"
                 >
                   <span
                     className={`w-4 text-center text-[10px] font-bold ${st.color}`}
@@ -654,7 +654,7 @@ export default function WorkspaceRightPanel({
   return (
     <div className="flex h-full flex-col">
       {/* Tab bar */}
-      <div className="flex items-center border-b border-[#1e2231] shrink-0 overflow-x-auto">
+      <div className="flex items-center border-b border-[#1a1a1a] shrink-0 overflow-x-auto">
         <button
           onClick={() => setActiveTab("files")}
           className={tabClass("files")}

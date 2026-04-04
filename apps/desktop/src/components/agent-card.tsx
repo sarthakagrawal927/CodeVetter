@@ -33,7 +33,7 @@ export default function AgentCard({ agent, selected, onStop, onClick }: AgentCar
       } ${
         selected
           ? "border-amber-500/40 bg-amber-500/5"
-          : "border-[#1e2231] bg-[#13151c] hover:border-[#2d3348]"
+          : "border-[#1a1a1a] bg-[#0a0a0a] hover:border-[#2d3348]"
       }`}
     >
       {/* Header */}
@@ -88,7 +88,7 @@ export default function AgentCard({ agent, selected, onStop, onClick }: AgentCar
               e.stopPropagation();
               onClick();
             }}
-            className="rounded-lg border border-[#1e2231] px-3 py-1 text-xs font-medium text-slate-400 transition-colors hover:border-[#2d3348] hover:text-slate-200"
+            className="rounded-lg border border-[#1a1a1a] px-3 py-1 text-xs font-medium text-slate-400 transition-colors hover:border-[#2d3348] hover:text-slate-200"
           >
             View Chat
           </button>

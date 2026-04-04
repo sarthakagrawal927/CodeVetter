@@ -30,7 +30,7 @@ export default function ContextMeter({
       <span className="text-[10px] text-slate-600 tabular-nums">
         {formatTokens(total)} / {formatTokens(maxTokens)} tokens
       </span>
-      <div className="w-16 h-1 rounded-full bg-[#1e2231] overflow-hidden">
+      <div className="w-16 h-1 rounded-full bg-[#1a1a1a] overflow-hidden">
         <div
           className={`h-full rounded-full ${color} transition-all duration-300`}
           style={{ width: `${pct}%` }}

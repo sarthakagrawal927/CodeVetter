@@ -78,7 +78,7 @@ export default function RulesEditor({ workspaceId }: RulesEditorProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[#1e2231] shrink-0">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[#1a1a1a] shrink-0">
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-medium text-slate-300">
             Review Rules
@@ -102,7 +102,7 @@ export default function RulesEditor({ workspaceId }: RulesEditorProps) {
 
       {/* Scope toggle (only show when workspace context exists) */}
       {workspaceId && (
-        <div className="flex items-center gap-1 px-3 py-1.5 border-b border-[#1e2231]/50 shrink-0">
+        <div className="flex items-center gap-1 px-3 py-1.5 border-b border-[#1a1a1a]/50 shrink-0">
           <button
             onClick={() => setScope("workspace")}
             className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
@@ -150,7 +150,7 @@ export default function RulesEditor({ workspaceId }: RulesEditorProps) {
             }}
             placeholder={PLACEHOLDER}
             spellCheck={false}
-            className="w-full h-full min-h-[120px] resize-none rounded-md border border-[#1e2231] bg-[#0a0b0f] px-3 py-2 text-[11px] text-slate-300 font-mono leading-relaxed placeholder:text-slate-700 focus:outline-none focus:border-amber-500/30 focus:ring-1 focus:ring-amber-500/20"
+            className="w-full h-full min-h-[120px] resize-none rounded-md border border-[#1a1a1a] bg-[#0a0b0f] px-3 py-2 text-[11px] text-slate-300 font-mono leading-relaxed placeholder:text-slate-700 focus:outline-none focus:border-amber-500/30 focus:ring-1 focus:ring-amber-500/20"
           />
         )}
       </div>

@@ -188,11 +188,11 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent
         hideClose
-        className="max-w-lg mx-4 p-0 bg-[#13151c] border border-[#1e2231] rounded-xl shadow-2xl overflow-hidden top-[30%] translate-y-0"
+        className="max-w-lg mx-4 p-0 bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl shadow-2xl overflow-hidden top-[30%] translate-y-0"
         onKeyDown={handleKeyDown}
       >
         {/* Search input */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-[#1e2231]">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-[#1a1a1a]">
           <span className="text-slate-500 text-sm">{"\u2315"}</span>
           <Input
             ref={inputRef}
@@ -205,7 +205,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
               setSelectedIndex(0);
             }}
           />
-          <Badge variant="outline" className="text-[10px] font-mono text-slate-600 bg-[#1e2231] rounded px-1.5 py-0.5">
+          <Badge variant="outline" className="text-[10px] font-mono text-slate-600 bg-[#1a1a1a] rounded px-1.5 py-0.5">
             ESC
           </Badge>
         </div>
@@ -233,7 +233,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
                     className={`w-full flex items-center gap-3 px-3 py-2 h-auto text-left justify-start rounded-none transition-colors cursor-pointer ${
                       isSelected
                         ? "bg-amber-500/10 text-slate-100"
-                        : "text-slate-400 hover:bg-[#1a1d27]"
+                        : "text-slate-400 hover:bg-[#111111]"
                     }`}
                     onClick={() => item.action()}
                     onMouseEnter={() => setSelectedIndex(globalIndex)}

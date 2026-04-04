@@ -113,7 +113,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
       <div className="relative z-10 w-full max-w-md">
         <div
-          className={`rounded-2xl border border-[#1e2231] bg-[#13151c] p-8 shadow-2xl ${animClass}`}
+          className={`rounded-2xl border border-[#1a1a1a] bg-[#0a0a0a] p-8 shadow-2xl ${animClass}`}
         >
           {/* ── Step 1: Welcome ─────────────────────────────────────── */}
           {step === "welcome" && (
@@ -228,7 +228,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                     className={`flex w-full items-center gap-3 rounded-lg border p-3.5 text-left transition-all ${
                       selectedModel === opt.value
                         ? "border-amber-500/50 bg-amber-500/[0.08]"
-                        : "border-[#1e2231] bg-[#0f1117] hover:border-[#2e3040]"
+                        : "border-[#1a1a1a] bg-[#0f1117] hover:border-[#2e3040]"
                     }`}
                   >
                     <div
@@ -279,7 +279,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 {TOUR_ITEMS.map((item) => (
                   <div
                     key={item.label}
-                    className="flex items-center gap-3 rounded-lg border border-[#1e2231] bg-[#0f1117] p-3"
+                    className="flex items-center gap-3 rounded-lg border border-[#1a1a1a] bg-[#0f1117] p-3"
                   >
                     <div className="flex h-8 w-8 items-center justify-center rounded-md bg-amber-500/10 text-amber-400">
                       <span className="text-sm">{item.icon}</span>
@@ -294,7 +294,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 ))}
               </div>
 
-              <div className="w-full rounded-lg border border-[#1e2231] bg-[#0f1117] px-4 py-3">
+              <div className="w-full rounded-lg border border-[#1a1a1a] bg-[#0f1117] px-4 py-3">
                 <p className="text-xs text-slate-400">
                   <span className="font-medium text-slate-300">Tip:</span>{" "}
                   Press{" "}
@@ -354,7 +354,7 @@ function PrereqRow({
   required?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-lg border border-[#1e2231] bg-[#0f1117] px-4 py-3">
+    <div className="flex items-center justify-between rounded-lg border border-[#1a1a1a] bg-[#0f1117] px-4 py-3">
       <div className="flex items-center gap-3">
         <span
           className={`text-sm ${installed ? "text-emerald-400" : "text-slate-600"}`}
