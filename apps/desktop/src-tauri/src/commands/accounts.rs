@@ -685,10 +685,27 @@ pub async fn check_live_usage(
     match provider.as_str() {
         "anthropic" => check_live_usage_anthropic(credential_key).await,
         "openai" => check_live_usage_openai().await,
-        "google" => Ok(json!({
-            "supported": false,
-            "reason": "Gemini live usage check coming soon (requires Google token refresh)"
-        })),
+        "google" => {
+            let local = check_live_usage_gemini_local().await;
+            let api = check_live_usage_gemini_api().await;
+
+            // Merge: local session data is always available; API may fail
+            match (local, api) {
+                (Ok(mut local_val), Ok(api_val)) => {
+                    // Attach API rate-limit info onto the local result
+                    local_val["api"] = api_val;
+                    Ok(local_val)
+                }
+                (Ok(mut local_val), Err(api_err)) => {
+                    local_val["api"] = json!({ "error": api_err });
+                    Ok(local_val)
+                }
+                (Err(_), Ok(api_val)) => Ok(api_val),
+                (Err(local_err), Err(api_err)) => Err(format!(
+                    "Both local and API checks failed: local={local_err}, api={api_err}"
+                )),
+            }
+        }
         _ => Ok(json!({
             "supported": false,
             "reason": format!("Unknown provider: {}", provider)
@@ -868,6 +885,230 @@ async fn check_live_usage_openai() -> Result<Value, String> {
         },
         "checked_at": chrono::Utc::now().to_rfc3339(),
         "_raw": body, // include raw response for debugging
+    }))
+}
+
+/// Gemini local usage: parse `~/.gemini/tmp/*/chats/session-*.json` files
+/// from today, summing token counts across all sessions and messages.
+async fn check_live_usage_gemini_local() -> Result<Value, String> {
+    use std::fs;
+    use std::path::PathBuf;
+
+    let home = std::env::var("HOME").map_err(|_| "HOME not set".to_string())?;
+    let gemini_tmp = PathBuf::from(&home).join(".gemini/tmp");
+
+    if !gemini_tmp.exists() {
+        return Ok(json!({
+            "supported": true,
+            "source": "local",
+            "today": {
+                "sessions": 0,
+                "messages": 0,
+                "tokens": { "input": 0, "output": 0, "cached": 0, "thoughts": 0, "tool": 0, "total": 0 }
+            },
+            "quota": {
+                "daily_requests": 1000,
+                "note": "Free tier: 1000 req/day. Pro: 1500. Ultra: 2000."
+            }
+        }));
+    }
+
+    // Get today's date in local time for comparison with file mtime
+    let today = chrono::Local::now().date_naive();
+
+    let mut total_sessions: u64 = 0;
+    let mut total_messages: u64 = 0;
+    let mut tok_input: i64 = 0;
+    let mut tok_output: i64 = 0;
+    let mut tok_cached: i64 = 0;
+    let mut tok_thoughts: i64 = 0;
+    let mut tok_tool: i64 = 0;
+    let mut tok_total: i64 = 0;
+
+    // Iterate over project hash directories
+    let project_dirs = fs::read_dir(&gemini_tmp).map_err(|e| format!("Cannot read ~/.gemini/tmp: {e}"))?;
+
+    for project_entry in project_dirs.flatten() {
+        let chats_dir = project_entry.path().join("chats");
+        if !chats_dir.is_dir() {
+            continue;
+        }
+
+        let chat_files = match fs::read_dir(&chats_dir) {
+            Ok(f) => f,
+            Err(_) => continue,
+        };
+
+        for file_entry in chat_files.flatten() {
+            let path = file_entry.path();
+
+            // Only process session-*.json files
+            let fname = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if !fname.starts_with("session-") || !fname.ends_with(".json") {
+                continue;
+            }
+
+            // Check modification date — only process files modified today
+            let metadata = match fs::metadata(&path) {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            let modified: chrono::DateTime<chrono::Local> = match metadata.modified() {
+                Ok(t) => t.into(),
+                Err(_) => continue,
+            };
+            if modified.date_naive() != today {
+                continue;
+            }
+
+            // Read and parse the session file
+            let content = match fs::read_to_string(&path) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+            let session: Value = match serde_json::from_str(&content) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+
+            // Count messages with tokens in this session
+            let mut session_had_tokens = false;
+
+            if let Some(messages) = session.get("messages").and_then(|m| m.as_array()) {
+                for msg in messages {
+                    if let Some(tokens) = msg.get("tokens") {
+                        session_had_tokens = true;
+                        total_messages += 1;
+                        tok_input += tokens.get("input").and_then(|v| v.as_i64()).unwrap_or(0);
+                        tok_output += tokens.get("output").and_then(|v| v.as_i64()).unwrap_or(0);
+                        tok_cached += tokens.get("cached").and_then(|v| v.as_i64()).unwrap_or(0);
+                        tok_thoughts += tokens.get("thoughts").and_then(|v| v.as_i64()).unwrap_or(0);
+                        tok_tool += tokens.get("tool").and_then(|v| v.as_i64()).unwrap_or(0);
+                        tok_total += tokens.get("total").and_then(|v| v.as_i64()).unwrap_or(0);
+                    }
+                }
+            }
+
+            if session_had_tokens {
+                total_sessions += 1;
+            }
+        }
+    }
+
+    Ok(json!({
+        "supported": true,
+        "source": "local",
+        "today": {
+            "sessions": total_sessions,
+            "messages": total_messages,
+            "tokens": {
+                "input": tok_input,
+                "output": tok_output,
+                "cached": tok_cached,
+                "thoughts": tok_thoughts,
+                "tool": tok_tool,
+                "total": tok_total,
+            }
+        },
+        "quota": {
+            "daily_requests": 1000,
+            "note": "Free tier: 1000 req/day. Pro: 1500. Ultra: 2000."
+        }
+    }))
+}
+
+/// Gemini live usage: read OAuth creds, make a minimal API call, read rate-limit headers.
+async fn check_live_usage_gemini_api() -> Result<Value, String> {
+    let home = std::env::var("HOME").map_err(|_| "HOME not set".to_string())?;
+    let creds_path = format!("{}/.gemini/oauth_creds.json", home);
+    let content = tokio::fs::read_to_string(&creds_path)
+        .await
+        .map_err(|e| format!("Failed to read ~/.gemini/oauth_creds.json: {e}"))?;
+    let parsed: Value = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse Gemini OAuth creds: {e}"))?;
+
+    let access_token = parsed
+        .get("access_token")
+        .and_then(|v| v.as_str())
+        .ok_or("No access_token in Gemini OAuth creds")?
+        .to_string();
+
+    // Check if token is expired
+    let expiry_date = parsed
+        .get("expiry_date")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
+    let now_millis = chrono::Utc::now().timestamp_millis();
+
+    if expiry_date > 0 && now_millis >= expiry_date {
+        return Ok(json!({
+            "supported": true,
+            "source": "api",
+            "token_status": "expired",
+            "rate_limit": null,
+            "checked_at": chrono::Utc::now().to_rfc3339(),
+        }));
+    }
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent")
+        .header("Authorization", format!("Bearer {}", access_token))
+        .header("Content-Type", "application/json")
+        .body(r#"{"contents":[{"parts":[{"text":"hi"}]}],"generationConfig":{"maxOutputTokens":1}}"#)
+        .send()
+        .await
+        .map_err(|e| format!("Gemini API request failed: {e}"))?;
+
+    let status_code = resp.status().as_u16();
+    if status_code == 401 || status_code == 403 {
+        return Ok(json!({
+            "supported": true,
+            "source": "api",
+            "token_status": "expired",
+            "rate_limit": null,
+            "checked_at": chrono::Utc::now().to_rfc3339(),
+        }));
+    }
+
+    let headers = resp.headers().clone();
+
+    let h_str = |name: &str| -> Option<String> {
+        headers
+            .get(name)
+            .and_then(|v| v.to_str().ok())
+            .map(String::from)
+    };
+    let h_i64 = |name: &str| -> Option<i64> {
+        headers
+            .get(name)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.parse::<i64>().ok())
+    };
+
+    let limit = h_i64("x-ratelimit-limit-requests");
+    let remaining = h_i64("x-ratelimit-remaining-requests");
+    let reset = h_str("x-ratelimit-reset-requests");
+
+    // Consume the body so the connection can be reused (ignore content)
+    let _ = resp.bytes().await;
+
+    let rate_limit = if limit.is_some() || remaining.is_some() || reset.is_some() {
+        json!({
+            "limit": limit,
+            "remaining": remaining,
+            "reset": reset,
+        })
+    } else {
+        Value::Null
+    };
+
+    Ok(json!({
+        "supported": true,
+        "source": "api",
+        "token_status": "valid",
+        "rate_limit": rate_limit,
+        "checked_at": chrono::Utc::now().to_rfc3339(),
     }))
 }
 
