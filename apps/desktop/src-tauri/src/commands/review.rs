@@ -180,6 +180,289 @@ pub async fn get_review(db: State<'_, DbState>, id: String) -> Result<Value, Str
     }))
 }
 
+/// Run a code review via a CLI agent (claude or gemini).
+///
+/// 1. Gets the git diff for the given range
+/// 2. Builds a review prompt and spawns the agent CLI
+/// 3. Parses the JSON response, computes score, persists findings
+/// 4. Returns review_id, score, findings, and summary
+#[tauri::command]
+pub async fn run_cli_review(
+    db: State<'_, DbState>,
+    repo_path: String,
+    diff_range: String,
+    project_description: String,
+    change_description: String,
+    agent: Option<String>,
+) -> Result<Value, String> {
+    let agent = agent.unwrap_or_else(|| "claude".to_string());
+
+    // 1. Get the diff
+    let mut cmd = StdCommand::new("git");
+    cmd.arg("diff").arg(&diff_range).current_dir(&repo_path);
+
+    let output = cmd
+        .output()
+        .map_err(|e| format!("Failed to run git diff: {e}"))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("git diff failed: {stderr}"));
+    }
+
+    let mut diff_text = String::from_utf8_lossy(&output.stdout).to_string();
+
+    // 2. Truncate to 100KB if too large
+    const MAX_DIFF_BYTES: usize = 100 * 1024;
+    if diff_text.len() > MAX_DIFF_BYTES {
+        diff_text.truncate(MAX_DIFF_BYTES);
+        diff_text.push_str("\n\n[DIFF TRUNCATED at 100KB]");
+    }
+
+    if diff_text.trim().is_empty() {
+        return Err("Empty diff — nothing to review".to_string());
+    }
+
+    // 3. Build the review prompt
+    let prompt = format!(
+        r#"You are a senior code reviewer. Review the following diff and return ONLY valid JSON (no markdown fences, no extra text).
+
+Project: {project_description}
+Change: {change_description}
+
+Return this exact JSON shape:
+{{"findings":[{{"severity":"critical|high|medium|low","title":"...","summary":"...","suggestion":"...","filePath":"...","line":42,"confidence":0.9}}],"score":75,"summary":"Overall assessment"}}
+
+Rules:
+- severity must be one of: critical, high, medium, low
+- confidence is 0.0-1.0
+- line is optional (use null if unknown)
+- filePath should be relative to repo root
+- score is 0-100 (100 = perfect)
+- Be specific and actionable
+
+Diff:
+{diff_text}"#
+    );
+
+    // 4. Spawn the CLI agent
+    let cli_cmd = match agent.as_str() {
+        "gemini" => "gemini",
+        _ => "claude",
+    };
+
+    let cli_output = StdCommand::new(cli_cmd)
+        .args(["-p", &prompt])
+        .current_dir(&repo_path)
+        .output()
+        .map_err(|e| format!("Failed to spawn {cli_cmd}: {e}"))?;
+
+    if !cli_output.status.success() {
+        let stderr = String::from_utf8_lossy(&cli_output.stderr);
+        return Err(format!("{cli_cmd} failed: {stderr}"));
+    }
+
+    let raw_output = String::from_utf8_lossy(&cli_output.stdout).to_string();
+
+    // 5. Extract JSON from the output (may be wrapped in markdown code blocks)
+    let json_str = extract_json_from_output(&raw_output)
+        .ok_or_else(|| format!("Could not find JSON in {cli_cmd} output"))?;
+
+    let parsed: Value =
+        serde_json::from_str(&json_str).map_err(|e| format!("Failed to parse JSON: {e}"))?;
+
+    // 6. Extract findings
+    let findings_val = parsed
+        .get("findings")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    let summary = parsed
+        .get("summary")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Review completed")
+        .to_string();
+
+    // 7. Compute score from findings if AI didn't return one
+    let score: f64 = parsed
+        .get("score")
+        .and_then(|v| v.as_f64())
+        .unwrap_or_else(|| {
+            let mut s: f64 = 100.0;
+            for f in &findings_val {
+                let sev = f
+                    .get("severity")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("low");
+                s += match sev {
+                    "critical" => -20.0,
+                    "high" => -10.0,
+                    "medium" => -5.0,
+                    "low" => -2.0,
+                    _ => -1.0,
+                };
+            }
+            s.max(0.0)
+        });
+
+    // 8. Persist the review
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+
+    let source_label = format!("cli:{agent}:{diff_range}");
+
+    let input = LocalReviewInput {
+        review_type: Some("cli".to_string()),
+        source_label: Some(source_label.clone()),
+        repo_path: Some(repo_path.clone()),
+        repo_full_name: None,
+        pr_number: None,
+        agent_used: Some(agent.clone()),
+        status: Some("completed".to_string()),
+    };
+
+    let review_id =
+        queries::create_local_review(&conn, &input).map_err(|e| e.to_string())?;
+
+    for f in &findings_val {
+        let severity = f
+            .get("severity")
+            .and_then(|v| v.as_str())
+            .unwrap_or("medium")
+            .to_string();
+        let title = f
+            .get("title")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Untitled")
+            .to_string();
+        let f_summary = f
+            .get("summary")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let suggestion = f
+            .get("suggestion")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        let file_path = f
+            .get("filePath")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        let line = f.get("line").and_then(|v| v.as_i64());
+        let confidence = f.get("confidence").and_then(|v| v.as_f64());
+
+        queries::insert_review_finding(
+            &conn,
+            &crate::db::queries::LocalReviewFindingInput {
+                review_id: review_id.clone(),
+                severity,
+                title,
+                summary: f_summary,
+                suggestion,
+                file_path,
+                line,
+                confidence,
+                fingerprint: None,
+            },
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    // Update review with score and completion
+    queries::update_local_review(
+        &conn,
+        &review_id,
+        &crate::db::queries::LocalReviewUpdate {
+            status: Some("completed".to_string()),
+            score_composite: Some(score),
+            findings_count: Some(findings_val.len() as i64),
+            review_action: None,
+            summary_markdown: Some(summary.clone()),
+            error_message: None,
+            completed_at: Some(chrono::Utc::now().to_rfc3339()),
+        },
+    )
+    .map_err(|e| e.to_string())?;
+
+    // 9. Log activity
+    queries::log_activity(
+        &conn,
+        &ActivityInput {
+            agent_id: None,
+            event_type: Some("cli_review_completed".to_string()),
+            summary: Some(format!(
+                "CLI review ({agent}) for {}: score={:.0}, {} findings",
+                source_label,
+                score,
+                findings_val.len()
+            )),
+            metadata: Some(json!({"review_id": review_id}).to_string()),
+        },
+    )
+    .map_err(|e| e.to_string())?;
+
+    // 10. Return result
+    Ok(json!({
+        "review_id": review_id,
+        "score": score,
+        "findings": findings_val,
+        "summary": summary,
+    }))
+}
+
+/// Extract a JSON object from CLI output that may contain markdown code fences
+/// or other surrounding text.
+fn extract_json_from_output(output: &str) -> Option<String> {
+    // Try to find JSON inside ```json ... ``` or ``` ... ``` blocks first
+    if let Some(start) = output.find("```json") {
+        let after_fence = &output[start + 7..];
+        if let Some(end) = after_fence.find("```") {
+            let candidate = after_fence[..end].trim();
+            if serde_json::from_str::<Value>(candidate).is_ok() {
+                return Some(candidate.to_string());
+            }
+        }
+    }
+    if let Some(start) = output.find("```\n") {
+        let after_fence = &output[start + 4..];
+        if let Some(end) = after_fence.find("```") {
+            let candidate = after_fence[..end].trim();
+            if serde_json::from_str::<Value>(candidate).is_ok() {
+                return Some(candidate.to_string());
+            }
+        }
+    }
+
+    // Try to find a raw JSON object by looking for the outermost { ... }
+    let mut depth = 0i32;
+    let mut json_start: Option<usize> = None;
+    for (i, ch) in output.char_indices() {
+        match ch {
+            '{' => {
+                if depth == 0 {
+                    json_start = Some(i);
+                }
+                depth += 1;
+            }
+            '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    if let Some(start) = json_start {
+                        let candidate = &output[start..=i];
+                        if serde_json::from_str::<Value>(candidate).is_ok() {
+                            return Some(candidate.to_string());
+                        }
+                    }
+                    json_start = None;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    None
+}
+
 /// List reviews with pagination and optional repo filter.
 #[tauri::command]
 pub async fn list_reviews(

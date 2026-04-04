@@ -1,6 +1,6 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Home, FolderGit2, Kanban, Clock, FileSearch, Settings } from "lucide-react";
+import { Home, FolderGit2, Kanban, Clock, Zap, FileSearch, Settings } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -21,6 +21,7 @@ const navItems: NavItem[] = [
   { label: "Workspaces", href: "/workspaces", icon: <FolderGit2 size={18} />, shortcut: "W" },
   { label: "Board", href: "/board", icon: <Kanban size={18} />, shortcut: "B" },
   { label: "History", href: "/history", icon: <Clock size={18} />, shortcut: "Y" },
+  { label: "Quick Review", href: "/review", icon: <Zap size={18} />, shortcut: "Q" },
   { label: "Reviews", href: "/reviews", icon: <FileSearch size={18} />, shortcut: "R" },
   { label: "Settings", href: "/settings", icon: <Settings size={18} />, shortcut: "," },
 ];

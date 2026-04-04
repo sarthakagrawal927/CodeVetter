@@ -361,6 +361,41 @@ export async function listReviews(
   return resp.reviews;
 }
 
+// ─── CLI Review ──────────────────────────────────────────────────────────────
+
+export interface CliReviewFinding {
+  severity: string;
+  title: string;
+  summary: string;
+  suggestion?: string;
+  filePath?: string;
+  line?: number;
+  confidence?: number;
+}
+
+export interface CliReviewResult {
+  review_id: string;
+  score: number;
+  findings: CliReviewFinding[];
+  summary: string;
+}
+
+export async function runCliReview(
+  repoPath: string,
+  diffRange: string,
+  projectDescription: string,
+  changeDescription: string,
+  agent?: string,
+): Promise<CliReviewResult> {
+  return safeInvoke("run_cli_review", {
+    repoPath,
+    diffRange,
+    projectDescription,
+    changeDescription,
+    agent: agent ?? null,
+  });
+}
+
 // ─── Session Commands ────────────────────────────────────────────────────────
 
 export async function listSessions(
@@ -905,6 +940,7 @@ export interface PullRequest {
   number: number;
   title: string;
   headRefName: string;
+  baseRefName: string;
   author: { login: string } | null;
 }
 

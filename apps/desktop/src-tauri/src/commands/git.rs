@@ -83,7 +83,7 @@ pub async fn list_pull_requests(repo_path: String) -> Result<Value, String> {
             "--state",
             "open",
             "--json",
-            "number,title,headRefName,author",
+            "number,title,headRefName,baseRefName,author",
             "--limit",
             "50",
         ])

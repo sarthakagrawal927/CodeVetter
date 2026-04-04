@@ -140,6 +140,7 @@ fn main() {
             commands::review::save_review,
             commands::review::get_review,
             commands::review::list_reviews,
+            commands::review::run_cli_review,
             // Session commands
             commands::sessions::list_sessions,
             commands::sessions::get_session,
