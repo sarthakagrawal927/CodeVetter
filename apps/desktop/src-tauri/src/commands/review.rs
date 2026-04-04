@@ -473,12 +473,78 @@ pub async fn fix_findings(
 
     let stdout = String::from_utf8_lossy(&cli_output.stdout).to_string();
 
+    // Get the git diff to show what changed
+    let diff_output = StdCommand::new("git")
+        .args(["diff"])
+        .current_dir(&repo_path)
+        .output()
+        .ok();
+
+    let diff_text = diff_output
+        .as_ref()
+        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+        .unwrap_or_default();
+
+    // Get list of changed files
+    let changed_output = StdCommand::new("git")
+        .args(["diff", "--name-status"])
+        .current_dir(&repo_path)
+        .output()
+        .ok();
+
+    let changed_files: Vec<Value> = changed_output
+        .as_ref()
+        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|line| {
+            let parts: Vec<&str> = line.splitn(2, '\t').collect();
+            if parts.len() == 2 {
+                Some(json!({"status": parts[0], "path": parts[1]}))
+            } else {
+                None
+            }
+        })
+        .collect();
+
     Ok(json!({
         "success": true,
         "agent": agent,
         "duration_ms": duration_ms,
         "output_length": stdout.len(),
         "findings_fixed": findings.len(),
+        "diff": diff_text,
+        "changed_files": changed_files,
+    }))
+}
+
+/// Revert specific files to their git HEAD state.
+#[tauri::command]
+pub async fn revert_files(
+    repo_path: String,
+    files: Vec<String>,
+) -> Result<Value, String> {
+    let mut reverted = Vec::new();
+    let mut failed = Vec::new();
+
+    for file in &files {
+        let output = StdCommand::new("git")
+            .args(["checkout", "HEAD", "--", file])
+            .current_dir(&repo_path)
+            .output()
+            .map_err(|e| format!("Failed to run git checkout: {e}"))?;
+
+        if output.status.success() {
+            reverted.push(file.clone());
+        } else {
+            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+            failed.push(json!({"file": file, "error": stderr}));
+        }
+    }
+
+    Ok(json!({
+        "reverted": reverted,
+        "failed": failed,
     }))
 }
 

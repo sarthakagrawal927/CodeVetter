@@ -384,11 +384,23 @@ export interface CliReviewResult {
   findings_count: number;
 }
 
+export interface FixChangedFile {
+  status: string;
+  path: string;
+}
+
 export interface FixFindingsResult {
   success: boolean;
   agent: string;
   duration_ms: number;
   findings_fixed: number;
+  diff: string;
+  changed_files: FixChangedFile[];
+}
+
+export interface RevertFilesResult {
+  reverted: string[];
+  failed: { file: string; error: string }[];
 }
 
 export async function runCliReview(
@@ -416,6 +428,16 @@ export async function fixFindings(
     repoPath,
     findings,
     agent: agent ?? null,
+  });
+}
+
+export async function revertFiles(
+  repoPath: string,
+  files: string[],
+): Promise<RevertFilesResult> {
+  return safeInvoke("revert_files", {
+    repoPath,
+    files,
   });
 }
 

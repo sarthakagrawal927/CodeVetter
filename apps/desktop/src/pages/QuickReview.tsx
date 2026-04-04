@@ -17,6 +17,8 @@ import {
   Plus,
   Square,
   CheckSquare2,
+  Undo2,
+  FileCode,
 } from "lucide-react";
 import {
   isTauriAvailable,
@@ -29,8 +31,10 @@ import {
   setPreference,
   runCliReview,
   fixFindings,
+  revertFiles,
   readFileAroundLine,
 } from "@/lib/tauri-ipc";
+import type { FixFindingsResult, FixChangedFile } from "@/lib/tauri-ipc";
 import type { PullRequest, CliReviewResult, CliReviewFinding, LocalReviewRow, FileLineData } from "@/lib/tauri-ipc";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -131,6 +135,7 @@ export default function QuickReview() {
   const [changeDesc, setChangeDesc] = useState("");
   const [isReviewing, setIsReviewing] = useState(false);
   const [isFixing, setIsFixing] = useState<string | null>(null);
+  const [fixResult, setFixResult] = useState<FixFindingsResult | null>(null);
   const [selectedFindings, setSelectedFindings] = useState<Set<number>>(new Set());
   const [result, setResult] = useState<CliReviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -372,16 +377,43 @@ export default function QuickReview() {
   const handleFixSelected = useCallback(async () => {
     if (!repoPath || !result || selectedFindings.size === 0) return;
     setIsFixing("selected");
+    setFixResult(null);
     setError(null);
     try {
       const toFix = sortedFindings.filter((_, i) => selectedFindings.has(i));
-      await fixFindings(repoPath, toFix, result.agent);
+      const res = await fixFindings(repoPath, toFix, result.agent);
+      setFixResult(res);
     } catch (e) {
       setError(`Fix failed: ${String(e)}`);
     } finally {
       setIsFixing(null);
     }
   }, [repoPath, result, selectedFindings, sortedFindings]);
+
+  const handleRevertFile = useCallback(async (filePath: string) => {
+    if (!repoPath) return;
+    try {
+      await revertFiles(repoPath, [filePath]);
+      // Re-fetch diff to update the view
+      if (fixResult) {
+        const remaining = fixResult.changed_files.filter(f => f.path !== filePath);
+        setFixResult({ ...fixResult, changed_files: remaining });
+      }
+    } catch (e) {
+      setError(`Revert failed: ${String(e)}`);
+    }
+  }, [repoPath, fixResult]);
+
+  const handleRevertAll = useCallback(async () => {
+    if (!repoPath || !fixResult) return;
+    const allFiles = fixResult.changed_files.map(f => f.path);
+    try {
+      await revertFiles(repoPath, allFiles);
+      setFixResult(null);
+    } catch (e) {
+      setError(`Revert failed: ${String(e)}`);
+    }
+  }, [repoPath, fixResult]);
 
   // ─── Finding click → load code ──────────────────────────────────────────
 
@@ -559,9 +591,77 @@ export default function QuickReview() {
           <PanelResizeHandle className="w-1.5 bg-[#1a1a1a] hover:bg-amber-500/30 transition-colors cursor-col-resize" />
 
           <Panel defaultSize={60} minSize={30}>
-          {/* Right column: code viewer */}
+          {/* Right column: code viewer OR fix diff */}
           <div className="flex h-full flex-col bg-[#050505]">
-            {selectedFindingIdx !== null && codeFilePath ? (
+            {/* Fix results view */}
+            {fixResult && fixResult.changed_files.length > 0 ? (
+              <>
+                <div className="shrink-0 border-b border-[#1a1a1a] px-4 py-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle size={14} className="text-emerald-400" />
+                    <span className="text-xs font-medium text-slate-300">
+                      Fixed {fixResult.findings_fixed} issue{fixResult.findings_fixed !== 1 ? "s" : ""} in {formatDuration(fixResult.duration_ms)}
+                    </span>
+                    <Badge variant="outline" className="text-[10px] text-slate-500">
+                      {fixResult.changed_files.length} file{fixResult.changed_files.length !== 1 ? "s" : ""} changed
+                    </Badge>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleRevertAll}
+                    className="gap-1 text-[11px] text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                  >
+                    <Undo2 size={12} />
+                    Revert All
+                  </Button>
+                </div>
+                {/* Changed files list */}
+                <div className="shrink-0 border-b border-[#1a1a1a]">
+                  {fixResult.changed_files.map((f) => (
+                    <div key={f.path} className="flex items-center gap-2 px-4 py-1.5 hover:bg-[#0e0e0e]">
+                      <FileCode size={12} className="shrink-0 text-slate-600" />
+                      <span className="flex-1 truncate font-mono text-[11px] text-slate-400">{f.path}</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleRevertFile(f.path)}
+                        className="h-6 gap-1 px-2 text-[10px] text-slate-600 hover:text-red-400 hover:bg-red-500/10"
+                      >
+                        <Undo2 size={10} />
+                        Revert
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                {/* Diff view */}
+                <div className="flex-1 overflow-y-auto">
+                  <div className="py-1">
+                    {fixResult.diff.split("\n").map((line, i) => (
+                      <div
+                        key={i}
+                        className={cn(
+                          "font-mono text-[12px] leading-[20px] px-4",
+                          line.startsWith("+") && !line.startsWith("+++") && "bg-emerald-500/8 text-emerald-400",
+                          line.startsWith("-") && !line.startsWith("---") && "bg-red-500/8 text-red-400",
+                          line.startsWith("@@") && "text-cyan-500/60 bg-cyan-500/5",
+                          line.startsWith("diff ") && "text-slate-500 font-semibold mt-2",
+                          !line.startsWith("+") && !line.startsWith("-") && !line.startsWith("@@") && !line.startsWith("diff ") && "text-slate-500",
+                        )}
+                      >
+                        {line}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : isFixing ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3">
+                <Loader2 size={28} className="animate-spin text-amber-400" />
+                <span className="text-sm text-slate-400">Fixing with Claude...</span>
+                <span className="text-[11px] text-slate-600">This may take a minute</span>
+              </div>
+            ) : selectedFindingIdx !== null && codeFilePath ? (
               <>
                 {/* File path header + finding context */}
                 <div className="shrink-0 border-b border-[#1a1a1a] px-4 py-2">

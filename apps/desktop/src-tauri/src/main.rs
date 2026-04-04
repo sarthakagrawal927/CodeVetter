@@ -142,6 +142,7 @@ fn main() {
             commands::review::list_reviews,
             commands::review::run_cli_review,
             commands::review::fix_findings,
+            commands::review::revert_files,
             // Session commands
             commands::sessions::list_sessions,
             commands::sessions::get_session,
