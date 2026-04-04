@@ -1,66 +1,95 @@
-# CodeVetter Desktop
+<!-- generated-by: gsd-doc-writer -->
+# @code-reviewer/desktop
 
-AI-powered code review and agent orchestration for your Mac.
+AI-powered code review and agent orchestration for macOS. A Tauri 2 desktop app (React + Vite frontend, Rust backend) that reviews AI-generated code locally or on GitHub PRs, and lets you coordinate multiple AI agents from a single interface.
+
+Part of the [CodeVetter](../../README.md) monorepo.
 
 ## Features
 
-- **Workspaces** — Branch-based coding environments with chat, terminal, file explorer, and PR management
-- **Agent Squad** — Persona-based AI agents (from ~/.claude/agents/) that work on tasks autonomously
-- **Code Review** — Severity-ranked findings, code suggestions, accept/dismiss, post to GitHub
-- **Task Board** — Kanban with Linear integration (To Do, In Progress, Review, Test)
-- **Session History** — Browse and search past Claude Code and Codex sessions
-- **Multi-Agent Coordination** — CRDT-based, agents coordinate without duplicating work
+- **Quick Review** — Run AI review on a local diff or GitHub PR; get severity-ranked findings with accept/dismiss actions and optional post-to-GitHub.
+- **Workspaces** — Branch-based coding environments with an integrated chat, terminal, file explorer, and PR management panel.
+- **Agent Board** — Kanban board backed by persona-based agents (loaded from `~/.claude/agents/`). Assign tasks, track In Progress / Review / Test columns, manage concurrency.
+- **Session History** — Browse and search past Claude Code and Codex CLI sessions.
+- **Multi-Agent Coordination** — CRDT-based (Automerge) agent state so multiple agents work on a repo without duplicating effort.
+- **Auto-updater** — Built-in update checker powered by `@tauri-apps/plugin-updater`.
 
 ## Prerequisites
 
 - macOS 12+
+- [Rust toolchain](https://rustup.rs/) (for building from source)
 - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed
-- [GitHub CLI](https://cli.github.com/) (optional, for PR management)
+- [GitHub CLI](https://cli.github.com/) — optional, needed for PR management
 
 ## Development
 
 ```bash
-# Install dependencies
+# Install JS dependencies (from repo root or this directory)
 npm install
 
-# Run in dev mode (hot reload)
+# Start Vite dev server only (hot reload, no Tauri shell)
+npm run dev
+
+# Start full Tauri dev build (Rust + React, hot reload)
 npm run tauri:dev
 
-# Build for release
+# Production build (.dmg / .app)
 npm run tauri:build
 
-# Run tests
-npm test
-
-# Run e2e tests
-npm run test:e2e
+# Lint
+npm run lint
 ```
+
+## Key scripts
+
+| Script | Description |
+|---|---|
+| `dev` | Vite dev server on port 1420 (kills existing process first) |
+| `build` | Vite production build |
+| `tauri:dev` | Full Tauri dev mode with hot reload |
+| `tauri:build` | Release build — outputs macOS `.app` / `.dmg` |
+| `lint` | ESLint over `src/` |
 
 ## Architecture
 
 ```
-src/                  React frontend (Vite + Tailwind + shadcn/ui)
-├── pages/            Home, Workspaces, Board (Agents), History, Settings
-├── components/       Shared components (workspace-chat, kanban-board, etc.)
-├── components/ui/    shadcn/ui primitives (Button, Card, Dialog, etc.)
-├── hooks/            Custom hooks (use-chat-stream)
-└── lib/              Utilities (tauri-ipc, utils)
+src/                       React frontend (Vite + Tailwind)
+├── pages/                 Home, Workspaces, Agents, Sessions, QuickReview, Settings
+├── components/            Feature components (sidebar, command-palette, kanban-board, …)
+├── components/ui/         Primitive UI components (Button, Card, Dialog, …)
+├── hooks/                 Custom hooks (use-chat-stream, …)
+└── lib/                   Utilities (tauri-ipc, utils)
 
-src-tauri/            Rust backend (Tauri 2)
-├── src/commands/     IPC command handlers
-├── src/coordination/ CRDT agent coordination (Automerge)
-├── src/db/           SQLite schema + queries
-├── src/adapters/     Claude Code + Codex CLI adapters
-└── sidecar/          Bun-compiled review sidecar
+src-tauri/                 Rust backend (Tauri 2)
+├── src/commands/          IPC command handlers (invoked from React via tauri-ipc)
+├── src/coordination/      CRDT agent coordination (Automerge)
+├── src/db/                SQLite schema + queries (tauri-plugin-sql)
+├── src/adapters/          Claude Code + Codex CLI adapters
+└── sidecar/               Bun-compiled review sidecar binary
 ```
 
-## Keyboard Shortcuts
+## Keyboard shortcuts
 
 | Shortcut | Action |
-|----------|--------|
-| ⌘K | Command palette |
-| ⌘/ | Keyboard shortcuts |
-| g h | Go to Home |
-| g w | Go to Workspaces |
-| g b | Go to Board |
-| g y | Go to History |
+|---|---|
+| `⌘K` | Open command palette |
+| `⌘/` | Show keyboard shortcuts |
+| `g h` | Go to Home |
+| `g w` | Go to Workspaces |
+| `g b` | Go to Agent Board |
+| `g y` | Go to Session History |
+
+## Testing
+
+```bash
+# Run all Playwright e2e tests (requires built app or dev server running)
+npm test
+
+# Interactive Playwright UI
+npm run test:e2e:ui
+
+# Tauri-specific e2e spec (Node test runner)
+npm run test:e2e:tauri
+```
+
+Tests live in `tests/e2e/`.

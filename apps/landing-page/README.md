@@ -1,28 +1,55 @@
-# Landing Page (Next.js)
+<!-- generated-by: gsd-doc-writer -->
+# @code-reviewer/landing-page
 
-This app is the Next.js landing page for the code-reviewer project.  
-It was adapted from the open-source Landwind template and customized for
-`Sarthak AI Code Reviewer`.
+Public marketing site for CodeVetter. A Next.js app (App Router) that presents the product, features, privacy story, FAQ, and a download CTA for the macOS desktop app.
 
-## Run locally
+Part of the [CodeVetter](../../README.md) monorepo.
 
-From the repo root:
+## Usage
+
+### Dev server
 
 ```bash
-npm install
+# From the repo root
 npm run -w apps/landing-page dev
+# or, inside this package
+npm run dev
 ```
 
-Then open [http://localhost:3000](http://localhost:3000).
+Opens at **http://localhost:3000**.
 
-## Build for production
+### Build & start production
 
 ```bash
 npm run -w apps/landing-page build
 npm run -w apps/landing-page start
 ```
 
-## Credits
+## Page structure
 
-- Original design source: [Themesberg Landwind](https://github.com/themesberg/landwind)
-- License: MIT (`apps/landing-page/LICENSE`)
+The single page (`app/page.js`) renders the following sections in order:
+
+1. **Nav** — sticky, links to GitHub and the latest release download
+2. **Hero** — headline, sub-copy, Download for macOS / View Source CTAs
+3. **Features** — three feature cards (Review, Feedback loop, Orchestration)
+4. **How it works** — three-step flow (Point at code → AI reviews → Agent fixes)
+5. **Privacy-first** — local-first architecture callouts, no-server diagram
+6. **FAQ** — accordion with 7 questions
+7. **CTA** — download prompt
+8. **Footer** — product and community links
+
+## Key scripts
+
+| Script | Description |
+|---|---|
+| `dev` | Next.js dev server (port 3000) |
+| `build` | Production bundle |
+| `start` | Serve production build |
+
+## Testing
+
+No dedicated test runner is configured for this package. Smoke-test the build locally:
+
+```bash
+npm run -w apps/landing-page build && npm run -w apps/landing-page start
+```
