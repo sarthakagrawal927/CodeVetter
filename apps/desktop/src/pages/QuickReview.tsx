@@ -14,6 +14,8 @@ import {
   CheckCircle,
   ArrowLeft,
   Plus,
+  Square,
+  CheckSquare2,
 } from "lucide-react";
 import {
   isTauriAvailable,
@@ -127,6 +129,7 @@ export default function QuickReview() {
   const [changeDesc, setChangeDesc] = useState("");
   const [isReviewing, setIsReviewing] = useState(false);
   const [isFixing, setIsFixing] = useState<string | null>(null);
+  const [selectedFindings, setSelectedFindings] = useState<Set<number>>(new Set());
   const [result, setResult] = useState<CliReviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -299,6 +302,7 @@ export default function QuickReview() {
       );
       setResult(res);
       setMode("view");
+      setSelectedFindings(new Set());
     } catch (e) {
       const msg = String(e);
       if (msg.includes("TAURI_NOT_AVAILABLE")) {
@@ -325,34 +329,37 @@ export default function QuickReview() {
 
   // ─── Fix handlers ───────────────────────────────────────────────────────
 
-  const handleFixAll = useCallback(async () => {
-    if (!repoPath || !result) return;
-    setIsFixing("all");
+  const toggleFinding = useCallback((idx: number) => {
+    setSelectedFindings((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    if (!result) return;
+    setSelectedFindings((prev) =>
+      prev.size === result.findings.length
+        ? new Set()
+        : new Set(result.findings.map((_, i) => i)),
+    );
+  }, [result]);
+
+  const handleFixSelected = useCallback(async () => {
+    if (!repoPath || !result || selectedFindings.size === 0) return;
+    setIsFixing("selected");
     setError(null);
     try {
-      await fixFindings(repoPath, result.findings, result.agent);
+      const toFix = sortedFindings.filter((_, i) => selectedFindings.has(i));
+      await fixFindings(repoPath, toFix, result.agent);
     } catch (e) {
       setError(`Fix failed: ${String(e)}`);
     } finally {
       setIsFixing(null);
     }
-  }, [repoPath, result]);
-
-  const handleFixOne = useCallback(
-    async (finding: CliReviewFinding, idx: number) => {
-      if (!repoPath || !result) return;
-      setIsFixing(String(idx));
-      setError(null);
-      try {
-        await fixFindings(repoPath, [finding], result.agent);
-      } catch (e) {
-        setError(`Fix failed: ${String(e)}`);
-      } finally {
-        setIsFixing(null);
-      }
-    },
-    [repoPath, result],
-  );
+  }, [repoPath, result, selectedFindings, sortedFindings]);
 
   // ─── Sorted findings ────────────────────────────────────────────────────
 
@@ -625,19 +632,34 @@ export default function QuickReview() {
                     Review Results
                   </h2>
                   {sortedFindings.length > 0 && (
-                    <Button
-                      size="sm"
-                      onClick={handleFixAll}
-                      disabled={isFixing !== null}
-                      className="gap-1.5 bg-amber-600 text-xs text-white hover:bg-amber-500 disabled:opacity-50"
-                    >
-                      {isFixing === "all" ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : (
-                        <Zap size={14} />
-                      )}
-                      {isFixing === "all" ? "Fixing..." : `Fix All (${sortedFindings.length})`}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={toggleSelectAll}
+                        className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300"
+                      >
+                        {selectedFindings.size === sortedFindings.length ? (
+                          <CheckSquare2 size={14} className="text-amber-400" />
+                        ) : (
+                          <Square size={14} />
+                        )}
+                        {selectedFindings.size === sortedFindings.length ? "Deselect" : "Select All"}
+                      </button>
+                      <Button
+                        size="sm"
+                        onClick={handleFixSelected}
+                        disabled={isFixing !== null || selectedFindings.size === 0}
+                        className="gap-1.5 bg-amber-600 text-xs text-white hover:bg-amber-500 disabled:opacity-50"
+                      >
+                        {isFixing === "selected" ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <Zap size={14} />
+                        )}
+                        {isFixing === "selected"
+                          ? "Fixing..."
+                          : `Fix${selectedFindings.size > 0 ? ` (${selectedFindings.size})` : ""}`}
+                      </Button>
+                    </div>
                   )}
                 </div>
                 {result.summary && (
@@ -675,9 +697,8 @@ export default function QuickReview() {
                   <FindingItem
                     key={idx}
                     finding={finding}
-                    isFixing={isFixing === String(idx)}
-                    anyFixing={isFixing !== null}
-                    onFix={() => handleFixOne(finding, idx)}
+                    selected={selectedFindings.has(idx)}
+                    onToggle={() => toggleFinding(idx)}
                   />
                 ))}
               </div>
@@ -700,19 +721,29 @@ export default function QuickReview() {
 
 function FindingItem({
   finding,
-  isFixing,
-  anyFixing,
-  onFix,
+  selected,
+  onToggle,
 }: {
   finding: CliReviewFinding;
-  isFixing: boolean;
-  anyFixing: boolean;
-  onFix: () => void;
+  selected: boolean;
+  onToggle: () => void;
 }) {
   return (
-    <div className="rounded-lg border border-[#1a1a1a] bg-[#0a0a0a] p-4">
-      {/* Header: severity badge + title + fix button */}
+    <div
+      className={cn(
+        "rounded-lg border bg-[#0a0a0a] p-4 transition-colors",
+        selected ? "border-amber-500/30" : "border-[#1a1a1a]",
+      )}
+    >
+      {/* Header: checkbox + severity badge + title */}
       <div className="flex items-start gap-2">
+        <button onClick={onToggle} className="mt-0.5 shrink-0 text-slate-500 hover:text-amber-400">
+          {selected ? (
+            <CheckSquare2 size={16} className="text-amber-400" />
+          ) : (
+            <Square size={16} />
+          )}
+        </button>
         <Badge
           variant="outline"
           className={cn(
@@ -723,20 +754,6 @@ function FindingItem({
           {finding.severity}
         </Badge>
         <h3 className="flex-1 text-sm font-medium text-slate-200">{finding.title}</h3>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={onFix}
-          disabled={anyFixing}
-          className="shrink-0 gap-1 text-[11px] text-slate-500 hover:text-amber-400 disabled:opacity-40"
-        >
-          {isFixing ? (
-            <Loader2 size={12} className="animate-spin" />
-          ) : (
-            <Zap size={12} />
-          )}
-          {isFixing ? "Fixing..." : "Fix"}
-        </Button>
       </div>
 
       {/* Summary */}
