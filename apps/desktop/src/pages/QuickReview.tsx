@@ -327,6 +327,16 @@ export default function QuickReview() {
     }
   }, [repoPath, loadFolderData]);
 
+  // ─── Sorted findings ────────────────────────────────────────────────────
+
+  const sortedFindings = result
+    ? [...result.findings].sort(
+        (a, b) =>
+          (severityOrder[a.severity] ?? 99) -
+          (severityOrder[b.severity] ?? 99),
+      )
+    : [];
+
   // ─── Fix handlers ───────────────────────────────────────────────────────
 
   const toggleFinding = useCallback((idx: number) => {
@@ -360,16 +370,6 @@ export default function QuickReview() {
       setIsFixing(null);
     }
   }, [repoPath, result, selectedFindings, sortedFindings]);
-
-  // ─── Sorted findings ────────────────────────────────────────────────────
-
-  const sortedFindings = result
-    ? [...result.findings].sort(
-        (a, b) =>
-          (severityOrder[a.severity] ?? 99) -
-          (severityOrder[b.severity] ?? 99),
-      )
-    : [];
 
   // ─── Render ─────────────────────────────────────────────────────────────
 
