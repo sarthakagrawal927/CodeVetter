@@ -243,6 +243,7 @@ fn main() {
             // File Tree
             commands::files::list_directory_tree,
             commands::files::read_file_preview,
+            commands::files::read_file_around_line,
             commands::files::open_in_app,
             // Diff Comments
             commands::diff_comments::get_file_diff,

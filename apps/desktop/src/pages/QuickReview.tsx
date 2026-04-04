@@ -28,8 +28,9 @@ import {
   setPreference,
   runCliReview,
   fixFindings,
+  readFileAroundLine,
 } from "@/lib/tauri-ipc";
-import type { PullRequest, CliReviewResult, CliReviewFinding, LocalReviewRow } from "@/lib/tauri-ipc";
+import type { PullRequest, CliReviewResult, CliReviewFinding, LocalReviewRow, FileLineData } from "@/lib/tauri-ipc";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -136,6 +137,12 @@ export default function QuickReview() {
   // Past reviews
   const [pastReviews, setPastReviews] = useState<LocalReviewRow[]>([]);
   const [showHistory, setShowHistory] = useState(true);
+
+  // Code viewer state (view mode)
+  const [selectedFindingIdx, setSelectedFindingIdx] = useState<number | null>(null);
+  const [codeLines, setCodeLines] = useState<FileLineData[]>([]);
+  const [codeFilePath, setCodeFilePath] = useState("");
+  const [codeLanguage, setCodeLanguage] = useState("");
 
   // Diff range derived from selection
   const [diffRange, setDiffRange] = useState("");
@@ -321,6 +328,10 @@ export default function QuickReview() {
     setMode("create");
     setResult(null);
     setError(null);
+    setSelectedFindingIdx(null);
+    setCodeLines([]);
+    setCodeFilePath("");
+    setCodeLanguage("");
     // Re-fetch branches for the current folder
     if (repoPath) {
       loadFolderData(repoPath);
@@ -371,7 +382,262 @@ export default function QuickReview() {
     }
   }, [repoPath, result, selectedFindings, sortedFindings]);
 
+  // ─── Finding click → load code ──────────────────────────────────────────
+
+  const handleFindingClick = useCallback(
+    async (idx: number) => {
+      setSelectedFindingIdx(idx);
+      const finding = sortedFindings[idx];
+      if (!finding?.filePath || finding.line == null) {
+        setCodeLines([]);
+        setCodeFilePath(finding?.filePath ?? "");
+        setCodeLanguage("");
+        return;
+      }
+      try {
+        const res = await readFileAroundLine(
+          repoPath + "/" + finding.filePath,
+          finding.line,
+          15,
+          15,
+        );
+        setCodeLines(res.lines);
+        setCodeFilePath(res.file_path);
+        setCodeLanguage(res.language);
+      } catch (e) {
+        console.error("[Review] failed to load code:", e);
+        setCodeLines([]);
+        setCodeFilePath(finding.filePath);
+        setCodeLanguage("");
+      }
+    },
+    [sortedFindings, repoPath],
+  );
+
   // ─── Render ─────────────────────────────────────────────────────────────
+
+  // ─── View mode layout ────────────────────────────────────────────────────
+
+  if (mode === "view" && result) {
+    return (
+      <div className="flex h-full flex-col">
+        {/* Top bar */}
+        <div className="flex shrink-0 items-center gap-3 border-b border-[#1a1a1a] px-4 py-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-slate-400 hover:text-slate-100"
+            onClick={handleNewReview}
+          >
+            <ArrowLeft size={16} />
+            Back
+          </Button>
+          <div className="flex flex-1 items-center justify-center gap-3">
+            <ScoreBadge score={Math.round(result.score)} size="sm" />
+            <span className="max-w-md truncate text-sm text-slate-300">
+              {result.summary || "Review complete"}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleSelectAll}
+              className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300"
+            >
+              {selectedFindings.size === sortedFindings.length && sortedFindings.length > 0 ? (
+                <CheckSquare2 size={14} className="text-amber-400" />
+              ) : (
+                <Square size={14} />
+              )}
+              {selectedFindings.size === sortedFindings.length && sortedFindings.length > 0 ? "Deselect" : "Select All"}
+            </button>
+            <Button
+              size="sm"
+              onClick={handleFixSelected}
+              disabled={isFixing !== null || selectedFindings.size === 0}
+              className="gap-1.5 bg-amber-600 text-xs text-white hover:bg-amber-500 disabled:opacity-50"
+            >
+              {isFixing === "selected" ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Zap size={14} />
+              )}
+              {isFixing === "selected"
+                ? "Fixing..."
+                : `Fix${selectedFindings.size > 0 ? ` (${selectedFindings.size})` : ""}`}
+            </Button>
+          </div>
+        </div>
+
+        {/* Error banner */}
+        {error && (
+          <div className="shrink-0 bg-red-500/10 px-4 py-2 text-xs text-red-400">
+            {error}
+          </div>
+        )}
+
+        {/* Two-column body */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Left column: findings list + past reviews */}
+          <div className="flex w-[40%] shrink-0 flex-col border-r border-[#1a1a1a]">
+            <div className="flex-1 overflow-y-auto">
+              {sortedFindings.length === 0 ? (
+                <div className="flex items-center gap-2 px-4 py-6 text-sm text-emerald-400">
+                  <CheckCircle size={18} />
+                  No findings — clean review.
+                </div>
+              ) : (
+                <div className="space-y-px">
+                  {sortedFindings.map((finding, idx) => (
+                    <div
+                      key={idx}
+                      className={cn(
+                        "flex cursor-pointer items-start gap-2 px-3 py-3 transition-colors",
+                        selectedFindingIdx === idx
+                          ? "border-l-2 border-amber-400 bg-amber-500/10"
+                          : "border-l-2 border-transparent hover:bg-[#111111]",
+                      )}
+                      onClick={() => handleFindingClick(idx)}
+                    >
+                      {/* Checkbox */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFinding(idx);
+                        }}
+                        className="mt-0.5 shrink-0 text-slate-500 hover:text-amber-400"
+                      >
+                        {selectedFindings.has(idx) ? (
+                          <CheckSquare2 size={16} className="text-amber-400" />
+                        ) : (
+                          <Square size={16} />
+                        )}
+                      </button>
+
+                      {/* Finding info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          {severityIcon(finding.severity)}
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "shrink-0 text-[10px] font-semibold uppercase",
+                              severityColor(finding.severity),
+                            )}
+                          >
+                            {finding.severity}
+                          </Badge>
+                          <span className="truncate text-xs font-medium text-slate-200">
+                            {finding.title}
+                          </span>
+                        </div>
+                        <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-slate-500">
+                          {finding.summary}
+                        </p>
+                        {finding.filePath && (
+                          <div className="mt-1 flex items-center gap-1 font-mono text-[10px] text-slate-600">
+                            <span className="truncate">{finding.filePath}</span>
+                            {finding.line != null && <span>:{finding.line}</span>}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Past reviews (in view mode, at bottom of findings column) */}
+              {pastReviews.length > 0 && (
+                <div className="border-t border-[#1a1a1a] px-3 py-3">
+                  <button
+                    onClick={() => setShowHistory(!showHistory)}
+                    className="flex w-full items-center justify-between text-[11px] font-medium text-slate-400 hover:text-slate-200"
+                  >
+                    <span>Past Reviews ({pastReviews.length})</span>
+                    <span className="text-slate-600">{showHistory ? "▼" : "▶"}</span>
+                  </button>
+                  {showHistory && (
+                    <div className="mt-2 space-y-1">
+                      {pastReviews.map((r) => (
+                        <button
+                          key={r.id}
+                          onClick={() => handleLoadPastReview(r.id)}
+                          className={cn(
+                            "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors",
+                            result?.review_id === r.id
+                              ? "bg-amber-500/10 text-amber-400"
+                              : "text-slate-400 hover:bg-[#111111] hover:text-slate-200",
+                          )}
+                        >
+                          <ScoreBadge score={Math.round(r.score_composite ?? 0)} size="sm" />
+                          <div className="flex-1 min-w-0">
+                            <div className="truncate">
+                              {r.repo_path
+                                ? shortenPath(r.repo_path).split("/").pop()
+                                : r.source_label ?? "Review"}
+                            </div>
+                            <div className="text-[10px] text-slate-600">
+                              {r.findings_count ?? 0} findings · {formatRelativeTime(r.completed_at ?? r.created_at)}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right column: code viewer */}
+          <div className="flex flex-1 flex-col bg-[#0a0a0a]">
+            {selectedFindingIdx !== null && codeFilePath ? (
+              <>
+                {/* File path header */}
+                <div className="shrink-0 border-b border-[#1a1a1a] px-4 py-2 font-mono text-[11px] text-slate-500">
+                  {codeFilePath}
+                </div>
+                {/* Code lines */}
+                <div className="flex-1 overflow-y-auto">
+                  {codeLines.length > 0 ? (
+                    <div className="py-2">
+                      {codeLines.map((cl) => (
+                        <div
+                          key={cl.line}
+                          className={cn(
+                            "flex font-mono text-[13px] leading-6",
+                            cl.highlight && "border-l-2 border-amber-500 bg-amber-500/10",
+                            !cl.highlight && "border-l-2 border-transparent",
+                          )}
+                        >
+                          <span className="w-12 shrink-0 select-none pr-3 text-right text-slate-600">
+                            {cl.line}
+                          </span>
+                          <pre className="flex-1 whitespace-pre text-slate-300">
+                            {cl.text}
+                          </pre>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-sm text-slate-600">
+                      No code available for this finding
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center gap-2 text-slate-600">
+                <Zap size={24} />
+                <span className="text-sm">Click a finding to view the code</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Create mode layout ─────────────────────────────────────────────────
 
   return (
     <div className="flex h-full">
@@ -389,20 +655,7 @@ export default function QuickReview() {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-          {/* Back / New Review button when viewing a past review */}
-          {mode === "view" && (
-            <Button
-              variant="outline"
-              className="w-full justify-start gap-2 border-[#1a1a1a] bg-[#0a0a0a] text-slate-300 hover:bg-[#111111] hover:text-slate-100"
-              onClick={handleNewReview}
-            >
-              <Plus size={16} />
-              New Review
-            </Button>
-          )}
-
           {/* Folder picker */}
-          {mode === "create" && (<>
           <Button
             variant="outline"
             className="w-full justify-start gap-2 border-[#1a1a1a] bg-[#0a0a0a] text-slate-300 hover:bg-[#111111] hover:text-slate-100"
@@ -566,7 +819,6 @@ export default function QuickReview() {
               )}
             </>
           )}
-          </>)}
 
           {/* Past reviews */}
           {pastReviews.length > 0 && (
@@ -620,89 +872,6 @@ export default function QuickReview() {
             <span className="text-sm text-slate-400">
               Reviewing with Claude...
             </span>
-          </div>
-        ) : result ? (
-          <div className="max-w-3xl p-6 pt-12">
-            {/* Score + summary header */}
-            <div className="flex items-start gap-4">
-              <ScoreBadge score={Math.round(result.score)} size="lg" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-slate-200">
-                    Review Results
-                  </h2>
-                  {sortedFindings.length > 0 && (
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={toggleSelectAll}
-                        className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300"
-                      >
-                        {selectedFindings.size === sortedFindings.length ? (
-                          <CheckSquare2 size={14} className="text-amber-400" />
-                        ) : (
-                          <Square size={14} />
-                        )}
-                        {selectedFindings.size === sortedFindings.length ? "Deselect" : "Select All"}
-                      </button>
-                      <Button
-                        size="sm"
-                        onClick={handleFixSelected}
-                        disabled={isFixing !== null || selectedFindings.size === 0}
-                        className="gap-1.5 bg-amber-600 text-xs text-white hover:bg-amber-500 disabled:opacity-50"
-                      >
-                        {isFixing === "selected" ? (
-                          <Loader2 size={14} className="animate-spin" />
-                        ) : (
-                          <Zap size={14} />
-                        )}
-                        {isFixing === "selected"
-                          ? "Fixing..."
-                          : `Fix${selectedFindings.size > 0 ? ` (${selectedFindings.size})` : ""}`}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-                {result.summary && (
-                  <p className="mt-1 text-sm text-slate-400">
-                    {result.summary}
-                  </p>
-                )}
-                {/* Metadata row */}
-                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
-                  <span className="flex items-center gap-1">
-                    <Badge variant="outline" className="text-[10px]">
-                      {sortedFindings.length} finding{sortedFindings.length !== 1 ? "s" : ""}
-                    </Badge>
-                  </span>
-                  <span className="font-mono">{result.diff_range || diffRange}</span>
-                  <span>Model: <span className="text-slate-400">{result.agent || "claude"}</span></span>
-                  {result.duration_ms > 0 && (
-                    <span>Time: <span className="text-slate-400">{formatDuration(result.duration_ms)}</span></span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <Separator className="my-5 bg-[#1a1a1a]" />
-
-            {/* Findings list */}
-            {sortedFindings.length === 0 ? (
-              <div className="flex items-center gap-2 rounded-lg bg-emerald-500/5 px-4 py-6 text-sm text-emerald-400">
-                <CheckCircle size={18} />
-                No findings — clean review.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {sortedFindings.map((finding, idx) => (
-                  <FindingItem
-                    key={idx}
-                    finding={finding}
-                    selected={selectedFindings.has(idx)}
-                    onToggle={() => toggleFinding(idx)}
-                  />
-                ))}
-              </div>
-            )}
           </div>
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-slate-500">

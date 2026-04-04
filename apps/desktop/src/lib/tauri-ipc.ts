@@ -1338,6 +1338,33 @@ export async function readFilePreview(
   });
 }
 
+export interface FileLineData {
+  line: number;
+  text: string;
+  highlight: boolean;
+}
+
+export interface FileAroundLineResult {
+  lines: FileLineData[];
+  language: string;
+  target_line: number;
+  file_path: string;
+}
+
+export async function readFileAroundLine(
+  filePath: string,
+  line: number,
+  contextBefore?: number,
+  contextAfter?: number,
+): Promise<FileAroundLineResult> {
+  return safeInvoke("read_file_around_line", {
+    filePath,
+    line,
+    contextBefore: contextBefore ?? 10,
+    contextAfter: contextAfter ?? 10,
+  });
+}
+
 export async function openInApp(
   appName: string,
   path: string

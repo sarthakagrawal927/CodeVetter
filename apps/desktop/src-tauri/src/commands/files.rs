@@ -78,6 +78,57 @@ pub async fn read_file_preview(
     }))
 }
 
+/// Read lines around a specific line number in a file.
+/// Returns context_before lines before and context_after lines after the target line.
+#[tauri::command]
+pub async fn read_file_around_line(
+    file_path: String,
+    line: u32,
+    context_before: Option<u32>,
+    context_after: Option<u32>,
+) -> Result<Value, String> {
+    let path = Path::new(&file_path);
+    if !path.is_file() {
+        return Err(format!("Not a file: {file_path}"));
+    }
+
+    let before = context_before.unwrap_or(10) as usize;
+    let after = context_after.unwrap_or(10) as usize;
+    let target = line as usize;
+    let start = if target > before { target - before } else { 1 };
+    let end = target + after;
+
+    let file = fs::File::open(path).map_err(|e| format!("Cannot open file: {e}"))?;
+    let reader = BufReader::new(file);
+
+    let mut lines: Vec<Value> = Vec::new();
+    for (i, result) in reader.lines().enumerate() {
+        let line_num = i + 1;
+        if line_num > end {
+            break;
+        }
+        if line_num >= start {
+            match result {
+                Ok(text) => lines.push(json!({
+                    "line": line_num,
+                    "text": text,
+                    "highlight": line_num == target,
+                })),
+                Err(_) => break,
+            }
+        }
+    }
+
+    let language = detect_language(path);
+
+    Ok(json!({
+        "lines": lines,
+        "language": language,
+        "target_line": target,
+        "file_path": file_path,
+    }))
+}
+
 /// Open a path in an external application (Cursor, VS Code, Finder, Terminal).
 #[tauri::command]
 pub async fn open_in_app(app_name: String, path: String) -> Result<Value, String> {
