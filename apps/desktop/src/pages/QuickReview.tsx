@@ -19,6 +19,7 @@ import {
   CheckSquare2,
   Undo2,
   FileCode,
+  RefreshCw,
 } from "lucide-react";
 import {
   isTauriAvailable,
@@ -140,6 +141,9 @@ export default function QuickReview() {
   const [result, setResult] = useState<CliReviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Whether the current view-mode review has a known repo path (for enabling fix)
+  const [viewHasRepoPath, setViewHasRepoPath] = useState(true);
+
   // Past reviews
   const [pastReviews, setPastReviews] = useState<LocalReviewRow[]>([]);
   const [showHistory, setShowHistory] = useState(true);
@@ -231,6 +235,7 @@ export default function QuickReview() {
         diff_range: review.source_label ?? "",
         findings_count: findings.length,
       });
+      setViewHasRepoPath(!!review.repo_path);
       if (review.repo_path) setRepoPath(review.repo_path);
       setMode("view");
     } catch (e) {
@@ -315,6 +320,7 @@ export default function QuickReview() {
       );
       setResult(res);
       setMode("view");
+      setViewHasRepoPath(true);
       setSelectedFindings(new Set());
     } catch (e) {
       const msg = String(e);
@@ -414,6 +420,16 @@ export default function QuickReview() {
       setError(`Revert failed: ${String(e)}`);
     }
   }, [repoPath, fixResult]);
+
+  const handleReReview = useCallback(() => {
+    setFixResult(null);
+    setSelectedFindings(new Set());
+    setSelectedFindingIdx(null);
+    setCodeLines([]);
+    setCodeFilePath("");
+    setCodeLanguage("");
+    handleReview();
+  }, [handleReview]);
 
   // ─── Finding click → load code ──────────────────────────────────────────
 
@@ -539,6 +555,11 @@ export default function QuickReview() {
                             {finding.line != null && <span>:{finding.line}</span>}
                           </div>
                         )}
+                        {finding.suggestion && (
+                          <p className="mt-1 line-clamp-1 text-[10px] text-amber-400/50 italic">
+                            {finding.suggestion}
+                          </p>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -550,10 +571,35 @@ export default function QuickReview() {
             <div className="shrink-0 border-t border-[#1a1a1a] bg-[#0a0a0a] px-3 py-2">
               <div className="flex items-center gap-2">
                 <ScoreBadge score={Math.round(result.score)} size="sm" />
-                <span className="text-[10px] text-slate-600">
-                  {sortedFindings.length} finding{sortedFindings.length !== 1 ? "s" : ""}
-                  {result.duration_ms > 0 && ` · ${formatDuration(result.duration_ms)}`}
-                  {` · ${result.agent}`}
+                <span className="flex items-center gap-1 text-[10px] text-slate-600">
+                  {(() => {
+                    const counts: Record<string, number> = {};
+                    for (const f of sortedFindings) {
+                      counts[f.severity] = (counts[f.severity] ?? 0) + 1;
+                    }
+                    const severityColorInline: Record<string, string> = {
+                      critical: "text-red-400",
+                      high: "text-orange-400",
+                      medium: "text-yellow-400",
+                      warning: "text-yellow-400",
+                      low: "text-blue-400",
+                      suggestion: "text-cyan-400",
+                      info: "text-slate-400",
+                    };
+                    const parts = Object.entries(counts)
+                      .sort(([a], [b]) => (severityOrder[a] ?? 99) - (severityOrder[b] ?? 99));
+                    if (parts.length === 0) return "0 findings";
+                    return parts.map(([sev, count], i) => (
+                      <span key={sev}>
+                        {i > 0 && <span className="text-slate-700"> · </span>}
+                        <span className={severityColorInline[sev] ?? "text-slate-400"}>{count} {sev}</span>
+                      </span>
+                    ));
+                  })()}
+                  {result.duration_ms > 0 && <span className="text-slate-700"> · </span>}
+                  {result.duration_ms > 0 && formatDuration(result.duration_ms)}
+                  <span className="text-slate-700"> · </span>
+                  {result.agent}
                 </span>
                 <div className="ml-auto flex items-center gap-2">
                   <button
@@ -567,21 +613,28 @@ export default function QuickReview() {
                     )}
                     All
                   </button>
-                  <Button
-                    size="sm"
-                    onClick={handleFixSelected}
-                    disabled={isFixing !== null || selectedFindings.size === 0}
-                    className="gap-1.5 bg-amber-600 text-xs text-white hover:bg-amber-500 disabled:opacity-50"
-                  >
-                    {isFixing === "selected" ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <Zap size={14} />
+                  <div className="relative group">
+                    <Button
+                      size="sm"
+                      onClick={handleFixSelected}
+                      disabled={isFixing !== null || selectedFindings.size === 0 || !viewHasRepoPath}
+                      className="gap-1.5 bg-amber-600 text-xs text-white hover:bg-amber-500 disabled:opacity-50"
+                    >
+                      {isFixing === "selected" ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Zap size={14} />
+                      )}
+                      {isFixing === "selected"
+                        ? "Fixing..."
+                        : `Fix${selectedFindings.size > 0 ? ` (${selectedFindings.size})` : ""}`}
+                    </Button>
+                    {!viewHasRepoPath && (
+                      <div className="absolute bottom-full right-0 mb-1.5 hidden group-hover:block whitespace-nowrap rounded bg-[#1a1a1a] px-2 py-1 text-[10px] text-slate-400 shadow-lg border border-[#2a2a2a]">
+                        No repo path — can't apply fixes
+                      </div>
                     )}
-                    {isFixing === "selected"
-                      ? "Fixing..."
-                      : `Fix${selectedFindings.size > 0 ? ` (${selectedFindings.size})` : ""}`}
-                  </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -606,15 +659,31 @@ export default function QuickReview() {
                       {fixResult.changed_files.length} file{fixResult.changed_files.length !== 1 ? "s" : ""} changed
                     </Badge>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={handleRevertAll}
-                    className="gap-1 text-[11px] text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                  >
-                    <Undo2 size={12} />
-                    Revert All
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleReReview}
+                      disabled={isReviewing || !repoPath || !diffRange}
+                      className="gap-1 text-[11px] text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 disabled:opacity-50"
+                    >
+                      {isReviewing ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <RefreshCw size={12} />
+                      )}
+                      Re-review
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleRevertAll}
+                      className="gap-1 text-[11px] text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                    >
+                      <Undo2 size={12} />
+                      Revert All
+                    </Button>
+                  </div>
                 </div>
                 {/* Changed files list */}
                 <div className="shrink-0 border-b border-[#1a1a1a]">
