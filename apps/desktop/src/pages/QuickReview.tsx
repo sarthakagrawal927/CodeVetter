@@ -422,6 +422,19 @@ export default function QuickReview() {
   if (mode === "view" && result) {
     return (
       <div className="flex h-full flex-col">
+        {/* Top bar: just back button */}
+        <div className="shrink-0 border-b border-[#1a1a1a] px-2 py-1.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1 text-slate-500 hover:text-slate-100"
+            onClick={handleNewReview}
+          >
+            <ArrowLeft size={14} />
+            Back
+          </Button>
+        </div>
+
         {/* Error banner */}
         {error && (
           <div className="shrink-0 bg-red-500/10 px-4 py-2 text-xs text-red-400">
@@ -504,15 +517,6 @@ export default function QuickReview() {
             {/* Sticky bottom bar: back, score, select all, fix */}
             <div className="shrink-0 border-t border-[#1a1a1a] bg-[#0a0a0a] px-3 py-2">
               <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="gap-1 text-slate-500 hover:text-slate-100"
-                  onClick={handleNewReview}
-                >
-                  <ArrowLeft size={14} />
-                  Back
-                </Button>
                 <ScoreBadge score={Math.round(result.score)} size="sm" />
                 <span className="text-[10px] text-slate-600">
                   {sortedFindings.length} finding{sortedFindings.length !== 1 ? "s" : ""}
