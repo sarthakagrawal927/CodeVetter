@@ -1,9 +1,29 @@
 use crate::db::queries::{self, LocalReviewInput, ActivityInput};
+use crate::talk;
 use crate::DbState;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::process::Command as StdCommand;
-use tauri::{Emitter, State};
+use tauri::{Emitter, Manager, State};
+
+/// Look up the latest talk for this project and prepend it as context if fresh enough.
+fn maybe_prepend_talk_context(
+    conn: &rusqlite::Connection,
+    project_path: &str,
+    prompt: &str,
+) -> String {
+    if let Ok(Some(t)) = queries::get_latest_talk_for_project(conn, project_path) {
+        // Check staleness
+        if let Ok(created) = chrono::DateTime::parse_from_rfc3339(&t.created_at) {
+            let age = chrono::Utc::now().signed_duration_since(created);
+            if age.num_seconds() <= talk::STALENESS_SECS {
+                let context = talk::render_talk_for_prompt(&t);
+                return format!("{context}\n\n{prompt}");
+            }
+        }
+    }
+    prompt.to_string()
+}
 
 /// Finding shape received from the frontend (review-core running in webview).
 #[derive(Debug, Deserialize)]
@@ -225,14 +245,14 @@ pub async fn run_cli_review(
     }
 
     // 3. Build the review prompt
-    let prompt = format!(
+    let base_prompt = format!(
         r#"You are a senior code reviewer. Review the following diff and return ONLY valid JSON (no markdown fences, no extra text).
 
 Project: {project_description}
 Change: {change_description}
 
 Return this exact JSON shape:
-{{"findings":[{{"severity":"critical|high|medium|low","title":"...","summary":"...","suggestion":"...","filePath":"...","line":42,"confidence":0.9}}],"score":75,"summary":"Overall assessment"}}
+{{"findings":[{{"severity":"critical|high|medium|low","title":"...","summary":"...","suggestion":"...","filePath":"...","line":42,"confidence":0.9}}],"score":75,"summary":"Overall assessment","talk":{{"files_read":["src/file.ts"],"files_modified":[],"actions_summary":"What you reviewed and found","unfinished_work":null,"key_decisions":"Important observations about the code","recommended_next_steps":"What should happen next"}}}}
 
 Rules:
 - severity must be one of: critical, high, medium, low
@@ -241,10 +261,19 @@ Rules:
 - filePath should be relative to repo root
 - score is 0-100 (100 = perfect)
 - Be specific and actionable
+- The "talk" object captures context for agent handover — fill it in based on your review
 
 Diff:
 {diff_text}"#
     );
+
+    // Inject previous talk context if available
+    let prompt = {{
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        let p = maybe_prepend_talk_context(&conn, &repo_path, &base_prompt);
+        drop(conn);
+        p
+    }};
 
     // 4. Spawn the CLI agent
     let cli_cmd = match agent.as_str() {
@@ -404,7 +433,22 @@ Diff:
 
     let duration_ms = start_time.elapsed().as_millis() as u64;
 
-    // 10. Return result
+    // 10. Capture talk for handover
+    let talk_input = talk::build_talk_from_review(
+        &agent,
+        &repo_path,
+        &base_prompt,
+        &raw_output,
+        &parsed,
+        Some(&review_id),
+        Some(duration_ms as i64),
+        None,
+    );
+    let talk_id = queries::insert_agent_talk(&conn, &talk_input)
+        .map_err(|e| log::warn!("Failed to save talk: {e}"))
+        .ok();
+
+    // 11. Return result
     Ok(json!({
         "review_id": review_id,
         "score": score,
@@ -414,6 +458,7 @@ Diff:
         "duration_ms": duration_ms,
         "diff_range": diff_range,
         "findings_count": findings_val.len(),
+        "talk_id": talk_id,
     }))
 }
 
@@ -518,9 +563,20 @@ pub async fn fix_findings(
         }
     }
 
-    let prompt = format!(
+    let base_fix_prompt = format!(
         "Fix the following code review issues by editing the files directly. Use your tools to read and write the actual source files. Do NOT just describe the changes — actually make the edits. Make the minimal changes needed. Do not refactor unrelated code.\n{issues}"
     );
+
+    // Inject previous talk context if available
+    let prompt = {
+        let db_state = app.state::<DbState>();
+        let result = if let Ok(conn) = db_state.0.lock() {
+            maybe_prepend_talk_context(&conn, &repo_path, &base_fix_prompt)
+        } else {
+            base_fix_prompt.clone()
+        };
+        result
+    };
 
     let cli_cmd = match agent.as_str() {
         "gemini" => "gemini",
@@ -632,6 +688,28 @@ pub async fn fix_findings(
         result["using_worktree"] = json!(true);
     } else {
         result["using_worktree"] = json!(false);
+    }
+
+    // Capture talk for handover
+    let modified_paths: Vec<String> = changed_files
+        .iter()
+        .filter_map(|f| f.get("path").and_then(|p| p.as_str()).map(String::from))
+        .collect();
+    let talk_input = talk::build_talk_from_fix(
+        &agent,
+        &repo_path,
+        &base_fix_prompt,
+        &agent_output,
+        &modified_paths,
+        None,
+        Some(duration_ms as i64),
+        Some(0),
+        None,
+    );
+    if let Ok(db_conn) = app.state::<DbState>().0.lock() {
+        if let Ok(tid) = queries::insert_agent_talk(&db_conn, &talk_input) {
+            result["talk_id"] = json!(tid);
+        }
     }
 
     Ok(result)

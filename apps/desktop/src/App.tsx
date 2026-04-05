@@ -9,10 +9,6 @@ import { getPreference, isTauriAvailable } from "@/lib/tauri-ipc";
 
 // Pages
 import Home from "@/pages/Home";
-import Sessions from "@/pages/Sessions";
-import Agents from "@/pages/Agents";
-import Workspaces from "@/pages/Workspaces";
-
 import QuickReview from "@/pages/QuickReview";
 import Settings from "@/pages/Settings";
 
@@ -131,10 +127,6 @@ export default function App() {
     <Routes>
       <Route element={<Shell />}>
         <Route path="/" element={<Home />} />
-        <Route path="/workspaces" element={<Workspaces />} />
-        <Route path="/history" element={<Sessions />} />
-
-        <Route path="/board" element={<Agents />} />
         <Route path="/review" element={<QuickReview />} />
         <Route path="/settings" element={<Settings />} />
       </Route>

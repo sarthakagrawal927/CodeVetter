@@ -14,7 +14,7 @@ This document covers every configurable setting across the CodeVetter monorepo.
 | `GITHUB_CLIENT_ID` | Yes (OAuth) | — | GitHub OAuth App client ID. Required for user login. |
 | `GITHUB_CLIENT_SECRET` | Yes (OAuth) | — | GitHub OAuth App client secret. Required for user login. |
 | `GITHUB_WEBHOOK_SECRET` | Yes (webhooks) | — | HMAC secret used to verify incoming GitHub webhook payloads. |
-| `SESSION_SECRET` | Yes (prod) | insecure default | Secret used to sign session tokens. Missing value logs a warning and uses an insecure fallback. |
+| `SESSION_SECRET` | Yes | — | Secret used to sign session tokens. Throws at invocation if missing. |
 | `WORKSPACE_SECRET_ENCRYPTION_KEY` | Yes (prod) | — | AES key for encrypting per-workspace AI gateway credentials at rest. |
 | `AI_GATEWAY_BASE_URL` | Yes (reviews) | — | Base URL of the AI inference gateway (e.g. `https://openrouter.ai/api/v1`). Without it, review jobs are skipped. |
 | `AI_GATEWAY_API_KEY` | Yes (reviews) | — | API key for the AI inference gateway. Without it, review jobs are skipped. |
@@ -231,7 +231,7 @@ Flat ESLint config applied to all `*.ts` / `*.tsx` files via `lint-staged` on pr
 
 | Setting | Degraded behaviour |
 |---|---|
-| `SESSION_SECRET` | Logs warning; uses insecure session default |
+| `SESSION_SECRET` | Logs warning at startup; throws when a session route is invoked |
 | `GITHUB_WEBHOOK_SECRET` | Logs warning; webhook signature validation is skipped |
 | `AI_GATEWAY_BASE_URL` / `AI_GATEWAY_API_KEY` | Logs warning; review jobs are skipped |
 | `GITHUB_APP_ID` / `GITHUB_APP_PRIVATE_KEY` | Logs warning; cannot post PR review comments |

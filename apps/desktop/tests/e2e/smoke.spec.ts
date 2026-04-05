@@ -24,43 +24,20 @@ test.describe("Smoke tests", () => {
     await navigateTo(page, "/");
     await waitForNoSpinners(page);
 
-    // Home page heading
     await expect(page.locator("h1", { hasText: "Overview" })).toBeVisible();
   });
 
-  test("Board page loads without errors", async ({ page }) => {
-    await navigateTo(page, "/board");
+  test("Review page loads without errors", async ({ page }) => {
+    await navigateTo(page, "/review");
     await waitForNoSpinners(page);
 
-    // Board has the "Agent Squad" sidebar heading
-    await expect(
-      page.locator("h2", { hasText: "Agent Squad" })
-    ).toBeVisible();
-  });
-
-  test("History page loads without errors", async ({ page }) => {
-    await navigateTo(page, "/history");
-    await waitForNoSpinners(page);
-
-    // History page heading
-    await expect(page.locator("h1", { hasText: "History" })).toBeVisible();
-  });
-
-  test("Workspaces page loads without errors", async ({ page }) => {
-    await navigateTo(page, "/workspaces");
-    await waitForNoSpinners(page);
-
-    // Workspaces page heading
-    await expect(
-      page.locator("h1", { hasText: "Workspaces" })
-    ).toBeVisible();
+    await expect(page.locator("h1", { hasText: "Review" })).toBeVisible();
   });
 
   test("Settings page loads without errors", async ({ page }) => {
     await navigateTo(page, "/settings");
     await waitForNoSpinners(page);
 
-    // Settings page has the "General" category selected by default
     await expect(page.locator("text=General").first()).toBeVisible();
   });
 
@@ -73,9 +50,9 @@ test.describe("Smoke tests", () => {
     const nav = page.locator("nav");
     await expect(nav).toBeVisible();
 
-    // All 5 nav links should be present (Home, Workspaces, Board, History, Settings)
+    // All 3 nav links should be present (Home, Review, Settings)
     const links = nav.locator("a");
-    await expect(links).toHaveCount(5);
+    await expect(links).toHaveCount(3);
   });
 
   test("Nav bar shows current page name", async ({ page }) => {
@@ -83,7 +60,6 @@ test.describe("Smoke tests", () => {
     await showNavBar(page);
 
     const nav = page.locator("nav");
-    // The page name is in a span with class "font-medium" inside the nav
     await expect(
       nav.locator("span.font-medium", { hasText: "Settings" })
     ).toBeVisible();
@@ -92,15 +68,12 @@ test.describe("Smoke tests", () => {
   // ─── No console errors across all pages ────────────────────────────────
 
   test("No unexpected console errors on any page", async ({ page }) => {
-    const routes = ["/", "/workspaces", "/board", "/history", "/settings"];
+    const routes = ["/", "/review", "/settings"];
 
     for (const route of routes) {
       await navigateTo(page, route);
       await waitForNoSpinners(page);
-      // Give async effects time to settle
       await page.waitForTimeout(500);
     }
-
-    // consoleErrors.assertNoErrors() runs in afterEach
   });
 });

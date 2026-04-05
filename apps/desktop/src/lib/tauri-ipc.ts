@@ -1903,3 +1903,50 @@ export async function deleteAgentPersona(
 ): Promise<void> {
   await safeInvoke("delete_agent_persona", { department, id });
 }
+
+// ── Agent Talks ──────────────────────────────────────────────────
+
+export interface AgentTalk {
+  id: string;
+  agent_process_id: string | null;
+  review_id: string | null;
+  agent_type: string;
+  project_path: string;
+  role: string | null;
+  input_prompt: string;
+  input_context: string | null;
+  files_read: string | null;
+  files_modified: string | null;
+  actions_summary: string | null;
+  output_raw: string | null;
+  output_structured: string | null;
+  exit_code: number | null;
+  unfinished_work: string | null;
+  blockers: string | null;
+  key_decisions: string | null;
+  codebase_state: string | null;
+  recommended_next_steps: string | null;
+  duration_ms: number | null;
+  session_id: string | null;
+  created_at: string;
+}
+
+export async function getTalk(id: string): Promise<AgentTalk | null> {
+  return safeInvoke("get_talk", { id });
+}
+
+export async function listProjectTalks(
+  projectPath: string,
+  limit?: number
+): Promise<AgentTalk[]> {
+  return safeInvoke("list_project_talks", {
+    projectPath,
+    limit: limit ?? null,
+  });
+}
+
+export async function getLatestTalk(
+  projectPath: string
+): Promise<AgentTalk | null> {
+  return safeInvoke("get_latest_talk", { projectPath });
+}
