@@ -24,6 +24,8 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronRight,
+  GitMerge,
+  Trash2,
 } from "lucide-react";
 import {
   isTauriAvailable,
@@ -37,6 +39,8 @@ import {
   runCliReview,
   fixFindings,
   revertFiles,
+  mergeFix,
+  discardFix,
   readFileAroundLine,
 } from "@/lib/tauri-ipc";
 import type { FixFindingsResult, FixChangedFile } from "@/lib/tauri-ipc";
@@ -467,27 +471,34 @@ export default function QuickReview() {
   }, [repoPath, result, selectedFindings, sortedFindings]);
 
   const handleRevertFile = useCallback(async (filePath: string) => {
-    if (!repoPath) return;
+    if (!fixResult?.worktree_path) return;
     try {
-      await revertFiles(repoPath, [filePath]);
+      await revertFiles(fixResult.worktree_path, [filePath]);
       // Re-fetch diff to update the view
-      if (fixResult) {
-        const remaining = fixResult.changed_files.filter(f => f.path !== filePath);
-        setFixResult({ ...fixResult, changed_files: remaining });
-      }
+      const remaining = fixResult.changed_files.filter(f => f.path !== filePath);
+      setFixResult({ ...fixResult, changed_files: remaining });
     } catch (e) {
       setError(`Revert failed: ${String(e)}`);
     }
-  }, [repoPath, fixResult]);
+  }, [fixResult]);
 
-  const handleRevertAll = useCallback(async () => {
-    if (!repoPath || !fixResult) return;
-    const allFiles = fixResult.changed_files.map(f => f.path);
+  const handleMergeFix = useCallback(async () => {
+    if (!repoPath || !fixResult?.worktree_branch) return;
     try {
-      await revertFiles(repoPath, allFiles);
+      await mergeFix(repoPath, fixResult.worktree_branch, fixResult.worktree_path);
       setFixResult(null);
     } catch (e) {
-      setError(`Revert failed: ${String(e)}`);
+      setError(`Merge failed: ${String(e)}`);
+    }
+  }, [repoPath, fixResult]);
+
+  const handleDiscardFix = useCallback(async () => {
+    if (!repoPath || !fixResult?.worktree_branch) return;
+    try {
+      await discardFix(repoPath, fixResult.worktree_branch, fixResult.worktree_path);
+      setFixResult(null);
+    } catch (e) {
+      setError(`Discard failed: ${String(e)}`);
     }
   }, [repoPath, fixResult]);
 
@@ -869,11 +880,20 @@ export default function QuickReview() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={handleRevertAll}
+                        onClick={handleMergeFix}
+                        className="gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+                      >
+                        <GitMerge size={12} />
+                        Merge
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleDiscardFix}
                         className="gap-1 text-[11px] text-red-400 hover:text-red-300 hover:bg-red-500/10"
                       >
-                        <Undo2 size={12} />
-                        Revert All
+                        <Trash2 size={12} />
+                        Discard
                       </Button>
                       <Button
                         size="sm"

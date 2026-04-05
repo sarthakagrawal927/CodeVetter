@@ -397,6 +397,8 @@ export interface FixFindingsResult {
   diff: string;
   changed_files: FixChangedFile[];
   agent_output: string;
+  worktree_path: string;
+  worktree_branch: string;
 }
 
 export interface RevertFilesResult {
@@ -440,6 +442,22 @@ export async function revertFiles(
     repoPath,
     files,
   });
+}
+
+export async function mergeFix(
+  repoPath: string,
+  worktreeBranch: string,
+  worktreePath: string,
+): Promise<{ success: boolean; merged: boolean }> {
+  return safeInvoke("merge_fix", { repoPath, worktreeBranch, worktreePath });
+}
+
+export async function discardFix(
+  repoPath: string,
+  worktreeBranch: string,
+  worktreePath: string,
+): Promise<{ success: boolean; discarded: boolean }> {
+  return safeInvoke("discard_fix", { repoPath, worktreeBranch, worktreePath });
 }
 
 // ─── Session Commands ────────────────────────────────────────────────────────

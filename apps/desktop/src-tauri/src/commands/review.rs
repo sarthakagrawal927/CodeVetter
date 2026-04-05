@@ -417,8 +417,69 @@ Diff:
     }))
 }
 
+/// Create a git worktree for running fixes in isolation.
+/// Returns `(worktree_path, branch_name)` on success, or `None` to fall back to the main repo.
+fn create_fix_worktree(repo_path: &str) -> Option<(String, String)> {
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let branch_name = format!("codevetter/fix-{timestamp}");
+    let worktree_dir = format!("{repo_path}/.codevetter-worktrees/{branch_name}");
+
+    // Ensure the parent directory exists
+    let parent = std::path::Path::new(&worktree_dir).parent()?;
+    std::fs::create_dir_all(parent).ok()?;
+
+    // Add .codevetter-worktrees to git's local exclude (not .gitignore)
+    let exclude_path = format!("{repo_path}/.git/info/exclude");
+    let exclude_entry = ".codevetter-worktrees";
+    if let Ok(contents) = std::fs::read_to_string(&exclude_path) {
+        if !contents.lines().any(|l| l.trim() == exclude_entry) {
+            let mut new_contents = contents;
+            if !new_contents.ends_with('\n') {
+                new_contents.push('\n');
+            }
+            new_contents.push_str(exclude_entry);
+            new_contents.push('\n');
+            let _ = std::fs::write(&exclude_path, new_contents);
+        }
+    } else {
+        // exclude file doesn't exist or can't be read — try to create it
+        let _ = std::fs::create_dir_all(format!("{repo_path}/.git/info"));
+        let _ = std::fs::write(&exclude_path, format!("{exclude_entry}\n"));
+    }
+
+    // Create branch from HEAD
+    let branch_output = StdCommand::new("git")
+        .args(["branch", &branch_name])
+        .current_dir(repo_path)
+        .output()
+        .ok()?;
+    if !branch_output.status.success() {
+        return None;
+    }
+
+    // Create worktree
+    let wt_output = StdCommand::new("git")
+        .args(["worktree", "add", &worktree_dir, &branch_name])
+        .current_dir(repo_path)
+        .output()
+        .ok()?;
+    if !wt_output.status.success() {
+        // Clean up the branch we created
+        let _ = StdCommand::new("git")
+            .args(["branch", "-D", &branch_name])
+            .current_dir(repo_path)
+            .output();
+        return None;
+    }
+
+    Some((worktree_dir, branch_name))
+}
+
 /// Fix one or more review findings by sending them to a CLI agent.
-/// Runs the agent in the repo directory with a prompt describing the issues to fix.
+/// Creates a git worktree so fixes happen in isolation (not in the user's working directory).
 #[tauri::command]
 pub async fn fix_findings(
     app: tauri::AppHandle,
@@ -428,6 +489,13 @@ pub async fn fix_findings(
 ) -> Result<Value, String> {
     let agent = agent.unwrap_or_else(|| "claude".to_string());
     let start_time = std::time::Instant::now();
+
+    // Try to create a worktree for isolated fixes; fall back to main repo on failure
+    let worktree_info = create_fix_worktree(&repo_path);
+    let (work_dir, _using_worktree) = match &worktree_info {
+        Some((wt_path, _)) => (wt_path.clone(), true),
+        None => (repo_path.clone(), false),
+    };
 
     // Build fix prompt
     let mut issues = String::new();
@@ -461,11 +529,11 @@ pub async fn fix_findings(
 
     // Spawn in a blocking thread so we don't block the Tauri event loop
     let app_handle = app.clone();
-    let repo_path_clone = repo_path.clone();
+    let work_dir_clone = work_dir.clone();
     let (stdout, _success, duration_ms) = tokio::task::spawn_blocking(move || {
         let mut child = StdCommand::new(cli_cmd)
             .args(["-p", &prompt])
-            .current_dir(&repo_path_clone)
+            .current_dir(&work_dir_clone)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .spawn()
@@ -505,10 +573,10 @@ pub async fn fix_findings(
     .await
     .map_err(|e| format!("Task join error: {e}"))??;
 
-    // Get the git diff to show what changed
+    // Get the git diff to show what changed (compare against HEAD in worktree)
     let diff_output = StdCommand::new("git")
-        .args(["diff"])
-        .current_dir(&repo_path)
+        .args(["diff", "HEAD"])
+        .current_dir(&work_dir)
         .output()
         .ok();
 
@@ -519,8 +587,8 @@ pub async fn fix_findings(
 
     // Get list of changed files
     let changed_output = StdCommand::new("git")
-        .args(["diff", "--name-status"])
-        .current_dir(&repo_path)
+        .args(["diff", "HEAD", "--name-status"])
+        .current_dir(&work_dir)
         .output()
         .ok();
 
@@ -546,7 +614,7 @@ pub async fn fix_findings(
         stdout
     };
 
-    Ok(json!({
+    let mut result = json!({
         "success": true,
         "agent": agent,
         "duration_ms": duration_ms,
@@ -555,6 +623,113 @@ pub async fn fix_findings(
         "diff": diff_text,
         "changed_files": changed_files,
         "agent_output": agent_output,
+    });
+
+    // Add worktree info if we used one
+    if let Some((wt_path, branch)) = &worktree_info {
+        result["worktree_path"] = json!(wt_path);
+        result["worktree_branch"] = json!(branch);
+        result["using_worktree"] = json!(true);
+    } else {
+        result["using_worktree"] = json!(false);
+    }
+
+    Ok(result)
+}
+
+/// Merge fixes from a worktree branch back into the main repo.
+/// Commits changes in the worktree, merges the branch, then cleans up.
+#[tauri::command]
+pub async fn merge_fix(
+    repo_path: String,
+    worktree_branch: String,
+    worktree_path: String,
+) -> Result<Value, String> {
+    // 1. Commit all changes in the worktree
+    let add_output = StdCommand::new("git")
+        .args(["add", "-A"])
+        .current_dir(&worktree_path)
+        .output()
+        .map_err(|e| format!("Failed to stage changes: {e}"))?;
+    if !add_output.status.success() {
+        let stderr = String::from_utf8_lossy(&add_output.stderr);
+        return Err(format!("git add failed: {stderr}"));
+    }
+
+    let commit_output = StdCommand::new("git")
+        .args(["commit", "-m", "fix: resolve code review findings"])
+        .current_dir(&worktree_path)
+        .output()
+        .map_err(|e| format!("Failed to commit: {e}"))?;
+    if !commit_output.status.success() {
+        let stderr = String::from_utf8_lossy(&commit_output.stderr);
+        // If there's nothing to commit, that's okay — the agent may not have changed anything
+        if !stderr.contains("nothing to commit") {
+            return Err(format!("git commit failed: {stderr}"));
+        }
+    }
+
+    // 2. Merge the branch into the main repo
+    let merge_output = StdCommand::new("git")
+        .args(["merge", &worktree_branch, "--no-ff", "-m", "fix: merge code review fixes"])
+        .current_dir(&repo_path)
+        .output()
+        .map_err(|e| format!("Failed to merge: {e}"))?;
+    if !merge_output.status.success() {
+        let stderr = String::from_utf8_lossy(&merge_output.stderr);
+        return Err(format!("git merge failed: {stderr}"));
+    }
+
+    // 3. Remove the worktree
+    let _ = StdCommand::new("git")
+        .args(["worktree", "remove", &worktree_path, "--force"])
+        .current_dir(&repo_path)
+        .output();
+
+    // 4. Delete the branch
+    let _ = StdCommand::new("git")
+        .args(["branch", "-D", &worktree_branch])
+        .current_dir(&repo_path)
+        .output();
+
+    Ok(json!({
+        "success": true,
+        "merged": true,
+    }))
+}
+
+/// Discard fixes by removing the worktree and deleting the branch.
+#[tauri::command]
+pub async fn discard_fix(
+    repo_path: String,
+    worktree_branch: String,
+    worktree_path: String,
+) -> Result<Value, String> {
+    // 1. Remove the worktree
+    let wt_output = StdCommand::new("git")
+        .args(["worktree", "remove", &worktree_path, "--force"])
+        .current_dir(&repo_path)
+        .output()
+        .map_err(|e| format!("Failed to remove worktree: {e}"))?;
+    if !wt_output.status.success() {
+        let stderr = String::from_utf8_lossy(&wt_output.stderr);
+        return Err(format!("git worktree remove failed: {stderr}"));
+    }
+
+    // 2. Delete the branch
+    let branch_output = StdCommand::new("git")
+        .args(["branch", "-D", &worktree_branch])
+        .current_dir(&repo_path)
+        .output()
+        .map_err(|e| format!("Failed to delete branch: {e}"))?;
+    if !branch_output.status.success() {
+        let stderr = String::from_utf8_lossy(&branch_output.stderr);
+        return Err(format!("git branch -D failed: {stderr}"));
+    }
+
+    Ok(json!({
+        "success": true,
+        "discarded": true,
     }))
 }
 
