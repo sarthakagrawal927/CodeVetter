@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
 import SessionCard from "@/components/session-card";
 import ScoreBadge from "@/components/score-badge";
@@ -10,7 +9,6 @@ import {
   getIndexStats,
   listSessions,
   listReviews,
-  listAgents,
   triggerIndex,
   getPreference,
   listProviderAccounts,
@@ -25,7 +23,6 @@ import type {
   IndexStats,
   SessionRow,
   LocalReviewRow,
-  AgentProcess,
   TriggerIndexResult,
   ProviderAccount,
   AccountUsage,
@@ -360,7 +357,6 @@ let _cachedDashboard: {
   stats: IndexStats | null;
   sessions: SessionRow[];
   reviews: LocalReviewRow[];
-  agents: AgentProcess[];
   accounts: ProviderAccount[];
   usages: Record<string, AccountUsage>;
   liveUsages: Record<string, LiveUsageResult>;
@@ -370,14 +366,12 @@ let _cachedDashboard: {
 const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes
 
 export default function Home() {
-  const navigate = useNavigate();
   const isInitialLoad = useRef(true);
 
   // Data state — initialize from cache if available
   const [stats, setStats] = useState<IndexStats | null>(_cachedDashboard?.stats ?? null);
   const [recentSessions, setRecentSessions] = useState<SessionRow[]>(_cachedDashboard?.sessions ?? []);
   const [recentReviews, setRecentReviews] = useState<LocalReviewRow[]>(_cachedDashboard?.reviews ?? []);
-  const [activeAgents, setActiveAgents] = useState<AgentProcess[]>(_cachedDashboard?.agents ?? []);
   const [accounts, setAccounts] = useState<ProviderAccount[]>(_cachedDashboard?.accounts ?? []);
   const [accountUsages, setAccountUsages] = useState<Record<string, AccountUsage>>(_cachedDashboard?.usages ?? {});
   const [liveUsages, setLiveUsages] = useState<Record<string, LiveUsageResult>>(_cachedDashboard?.liveUsages ?? {});
@@ -402,12 +396,11 @@ export default function Home() {
 
     try {
       // Fire all requests in parallel
-      const [statsResult, sessionsResult, reviewsResult, agentsResult, accountsResult] =
+      const [statsResult, sessionsResult, reviewsResult, accountsResult] =
         await Promise.allSettled([
           getIndexStats(),
           listSessions(undefined, undefined, 4, 0),
           listReviews(4, 0),
-          listAgents(),
           listProviderAccounts(),
         ]);
 
@@ -419,9 +412,6 @@ export default function Home() {
       }
       if (reviewsResult.status === "fulfilled") {
         setRecentReviews(reviewsResult.value);
-      }
-      if (agentsResult.status === "fulfilled") {
-        setActiveAgents(agentsResult.value);
       }
 
       // Load accounts — auto-detect if none exist
@@ -460,7 +450,6 @@ export default function Home() {
         statsResult,
         sessionsResult,
         reviewsResult,
-        agentsResult,
       ].every((r) => r.status === "rejected");
       if (allFailed && statsResult.status === "rejected") {
         const msg =
@@ -490,13 +479,12 @@ export default function Home() {
       stats,
       sessions: recentSessions,
       reviews: recentReviews,
-      agents: activeAgents,
       accounts,
       usages: accountUsages,
       liveUsages,
       fetchedAt: Date.now(),
     };
-  }, [loading, stats, recentSessions, recentReviews, activeAgents, accounts, accountUsages, liveUsages]);
+  }, [loading, stats, recentSessions, recentReviews, accounts, accountUsages, liveUsages]);
 
   // Refresh without showing loading spinners (for background event updates)
   const refreshDashboard = useCallback(() => {
@@ -589,7 +577,6 @@ export default function Home() {
 
   // ─── Computed values ───────────────────────────────────────────────────
 
-  const runningAgents = activeAgents.filter((a) => a.status === "running");
   const completedReviews = recentReviews.filter(
     (r) => r.status === "completed"
   );
@@ -647,11 +634,6 @@ export default function Home() {
       {/* Stats strip */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {[
-          {
-            label: "Active Agents",
-            value: loading ? "--" : String(runningAgents.length),
-            color: "text-amber-400",
-          },
           {
             label: "Reviews",
             value: loading ? "--" : String(completedReviews.length),
@@ -819,9 +801,7 @@ export default function Home() {
             <h2 className="text-[13px] font-medium text-slate-300">
               Recent Sessions
             </h2>
-            <Button variant="link" size="sm" className="h-auto px-0 py-0 text-[11px] text-slate-500 hover:text-slate-300" asChild>
-              <Link to="/history">View all</Link>
-            </Button>
+            <span className="text-[11px] text-slate-600">Recent</span>
           </div>
           {loading ? (
             <div className="flex items-center justify-center py-8">
@@ -863,7 +843,6 @@ export default function Home() {
                 <div key={session.id} className="border-b border-[#1a1a1a]/50 last:border-b-0">
                   <SessionCard
                     session={session}
-                    onClick={() => navigate(`/sessions?id=${session.id}`)}
                   />
                 </div>
               ))}
@@ -876,7 +855,7 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <h2 className="text-[13px] font-medium text-slate-300">Reviews</h2>
             <Button variant="link" size="sm" className="h-auto px-0 py-0 text-[11px] text-slate-500 hover:text-slate-300" asChild>
-              <Link to="/board">New review</Link>
+              <Link to="/review">New review</Link>
             </Button>
           </div>
           {loading ? (
@@ -905,7 +884,7 @@ export default function Home() {
             <Card className="flex flex-col items-center justify-center py-8 border-[#1a1a1a]">
               <p className="text-[11px] text-slate-600">No reviews yet</p>
               <Button variant="link" size="sm" className="mt-1 h-auto px-0 py-0 text-[11px] text-slate-500 hover:text-slate-300" asChild>
-                <Link to="/board">Start a review</Link>
+                <Link to="/review">Start a review</Link>
               </Button>
             </Card>
           ) : (
@@ -940,84 +919,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Active Agents strip */}
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[13px] font-medium text-slate-300">
-            Agents
-          </h2>
-          <Button variant="link" size="sm" className="h-auto px-0 py-0 text-[11px] text-slate-500 hover:text-slate-300" asChild>
-            <Link to="/board">Mission Control</Link>
-          </Button>
-        </div>
-        <Card className="border-[#1a1a1a] overflow-hidden">
-          {loading ? (
-            <div className="flex items-center justify-center py-6">
-              <svg
-                className="h-4 w-4 animate-spin text-slate-500"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                />
-              </svg>
-            </div>
-          ) : (
-            <>
-              {activeAgents.map((agent) => (
-                <div
-                  key={agent.id}
-                  className="flex items-center gap-3 px-3 py-2 border-b border-[#1a1a1a]/50 last:border-b-0 transition-colors hover:bg-[#111111] min-w-0 overflow-hidden"
-                >
-                  <span
-                    className={`h-2 w-2 shrink-0 rounded-full ${
-                      agent.status === "running"
-                        ? "bg-emerald-400"
-                        : agent.status === "stopped"
-                        ? "bg-slate-600"
-                        : "bg-yellow-400"
-                    }`}
-                  />
-                  <span className="text-[13px] font-medium text-slate-200 capitalize truncate">
-                    {agent.display_name || agent.role || "Agent"}
-                  </span>
-                  <span className="text-[11px] text-slate-600 uppercase shrink-0">
-                    {agent.agent_type}
-                  </span>
-                  <span className="flex-1" />
-                  <span className="text-[11px] text-slate-500 truncate max-w-[160px] font-mono">
-                    {agent.project_path?.split("/").pop() || ""}
-                  </span>
-                  {showCosts && agent.estimated_cost_usd > 0 && (
-                    <span className="text-[11px] text-rose-400/70 tabular-nums">
-                      ${agent.estimated_cost_usd.toFixed(2)}
-                    </span>
-                  )}
-                </div>
-              ))}
-
-              <Link
-                to="/board"
-                className="flex items-center gap-2 px-3 py-2 text-slate-600 transition-colors hover:bg-[#111111] hover:text-slate-400"
-              >
-                <span className="text-sm">+</span>
-                <span className="text-[11px] font-medium">Launch Agent</span>
-              </Link>
-            </>
-          )}
-        </Card>
-      </div>
     </div>
   );
 }

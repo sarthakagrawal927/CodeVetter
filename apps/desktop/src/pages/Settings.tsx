@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 
-import CostDashboard from "@/components/cost-dashboard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -884,7 +883,7 @@ export default function Settings() {
               title="Usage"
               description="Token usage and cost breakdown across sessions."
             />
-            <CostDashboard />
+            <p className="text-sm text-slate-500 px-1">Usage data is shown on the Home page.</p>
           </div>
         );
 
