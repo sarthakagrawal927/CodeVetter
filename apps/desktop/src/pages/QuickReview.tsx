@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from "react-resizable-panels";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -180,7 +180,9 @@ export default function QuickReview() {
   const [changeDesc, setChangeDesc] = useState("");
   const [isReviewing, setIsReviewing] = useState(false);
   const [isFixing, setIsFixing] = useState<string | null>(null);
+  const [fixProgress, setFixProgress] = useState<string[]>([]);
   const [fixResult, setFixResult] = useState<FixFindingsResult | null>(null);
+  const fixLogRef = useRef<HTMLDivElement>(null);
   const [selectedFindings, setSelectedFindings] = useState<Set<number>>(new Set());
   const [result, setResult] = useState<CliReviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -430,7 +432,28 @@ export default function QuickReview() {
     if (!repoPath || !result || selectedFindings.size === 0) return;
     setIsFixing("selected");
     setFixResult(null);
+    setFixProgress([]);
     setError(null);
+
+    // Listen for streaming progress events
+    let unlisten: (() => void) | undefined;
+    try {
+      const { listen } = await import("@tauri-apps/api/event");
+      unlisten = await listen<string>("fix-progress", (event) => {
+        setFixProgress((prev) => {
+          const next = [...prev, event.payload];
+          // Keep last 50 lines
+          return next.length > 50 ? next.slice(-50) : next;
+        });
+        // Auto-scroll
+        if (fixLogRef.current) {
+          fixLogRef.current.scrollTop = fixLogRef.current.scrollHeight;
+        }
+      });
+    } catch {
+      // Event listening not available, continue without streaming
+    }
+
     try {
       const toFix = sortedFindings.filter((_, i) => selectedFindings.has(i));
       const res = await fixFindings(repoPath, toFix, result.agent);
@@ -439,6 +462,7 @@ export default function QuickReview() {
       setError(`Fix failed: ${String(e)}`);
     } finally {
       setIsFixing(null);
+      unlisten?.();
     }
   }, [repoPath, result, selectedFindings, sortedFindings]);
 
@@ -487,14 +511,17 @@ export default function QuickReview() {
   }, [repoPath, fixResult]);
 
   const handleOpenInIDE = useCallback(async () => {
-    if (!repoPath) return;
+    if (!repoPath || !isTauriAvailable()) return;
     try {
-      const { safeInvoke } = await import("@/lib/tauri-ipc");
-      await safeInvoke("open_in_app", { appName: "cursor", path: repoPath }).catch(() =>
-        safeInvoke("open_in_app", { appName: "vscode", path: repoPath })
-      );
-    } catch {
-      setError("Could not open IDE");
+      // Try Cursor first, fall back to VS Code
+      const { invoke } = await import("@tauri-apps/api/core");
+      try {
+        await invoke("open_in_app", { appName: "cursor", path: repoPath });
+      } catch {
+        await invoke("open_in_app", { appName: "vscode", path: repoPath });
+      }
+    } catch (e) {
+      setError(`Could not open IDE: ${String(e)}`);
     }
   }, [repoPath]);
 
@@ -862,10 +889,25 @@ export default function QuickReview() {
                 </div>
               </div>
             ) : isFixing ? (
-              <div className="flex h-full flex-col items-center justify-center gap-3">
-                <Loader2 size={28} className="animate-spin text-amber-400" />
-                <span className="text-sm text-slate-400">Fixing with Claude...</span>
-                <span className="text-[11px] text-slate-600">This may take a minute</span>
+              <div className="flex h-full flex-col bg-[#050505]">
+                <div className="shrink-0 border-b border-[#1a1a1a] px-4 py-2 flex items-center gap-2">
+                  <Loader2 size={14} className="animate-spin text-amber-400" />
+                  <span className="text-xs font-medium text-amber-400">Fixing with Claude...</span>
+                </div>
+                <div ref={fixLogRef} className="flex-1 overflow-y-auto p-4">
+                  {fixProgress.length > 0 ? (
+                    fixProgress.map((line, i) => (
+                      <div key={i} className="font-mono text-[11px] leading-5 text-slate-500">
+                        {line}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="flex items-center gap-2 text-slate-600 text-sm">
+                      <Loader2 size={16} className="animate-spin" />
+                      Waiting for output...
+                    </div>
+                  )}
+                </div>
               </div>
             ) : selectedFindingIdx !== null && codeFilePath ? (
               <>
