@@ -19,7 +19,7 @@ Monorepo with:
 - **Desktop**: Tauri 2 (Rust backend) + React 19 + Vite + React Router
 - **Styling**: Tailwind CSS + shadcn/ui, warm amber accent (#d4a039), dark backgrounds
 - **Web**: Next.js 15 (landing page), Hono (API worker)
-- **Database**: Local SQLite (desktop), CockroachDB/D1 (cloud)
+- **Database**: Local SQLite (desktop), Cloudflare D1 (cloud)
 - **Testing**: Vitest (unit), Playwright (e2e)
 - **Package manager**: npm workspaces
 

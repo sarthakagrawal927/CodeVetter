@@ -1,4 +1,4 @@
--- Enterprise v1 initial control plane schema (Cockroach/Postgres compatible)
+-- Enterprise v1 initial control plane schema (D1/SQLite compatible)
 
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,

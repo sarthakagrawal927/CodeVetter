@@ -29,7 +29,6 @@ database_id = "79f405dc-aefe-495b-883c-1f7623f0f0bf"
 # ── Secrets ────────────────────────────────────────────────────────────────────
 # Upload each secret once with: wrangler secret put <NAME>
 #
-#   wrangler secret put COCKROACH_DATABASE_URL
 #   wrangler secret put GITHUB_CLIENT_ID
 #   wrangler secret put GITHUB_CLIENT_SECRET
 #   wrangler secret put GITHUB_WEBHOOK_SECRET

@@ -120,7 +120,7 @@
 
 **Environment:**
 See `.env.example` for required variables:
-- Cloudflare Workers database URL (CockroachDB option)
+- Cloudflare Workers D1 database
 - GitHub OAuth (client ID, secret, webhook secret)
 - GitHub App credentials (app ID, private key)
 - Session management (secret, TTL, cookie domain)

@@ -11,7 +11,6 @@ This document covers every configurable setting across the CodeVetter monorepo.
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `COCKROACH_DATABASE_URL` | No | — | CockroachDB connection string (Postgres wire protocol). When absent the API worker falls back to an in-memory D1 adapter. |
 | `GITHUB_CLIENT_ID` | Yes (OAuth) | — | GitHub OAuth App client ID. Required for user login. |
 | `GITHUB_CLIENT_SECRET` | Yes (OAuth) | — | GitHub OAuth App client secret. Required for user login. |
 | `GITHUB_WEBHOOK_SECRET` | Yes (webhooks) | — | HMAC secret used to verify incoming GitHub webhook payloads. |
@@ -59,7 +58,6 @@ All bindings are set via `wrangler secret put` or declared as `[vars]` in `wrang
 | `GITHUB_DRIFT_CHECK_TOKEN` | No | — | GitHub token for drift-check operations. Falls back to `GITHUB_APP_INSTALLATION_TOKEN` then `GITHUB_TOKEN`. |
 | `PLATFORM_ACTION_TOKEN` | No | — | Bearer token required by internal platform-action endpoints (`/v1/actions/…`). Endpoints return `503` when unset. |
 | `DB_USE_IN_MEMORY` | No | `false` | Set to `true` to force the in-memory D1 adapter (useful for local dev without a real database). |
-| `DB_MAX_CONNECTIONS` | No | `10` | CockroachDB connection pool size. |
 
 ### `workers/review` bindings (Cloudflare Worker — review worker)
 
@@ -120,7 +118,6 @@ wrangler secret put WORKSPACE_SECRET_ENCRYPTION_KEY
 wrangler secret put GITHUB_APP_ID
 wrangler secret put GITHUB_APP_PRIVATE_KEY
 wrangler secret put PLATFORM_ACTION_TOKEN
-wrangler secret put COCKROACH_DATABASE_URL   # if using CockroachDB
 ```
 
 ### `workers/review/wrangler.toml`
@@ -238,7 +235,6 @@ Flat ESLint config applied to all `*.ts` / `*.tsx` files via `lint-staged` on pr
 | `GITHUB_WEBHOOK_SECRET` | Logs warning; webhook signature validation is skipped |
 | `AI_GATEWAY_BASE_URL` / `AI_GATEWAY_API_KEY` | Logs warning; review jobs are skipped |
 | `GITHUB_APP_ID` / `GITHUB_APP_PRIVATE_KEY` | Logs warning; cannot post PR review comments |
-| `COCKROACH_DATABASE_URL` | API worker falls back to in-memory D1 adapter |
 | `NEXT_PUBLIC_PLATFORM_API_BASE_URL` | Dashboard falls back to `http://127.0.0.1:8787` |
 | `CODEVETTER_LINEAR_CLIENT_ID` | Desktop app Linear integration is unavailable |
 
@@ -257,7 +253,6 @@ Flat ESLint config applied to all `*.ts` / `*.tsx` files via `lint-staged` on pr
 | `RATE_LIMIT_WINDOW_MS` | `60000` | `workers/api/src/index.ts` constant / `wrangler.toml` |
 | `RATE_LIMIT_MAX_REQUESTS` | `120` | `workers/api/src/index.ts` constant / `wrangler.toml` |
 | `DB_USE_IN_MEMORY` | `false` | `wrangler.toml` |
-| `DB_MAX_CONNECTIONS` | `10` | `workers/api` README |
 | `AI_GATEWAY_MODEL` | `llama-3.3-70b-versatile` (review worker `wrangler.toml`) / `auto` (code fallback) | `workers/review/wrangler.toml` / `workers/review/src/index.ts` |
 | `REVIEW_WORKER_POLL_MS` | `2000` | `workers/review/src/config.ts` |
 | `REVIEW_WORKER_MAX_ITERATIONS` | `10` | `workers/review/src/config.ts` |

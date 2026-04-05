@@ -10,12 +10,10 @@
     "@code-reviewer/ai-gateway-client": "file:../../packages/ai-gateway-client",
     "@code-reviewer/db": "file:../../packages/db",
     "@code-reviewer/shared-types": "file:../../packages/shared-types",
-    "pg": "^8.16.3",
     "web-tree-sitter": "^0.26.6"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260215.0",
-    "@types/pg": "^8.11.13",
     "wrangler": "^4.3.0"
   }
 }

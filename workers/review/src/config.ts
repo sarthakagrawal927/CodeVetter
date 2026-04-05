@@ -9,7 +9,6 @@ export type ReviewWorkerConfig = {
   indexMaxChunkLines: number;
   reviewQueueName: string;
   indexingQueueName: string;
-  cockroachDatabaseUrl: string | undefined;
   githubApiBaseUrl: string;
   githubAppId: string | undefined;
   githubAppPrivateKey: string | undefined;
@@ -30,7 +29,6 @@ export function loadReviewWorkerConfig(): ReviewWorkerConfig {
   const reviewQueueName = process.env.CF_REVIEW_QUEUE_NAME?.trim() || 'review-jobs';
   const indexingQueueName = process.env.CF_INDEXING_QUEUE_NAME?.trim() || 'indexing-jobs';
 
-  const cockroachDatabaseUrl = process.env.COCKROACH_DATABASE_URL?.trim() || undefined;
   const githubApiBaseUrl = process.env.GITHUB_API_BASE_URL?.trim() || 'https://api.github.com';
   const githubAppId = process.env.GITHUB_APP_ID?.trim() || undefined;
   const githubAppPrivateKeyRaw = process.env.GITHUB_APP_PRIVATE_KEY?.trim() || undefined;
@@ -94,7 +92,6 @@ export function loadReviewWorkerConfig(): ReviewWorkerConfig {
     indexMaxChunkLines,
     reviewQueueName,
     indexingQueueName,
-    cockroachDatabaseUrl,
     githubApiBaseUrl,
     githubAppId,
     githubAppPrivateKey,
