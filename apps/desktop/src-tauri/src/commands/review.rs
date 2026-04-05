@@ -459,46 +459,51 @@ pub async fn fix_findings(
         _ => "claude",
     };
 
-    let mut child = StdCommand::new(cli_cmd)
-        .args(["-p", &prompt])
-        .current_dir(&repo_path)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("Failed to spawn {cli_cmd}: {e}"))?;
+    // Spawn in a blocking thread so we don't block the Tauri event loop
+    let app_handle = app.clone();
+    let repo_path_clone = repo_path.clone();
+    let (stdout, _success, duration_ms) = tokio::task::spawn_blocking(move || {
+        let mut child = StdCommand::new(cli_cmd)
+            .args(["-p", &prompt])
+            .current_dir(&repo_path_clone)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("Failed to spawn {cli_cmd}: {e}"))?;
 
-    // Read stdout line-by-line, emit events for live progress
-    let mut stdout_text = String::new();
-    if let Some(stdout_pipe) = child.stdout.take() {
-        use std::io::BufRead;
-        let reader = std::io::BufReader::new(stdout_pipe);
-        for line in reader.lines() {
-            match line {
-                Ok(l) => {
-                    // Emit progress event to frontend
-                    let _ = app.emit("fix-progress", &l);
-                    stdout_text.push_str(&l);
-                    stdout_text.push('\n');
+        let mut stdout_text = String::new();
+        if let Some(stdout_pipe) = child.stdout.take() {
+            use std::io::BufRead;
+            let reader = std::io::BufReader::new(stdout_pipe);
+            for line in reader.lines() {
+                match line {
+                    Ok(l) => {
+                        let _ = app_handle.emit("fix-progress", &l);
+                        stdout_text.push_str(&l);
+                        stdout_text.push('\n');
+                    }
+                    Err(_) => break,
                 }
-                Err(_) => break,
             }
         }
-    }
 
-    let status = child.wait().map_err(|e| format!("Process wait failed: {e}"))?;
-    let duration_ms = start_time.elapsed().as_millis() as u64;
+        let status = child.wait().map_err(|e| format!("Process wait failed: {e}"))?;
+        let elapsed = start_time.elapsed().as_millis() as u64;
 
-    if !status.success() {
-        let stderr_text = child.stderr.map(|mut s| {
-            let mut buf = String::new();
-            use std::io::Read;
-            let _ = s.read_to_string(&mut buf);
-            buf
-        }).unwrap_or_default();
-        return Err(format!("{cli_cmd} fix failed: {stderr_text}"));
-    }
+        if !status.success() {
+            let stderr_text = child.stderr.map(|mut s| {
+                let mut buf = String::new();
+                use std::io::Read;
+                let _ = s.read_to_string(&mut buf);
+                buf
+            }).unwrap_or_default();
+            return Err(format!("{cli_cmd} fix failed: {stderr_text}"));
+        }
 
-    let stdout = stdout_text;
+        Ok::<_, String>((stdout_text, true, elapsed))
+    })
+    .await
+    .map_err(|e| format!("Task join error: {e}"))??;
 
     // Get the git diff to show what changed
     let diff_output = StdCommand::new("git")
