@@ -20,6 +20,10 @@ import {
   Undo2,
   FileCode,
   RefreshCw,
+  GitCommitHorizontal,
+  ExternalLink,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import {
   isTauriAvailable,
@@ -107,6 +111,46 @@ function formatDuration(ms: number): string {
   const mins = Math.floor(secs / 60);
   const remSecs = secs % 60;
   return `${mins}m ${remSecs}s`;
+}
+
+interface DiffFile {
+  path: string;
+  hunks: string[];
+  additions: number;
+  deletions: number;
+}
+
+function parseDiffIntoFiles(diff: string): DiffFile[] {
+  if (!diff.trim()) return [];
+  const files: DiffFile[] = [];
+  const fileSections = diff.split(/^diff --git /m).filter(Boolean);
+
+  for (const section of fileSections) {
+    const lines = section.split("\n");
+    // Extract file path from "a/path b/path"
+    const headerMatch = lines[0]?.match(/a\/(.*?) b\/(.*)/);
+    const path = headerMatch?.[2] ?? lines[0] ?? "unknown";
+
+    let additions = 0;
+    let deletions = 0;
+    const hunks: string[] = [];
+    let currentHunk: string[] = [];
+
+    for (const line of lines.slice(1)) {
+      if (line.startsWith("@@")) {
+        if (currentHunk.length > 0) hunks.push(currentHunk.join("\n"));
+        currentHunk = [line];
+      } else if (currentHunk.length > 0 || line.startsWith("+") || line.startsWith("-")) {
+        currentHunk.push(line);
+        if (line.startsWith("+") && !line.startsWith("+++")) additions++;
+        if (line.startsWith("-") && !line.startsWith("---")) deletions++;
+      }
+    }
+    if (currentHunk.length > 0) hunks.push(currentHunk.join("\n"));
+
+    files.push({ path, hunks, additions, deletions });
+  }
+  return files;
 }
 
 function shortenPath(path: string): string {
@@ -423,6 +467,51 @@ export default function QuickReview() {
     }
   }, [repoPath, fixResult]);
 
+  const handleCommitFixes = useCallback(async () => {
+    if (!repoPath || !fixResult) return;
+    try {
+      const { safeInvoke } = await import("@/lib/tauri-ipc");
+      // Stage changed files and commit
+      const files = fixResult.changed_files.map(f => f.path);
+      for (const file of files) {
+        await safeInvoke("run_git_command", { repoPath, args: ["add", file] }).catch(() => {});
+      }
+      const msg = `fix: resolve ${fixResult.findings_fixed} code review finding${fixResult.findings_fixed !== 1 ? "s" : ""}`;
+      await safeInvoke("run_git_command", { repoPath, args: ["commit", "-m", msg] }).catch(() => {});
+      setFixResult(null);
+      setError(null);
+    } catch (e) {
+      // Fallback: just tell the user to commit manually
+      setError(`Auto-commit not available. Run: cd ${repoPath} && git add -A && git commit -m "fix: resolve review findings"`);
+    }
+  }, [repoPath, fixResult]);
+
+  const handleOpenInIDE = useCallback(async () => {
+    if (!repoPath) return;
+    try {
+      const { safeInvoke } = await import("@/lib/tauri-ipc");
+      await safeInvoke("open_in_app", { appName: "cursor", path: repoPath }).catch(() =>
+        safeInvoke("open_in_app", { appName: "vscode", path: repoPath })
+      );
+    } catch {
+      setError("Could not open IDE");
+    }
+  }, [repoPath]);
+
+  // Track which diff files are expanded
+  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
+  const toggleFileExpanded = useCallback((path: string) => {
+    setExpandedFiles(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  }, []);
+
+  // Parse diff into files when fixResult changes
+  const diffFiles = fixResult?.diff ? parseDiffIntoFiles(fixResult.diff) : [];
+
   const handleReReview = useCallback(() => {
     setFixResult(null);
     setSelectedFindings(new Set());
@@ -604,39 +693,55 @@ export default function QuickReview() {
                   {result.agent}
                 </span>
                 <div className="ml-auto flex items-center gap-2">
-                  <button
-                    onClick={toggleSelectAll}
-                    className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300"
-                  >
-                    {selectedFindings.size === sortedFindings.length && sortedFindings.length > 0 ? (
-                      <CheckSquare2 size={14} className="text-amber-400" />
-                    ) : (
-                      <Square size={14} />
-                    )}
-                    All
-                  </button>
-                  <div className="relative group">
-                    <Button
-                      size="sm"
-                      onClick={handleFixSelected}
-                      disabled={isFixing !== null || selectedFindings.size === 0 || !viewHasRepoPath}
-                      className="gap-1.5 bg-amber-600 text-xs text-white hover:bg-amber-500 disabled:opacity-50"
-                    >
-                      {isFixing === "selected" ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : (
-                        <Zap size={14} />
-                      )}
-                      {isFixing === "selected"
-                        ? "Fixing..."
-                        : `Fix${selectedFindings.size > 0 ? ` (${selectedFindings.size})` : ""}`}
-                    </Button>
-                    {!viewHasRepoPath && (
-                      <div className="absolute bottom-full right-0 mb-1.5 hidden group-hover:block whitespace-nowrap rounded bg-[#1a1a1a] px-2 py-1 text-[10px] text-slate-400 shadow-lg border border-[#2a2a2a]">
-                        No repo path — can't apply fixes
+                  {fixResult ? (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleOpenInIDE}
+                        className="gap-1 text-[11px] text-slate-400 hover:text-slate-200"
+                      >
+                        <ExternalLink size={12} />
+                        Open in IDE
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={toggleSelectAll}
+                        className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300"
+                      >
+                        {selectedFindings.size === sortedFindings.length && sortedFindings.length > 0 ? (
+                          <CheckSquare2 size={14} className="text-amber-400" />
+                        ) : (
+                          <Square size={14} />
+                        )}
+                        All
+                      </button>
+                      <div className="relative group">
+                        <Button
+                          size="sm"
+                          onClick={handleFixSelected}
+                          disabled={isFixing !== null || selectedFindings.size === 0 || !viewHasRepoPath}
+                          className="gap-1.5 bg-amber-600 text-xs text-white hover:bg-amber-500 disabled:opacity-50"
+                        >
+                          {isFixing === "selected" ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <Zap size={14} />
+                          )}
+                          {isFixing === "selected"
+                            ? "Fixing..."
+                            : `Fix${selectedFindings.size > 0 ? ` (${selectedFindings.size})` : ""}`}
+                        </Button>
+                        {!viewHasRepoPath && (
+                          <div className="absolute bottom-full right-0 mb-1.5 hidden group-hover:block whitespace-nowrap rounded bg-[#1a1a1a] px-2 py-1 text-[10px] text-slate-400 shadow-lg border border-[#2a2a2a]">
+                            No repo path — can't apply fixes
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -650,78 +755,60 @@ export default function QuickReview() {
           <div className="flex h-full flex-col bg-[#050505]">
             {/* Fix results view */}
             {fixResult ? (
-              <>
-                <div className="shrink-0 border-b border-[#1a1a1a] px-4 py-2 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle size={14} className="text-emerald-400" />
-                    <span className="text-xs font-medium text-slate-300">
-                      Fixed {fixResult.findings_fixed} issue{fixResult.findings_fixed !== 1 ? "s" : ""} in {formatDuration(fixResult.duration_ms)}
-                    </span>
-                    <Badge variant="outline" className="text-[10px] text-slate-500">
-                      {fixResult.changed_files.length} file{fixResult.changed_files.length !== 1 ? "s" : ""} changed
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={handleReReview}
-                      disabled={isReviewing || !repoPath || !diffRange}
-                      className="gap-1 text-[11px] text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 disabled:opacity-50"
-                    >
-                      {isReviewing ? (
-                        <Loader2 size={12} className="animate-spin" />
-                      ) : (
-                        <RefreshCw size={12} />
-                      )}
-                      Re-review
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={handleRevertAll}
-                      className="gap-1 text-[11px] text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                    >
-                      <Undo2 size={12} />
-                      Revert All
-                    </Button>
-                  </div>
-                </div>
-                {/* Changed files list */}
-                <div className="shrink-0 border-b border-[#1a1a1a]">
-                  {fixResult.changed_files.map((f) => (
-                    <div key={f.path} className="flex items-center gap-2 px-4 py-1.5 hover:bg-[#0e0e0e]">
-                      <FileCode size={12} className="shrink-0 text-slate-600" />
-                      <span className="flex-1 truncate font-mono text-[11px] text-slate-400">{f.path}</span>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleRevertFile(f.path)}
-                        className="h-6 gap-1 px-2 text-[10px] text-slate-600 hover:text-red-400 hover:bg-red-500/10"
-                      >
-                        <Undo2 size={10} />
-                        Revert
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-                {/* Diff view or agent output */}
+              <div className="flex h-full flex-col">
+                {/* File-grouped diff */}
                 <div className="flex-1 overflow-y-auto">
-                  {fixResult.diff.trim() ? (
-                    <div className="py-1">
-                      {fixResult.diff.split("\n").map((line, i) => (
-                        <div
-                          key={i}
-                          className={cn(
-                            "font-mono text-[12px] leading-[20px] px-4",
-                            line.startsWith("+") && !line.startsWith("+++") && "bg-emerald-500/8 text-emerald-400",
-                            line.startsWith("-") && !line.startsWith("---") && "bg-red-500/8 text-red-400",
-                            line.startsWith("@@") && "text-cyan-500/60 bg-cyan-500/5",
-                            line.startsWith("diff ") && "text-slate-500 font-semibold mt-2",
-                            !line.startsWith("+") && !line.startsWith("-") && !line.startsWith("@@") && !line.startsWith("diff ") && "text-slate-500",
+                  {diffFiles.length > 0 ? (
+                    <div className="divide-y divide-[#1a1a1a]">
+                      {diffFiles.map((file) => (
+                        <div key={file.path}>
+                          {/* File header */}
+                          <div
+                            className="sticky top-0 z-10 flex items-center gap-2 bg-[#0a0a0a] border-b border-[#1a1a1a] px-4 py-2 cursor-pointer hover:bg-[#111111]"
+                            onClick={() => toggleFileExpanded(file.path)}
+                          >
+                            {expandedFiles.has(file.path) || expandedFiles.size === 0 ? (
+                              <ChevronDown size={14} className="text-slate-500" />
+                            ) : (
+                              <ChevronRight size={14} className="text-slate-500" />
+                            )}
+                            <FileCode size={14} className="text-slate-500" />
+                            <span className="flex-1 font-mono text-[12px] text-slate-300">{file.path}</span>
+                            <span className="text-[11px] text-emerald-400">+{file.additions}</span>
+                            <span className="text-[11px] text-red-400">-{file.deletions}</span>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => { e.stopPropagation(); handleRevertFile(file.path); }}
+                              className="h-6 gap-1 px-2 text-[10px] text-slate-600 hover:text-red-400 hover:bg-red-500/10"
+                            >
+                              <Undo2 size={10} />
+                              Revert
+                            </Button>
+                          </div>
+                          {/* Hunks (expanded by default, collapsible) */}
+                          {(expandedFiles.has(file.path) || expandedFiles.size === 0) && (
+                            <div>
+                              {file.hunks.map((hunk, hi) => (
+                                <div key={hi}>
+                                  {hunk.split("\n").map((line, li) => (
+                                    <div
+                                      key={`${hi}-${li}`}
+                                      className={cn(
+                                        "font-mono text-[12px] leading-[22px] pl-4 pr-4",
+                                        line.startsWith("+") && !line.startsWith("+++") && "bg-emerald-500/[0.07] text-emerald-400 border-l-2 border-emerald-500/30",
+                                        line.startsWith("-") && !line.startsWith("---") && "bg-red-500/[0.07] text-red-400 border-l-2 border-red-500/30",
+                                        line.startsWith("@@") && "bg-[#0a0a0a] text-cyan-500/50 text-[11px] py-1 border-l-2 border-cyan-500/20",
+                                        !line.startsWith("+") && !line.startsWith("-") && !line.startsWith("@@") && "text-slate-500 border-l-2 border-transparent",
+                                      )}
+                                    >
+                                      {line}
+                                    </div>
+                                  ))}
+                                </div>
+                              ))}
+                            </div>
                           )}
-                        >
-                          {line}
                         </div>
                       ))}
                     </div>
@@ -734,7 +821,46 @@ export default function QuickReview() {
                     </div>
                   )}
                 </div>
-              </>
+                {/* Bottom action bar */}
+                <div className="shrink-0 border-t border-[#1a1a1a] bg-[#0a0a0a] px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle size={14} className="text-emerald-400" />
+                    <span className="text-[11px] text-slate-400">
+                      {diffFiles.length} file{diffFiles.length !== 1 ? "s" : ""} changed in {formatDuration(fixResult.duration_ms)}
+                    </span>
+                    <div className="ml-auto flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleReReview}
+                        disabled={isReviewing || !repoPath || !diffRange}
+                        className="gap-1 text-[11px] text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 disabled:opacity-50"
+                      >
+                        {isReviewing ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                        Re-review
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleRevertAll}
+                        className="gap-1 text-[11px] text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                      >
+                        <Undo2 size={12} />
+                        Revert All
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleOpenInIDE}
+                        className="gap-1 text-[11px] text-slate-400 hover:text-slate-200"
+                      >
+                        <ExternalLink size={12} />
+                        Open in IDE
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             ) : isFixing ? (
               <div className="flex h-full flex-col items-center justify-center gap-3">
                 <Loader2 size={28} className="animate-spin text-amber-400" />
