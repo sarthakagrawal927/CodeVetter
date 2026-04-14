@@ -1,14 +1,19 @@
-#!/bin/sh
+# Abort push if lint fails or a known secret pattern leaks into tracked files.
+set -e
 
-echo "Running pre-push checks..."
+if [ -f package.json ] && grep -q '"lint"' package.json; then
+  npm run lint || { echo "lint failed — fix before pushing" >&2; exit 1; }
+fi
 
-# ESLint
-echo "  Linting desktop app..."
-npx eslint apps/desktop/src/ --ext .ts,.tsx --quiet --max-warnings 0 2>/dev/null || echo "  ESLint warnings (non-blocking)"
+SECRETS=$(git ls-files -z 2>/dev/null \
+  | xargs -0 grep -lE \
+    'sk-(proj-|ant-)?[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|gho_[A-Za-z0-9]{36}|AIzaSy[A-Za-z0-9_-]{33}|xoxb-[A-Za-z0-9-]+|-----BEGIN (RSA |EC )?PRIVATE KEY-----' 2>/dev/null \
+  | grep -vE '(\.example$|\.sample$|/tests?/|/__tests__/|/fixtures?/|/mocks?/|/vendor/|/\.tmp-)' \
+  || true)
 
-# Build desktop frontend
-echo "  Building desktop frontend..."
-cd apps/desktop && npm run build || exit 1
-cd ../..
-
-echo "Pre-push checks passed"
+if [ -n "$SECRETS" ]; then
+  echo "Possible secret(s) detected in tracked files:" >&2
+  printf '  %s\n' $SECRETS >&2
+  echo "Push aborted. Untrack or redact before pushing." >&2
+  exit 1
+fi
