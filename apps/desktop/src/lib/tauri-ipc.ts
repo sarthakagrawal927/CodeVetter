@@ -550,13 +550,33 @@ export interface LiveUsageResult {
   today?: {
     sessions: number;
     messages: number;
-    tokens: { input: number; output: number; total: number };
+    tokens: { input: number; output: number; cached: number; thoughts: number; tool: number; total: number };
   };
+  models?: Array<{
+    model: string;
+    requests: number;
+    tokens: { input: number; output: number; cached: number; thoughts: number; tool: number; total: number };
+  }>;
   api?: {
     supported: boolean;
     source: string;
     rate_limit?: { limit: number; remaining: number; reset?: string };
   };
+  // Gemini quota API (per-model usage percentages from Google Code Assist)
+  quota_api?: {
+    supported: boolean;
+    project_id?: string;
+    buckets?: Array<{
+      model_id: string;
+      remaining_fraction: number | null;
+      remaining_amount: number | null;
+      used_pct: number | null;
+      limit: number | null;
+      reset_time: string | null;
+    }>;
+    checked_at?: string;
+  };
+  quota_api_error?: string;
 }
 
 export async function checkLiveUsage(provider: string, credentialKey?: string): Promise<LiveUsageResult> {
