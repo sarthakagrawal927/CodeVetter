@@ -159,10 +159,8 @@ function AccountUsageRow({
 
   // Gemini-specific live data
   const geminiToday = liveUsage?.today;
-  const geminiRateLimit = liveUsage?.api?.rate_limit;
-  const geminiUtilPct = geminiRateLimit
-    ? ((geminiRateLimit.limit - geminiRateLimit.remaining) / geminiRateLimit.limit) * 100
-    : null;
+  const geminiModels = liveUsage?.models;
+  const quotaBuckets = liveUsage?.quota_api?.buckets;
 
   // Determine bar color based on utilization
   function barColor(pct: number): "amber" | "red" {
@@ -262,39 +260,108 @@ function AccountUsageRow({
         )}
 
         {/* ── Gemini-specific usage display ────────────────────── */}
-        {account.provider === "google" && hasLive && geminiToday && (
+        {account.provider === "google" && (hasLive || quotaBuckets) && (
           <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2 text-[11px]">
-              <span className="text-blue-400/80 font-medium">Today</span>
-              <span className="rounded bg-[#111111] px-1.5 py-0.5 text-[10px] text-slate-300 tabular-nums">
-                {geminiToday.sessions} session{geminiToday.sessions !== 1 ? "s" : ""}
-              </span>
-              <span className="rounded bg-[#111111] px-1.5 py-0.5 text-[10px] text-slate-300 tabular-nums">
-                {geminiToday.messages} msg{geminiToday.messages !== 1 ? "s" : ""}
-              </span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-lg font-semibold text-blue-400 tabular-nums">
-                {formatTokens(geminiToday.tokens.total)}
-              </span>
-              <span className="text-[10px] text-slate-500">tokens used</span>
-            </div>
-            <div className="flex gap-3 text-[10px] text-slate-500">
-              <span>In: {formatTokens(geminiToday.tokens.input)}</span>
-              <span>Out: {formatTokens(geminiToday.tokens.output)}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Rate limited warning */}
-        {isRateLimited && (
-          <div className="flex items-center gap-2 px-2 py-1.5 rounded bg-red-500/10 border border-red-500/20">
-            <span className="text-red-400 text-[11px] font-semibold">Rate limited</span>
-            {fiveH?.resets_in_secs != null && fiveH.resets_in_secs > 0 && (
-              <span className="text-[11px] text-red-400/70 tabular-nums">
-                resets in {formatDuration(fiveH.resets_in_secs)}
-              </span>
+            {/* Today summary — single compact row */}
+            {geminiToday && (
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-slate-400">Today</span>
+                <div className="flex items-center gap-3 text-[11px] tabular-nums">
+                  <span className="text-slate-500">
+                    {geminiToday.sessions} session{geminiToday.sessions !== 1 ? "s" : ""}
+                    {" · "}
+                    {geminiToday.messages} msg{geminiToday.messages !== 1 ? "s" : ""}
+                  </span>
+                  <span className="text-blue-400 font-semibold">
+                    {formatTokens(geminiToday.tokens.total)}
+                  </span>
+                </div>
+              </div>
             )}
+
+            {/* Token split — inline row */}
+            {geminiToday && (
+              <div className="flex items-center gap-2 text-[10px] tabular-nums text-slate-600">
+                <span>{formatTokens(geminiToday.tokens.input)} in</span>
+                <span className="text-slate-700">·</span>
+                <span>{formatTokens(geminiToday.tokens.output)} out</span>
+                {geminiToday.tokens.cached > 0 && (
+                  <>
+                    <span className="text-slate-700">·</span>
+                    <span className="text-emerald-500/60">{formatTokens(geminiToday.tokens.cached)} cached</span>
+                  </>
+                )}
+                {geminiToday.tokens.thoughts > 0 && (
+                  <>
+                    <span className="text-slate-700">·</span>
+                    <span className="text-purple-400/60">{formatTokens(geminiToday.tokens.thoughts)} thinking</span>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Per-model quota bars — real usage % from Google API */}
+            {quotaBuckets && quotaBuckets.length > 0 && (() => {
+              // Collapse to one Pro + one Flash — variants share the same quota
+              const proBucket = quotaBuckets.find((b) => b.model_id.includes("pro"));
+              const flashBucket = quotaBuckets.find((b) => b.model_id.includes("flash") && !b.model_id.includes("lite"));
+              const dedupedBuckets = [
+                proBucket ? { ...proBucket, model_id: "Pro" } : null,
+                flashBucket ? { ...flashBucket, model_id: "Flash" } : null,
+              ].filter(Boolean) as typeof quotaBuckets;
+              return (
+              <div className="flex flex-col gap-2 mt-0.5">
+                {dedupedBuckets.map((b) => {
+                  const pct = b.used_pct ?? 0;
+                  const atLimit = b.remaining_fraction === 0;
+                  const resetLabel = b.reset_time
+                    ? (() => {
+                        const resetMs = new Date(b.reset_time).getTime() - Date.now();
+                        if (resetMs <= 0) return undefined;
+                        return `resets in ${formatDuration(Math.round(resetMs / 1000))}`;
+                      })()
+                    : undefined;
+                  return (
+                    <UsageBar
+                      key={b.model_id}
+                      pct={pct}
+                      label={b.model_id}
+                      resetLabel={atLimit ? "Limit" : resetLabel}
+                      color={pct >= 90 ? "red" : "amber"}
+                    />
+                  );
+                })}
+              </div>
+              );
+            })()}
+
+            {/* Fallback: show local model breakdown if no quota API data */}
+            {!quotaBuckets && geminiModels && geminiModels.length > 0 && (() => {
+              const maxTokens = Math.max(...geminiModels.map((m) => m.tokens.total));
+              return (
+                <div className="flex flex-col gap-1 mt-0.5">
+                  {geminiModels.map((m) => {
+                    const pct = maxTokens > 0 ? (m.tokens.total / maxTokens) * 100 : 0;
+                    return (
+                      <div key={m.model} className="flex items-center gap-2 min-w-0">
+                        <span className="text-[10px] text-slate-400 truncate w-28 shrink-0" title={m.model}>
+                          {m.model}
+                        </span>
+                        <div className="flex-1 h-1 rounded-full bg-amber-500/10 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-amber-500 transition-all duration-500"
+                            style={{ width: `${Math.min(100, pct)}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-slate-500 tabular-nums shrink-0 w-10 text-right">
+                          {formatTokens(m.tokens.total)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         )}
 
