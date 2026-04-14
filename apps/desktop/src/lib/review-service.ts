@@ -30,6 +30,10 @@ export function saveReviewConfig(config: ReviewConfig): void {
 }
 
 export const PROVIDER_PRESETS: Record<string, { baseUrl: string; model: string }> = {
+  "free-ai": {
+    baseUrl: "https://free-ai-gateway.sarthakagrawal927.workers.dev/v1",
+    model: "auto",
+  },
   anthropic: {
     baseUrl: "https://api.anthropic.com/v1",
     model: "claude-sonnet-4-20250514",
