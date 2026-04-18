@@ -224,13 +224,28 @@ pub async fn run_cli_review(
         return Err("Empty diff — nothing to review".to_string());
     }
 
-    // 3. Build the review prompt
+    // 3. Compute a graph-aware blast-radius summary to give the model
+    //    real caller counts for every changed symbol. Failure is non-fatal —
+    //    the model still gets the diff.
+    let blast_summary = crate::commands::blast_radius::compute_blast_radius(&repo_path, &diff_range)
+        .ok()
+        .as_ref()
+        .and_then(crate::commands::blast_radius::summarize_for_prompt)
+        .unwrap_or_default();
+
+    let blast_section = if blast_summary.is_empty() {
+        String::new()
+    } else {
+        format!("\n{blast_summary}\n")
+    };
+
+    // 4. Build the review prompt
     let prompt = format!(
         r#"You are a senior code reviewer. Review the following diff and return ONLY valid JSON (no markdown fences, no extra text).
 
 Project: {project_description}
 Change: {change_description}
-
+{blast_section}
 Return this exact JSON shape:
 {{"findings":[{{"severity":"critical|high|medium|low","title":"...","summary":"...","suggestion":"...","filePath":"...","line":42,"confidence":0.9}}],"score":75,"summary":"Overall assessment"}}
 

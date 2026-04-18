@@ -42,9 +42,11 @@ import {
   mergeFix,
   discardFix,
   readFileAroundLine,
+  analyzeBlastRadius,
 } from "@/lib/tauri-ipc";
-import type { FixFindingsResult, FixChangedFile } from "@/lib/tauri-ipc";
+import type { FixFindingsResult, FixChangedFile, BlastRadiusReport } from "@/lib/tauri-ipc";
 import type { PullRequest, CliReviewResult, CliReviewFinding, LocalReviewRow, FileLineData } from "@/lib/tauri-ipc";
+import BlastRadiusPanel from "@/components/blast-radius-panel";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -191,6 +193,11 @@ export default function QuickReview() {
   const [result, setResult] = useState<CliReviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Blast radius analysis (graph-aware PR context)
+  const [blastReport, setBlastReport] = useState<BlastRadiusReport | null>(null);
+  const [blastLoading, setBlastLoading] = useState(false);
+  const [blastError, setBlastError] = useState<string | null>(null);
+
   // Whether the current view-mode review has a known repo path (for enabling fix)
   const [viewHasRepoPath, setViewHasRepoPath] = useState(true);
 
@@ -289,6 +296,9 @@ export default function QuickReview() {
       });
       setViewHasRepoPath(!!review.repo_path);
       if (review.repo_path) setRepoPath(review.repo_path);
+      // Past reviews don't have a stored blast report — clear the panel.
+      setBlastReport(null);
+      setBlastError(null);
       setMode("view");
     } catch (e) {
       setError(String(e));
@@ -361,6 +371,22 @@ export default function QuickReview() {
     setIsReviewing(true);
     setError(null);
     setResult(null);
+    setBlastReport(null);
+    setBlastError(null);
+    setBlastLoading(true);
+
+    // Kick off blast-radius analysis in parallel with the LLM review.
+    // It's deterministic and fast (git grep), so it usually returns first.
+    const blastPromise = analyzeBlastRadius(repoPath, diffRange)
+      .then((r) => {
+        setBlastReport(r);
+        return r;
+      })
+      .catch((e) => {
+        setBlastError(String(e));
+        return null;
+      })
+      .finally(() => setBlastLoading(false));
 
     try {
       const res = await runCliReview(
@@ -374,6 +400,7 @@ export default function QuickReview() {
       setMode("view");
       setViewHasRepoPath(true);
       setSelectedFindings(new Set());
+      await blastPromise;
     } catch (e) {
       const msg = String(e);
       if (msg.includes("TAURI_NOT_AVAILABLE")) {
@@ -392,6 +419,8 @@ export default function QuickReview() {
     setMode("create");
     setResult(null);
     setError(null);
+    setBlastReport(null);
+    setBlastError(null);
     setSelectedFindingIdx(null);
     setCodeLines([]);
     setCodeFilePath("");
@@ -592,6 +621,32 @@ export default function QuickReview() {
     [sortedFindings, repoPath],
   );
 
+  // ─── Jump from blast-radius caller → code viewer ─────────────────────────
+
+  const handleJumpToCaller = useCallback(
+    async (file: string, line: number) => {
+      setSelectedFindingIdx(null);
+      if (!repoPath) return;
+      try {
+        const res = await readFileAroundLine(
+          repoPath + "/" + file,
+          line,
+          15,
+          15,
+        );
+        setCodeLines(res.lines);
+        setCodeFilePath(res.file_path);
+        setCodeLanguage(res.language);
+      } catch (e) {
+        console.error("[Review] failed to load caller code:", e);
+        setCodeLines([]);
+        setCodeFilePath(file);
+        setCodeLanguage("");
+      }
+    },
+    [repoPath],
+  );
+
   // ─── Render ─────────────────────────────────────────────────────────────
 
   // ─── View mode layout ────────────────────────────────────────────────────
@@ -623,6 +678,14 @@ export default function QuickReview() {
         <PanelGroup direction="horizontal" className="flex-1">
           <Panel defaultSize={40} minSize={25}>
           <div className="flex h-full flex-col">
+            {/* Blast Radius panel — graph-aware PR analysis */}
+            <BlastRadiusPanel
+              report={blastReport}
+              loading={blastLoading}
+              error={blastError}
+              onJump={handleJumpToCaller}
+            />
+
             {/* Scrollable findings list */}
             <div className="flex-1 overflow-y-auto">
               {sortedFindings.length === 0 ? (

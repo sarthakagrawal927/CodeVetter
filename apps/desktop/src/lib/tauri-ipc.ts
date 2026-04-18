@@ -444,6 +444,44 @@ export async function revertFiles(
   });
 }
 
+// ─── Blast Radius (graph-aware PR analysis) ──────────────────────────────────
+
+export type BlastRisk = "safe" | "medium" | "high";
+
+export interface BlastCallerSite {
+  file: string;
+  line: number;
+  snippet: string;
+}
+
+export interface BlastSymbol {
+  name: string;
+  kind: string;
+  language: string;
+  definedIn: string;
+  callers: BlastCallerSite[];
+  callerCount: number;
+  risk: BlastRisk;
+}
+
+export interface BlastRadiusReport {
+  symbols: BlastSymbol[];
+  totalSymbols: number;
+  totalCallers: number;
+  durationMs: number;
+  changedFiles: number;
+}
+
+export async function analyzeBlastRadius(
+  repoPath: string,
+  diffRange: string,
+): Promise<BlastRadiusReport> {
+  return safeInvoke("analyze_blast_radius", {
+    repoPath,
+    diffRange,
+  });
+}
+
 export async function mergeFix(
   repoPath: string,
   worktreeBranch: string,

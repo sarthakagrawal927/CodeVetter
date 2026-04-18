@@ -145,6 +145,8 @@ fn main() {
             commands::review::merge_fix,
             commands::review::discard_fix,
             commands::review::revert_files,
+            // Blast radius (graph-aware PR analysis)
+            commands::blast_radius::analyze_blast_radius,
             // Session commands
             commands::sessions::list_sessions,
             commands::sessions::get_session,

@@ -1,5 +1,6 @@
 pub mod accounts;
 pub mod agents;
+pub mod blast_radius;
 pub mod chat;
 pub mod chat_tabs;
 pub mod coordination;
