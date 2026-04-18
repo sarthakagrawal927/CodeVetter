@@ -26,9 +26,7 @@ const MODEL_OPTIONS: { value: ModelOption; label: string; desc: string }[] = [
 
 const TOUR_ITEMS: { icon: string; label: string; desc: string }[] = [
   { icon: "\u2302", label: "Home", desc: "Usage stats & overview" },
-  { icon: "\u25A3", label: "Workspaces", desc: "Your coding environments" },
-  { icon: "\u2637", label: "Board", desc: "Tasks & agent squad" },
-  { icon: "\u29D6", label: "History", desc: "Past sessions" },
+  { icon: "\u2714", label: "Review", desc: "AI code review" },
   { icon: "\u2699", label: "Settings", desc: "Configuration" },
 ];
 
@@ -126,11 +124,11 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                   CodeVetter
                 </h1>
                 <p className="mt-1 text-sm font-medium text-amber-400/80">
-                  AI agents that ship code
+                  Your AI coding companion
                 </p>
                 <p className="mt-3 text-sm text-slate-400 leading-relaxed">
-                  Orchestrate coding agents, review code, manage PRs — all from
-                  your desktop.
+                  Monitor usage, review agent-generated code — all from your
+                  desktop.
                 </p>
               </div>
               <Button

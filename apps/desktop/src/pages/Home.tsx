@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
 import SessionCard from "@/components/session-card";
 import ScoreBadge from "@/components/score-badge";
@@ -10,7 +9,6 @@ import {
   getIndexStats,
   listSessions,
   listReviews,
-  listAgents,
   triggerIndex,
   getPreference,
   listProviderAccounts,
@@ -25,7 +23,6 @@ import type {
   IndexStats,
   SessionRow,
   LocalReviewRow,
-  AgentProcess,
   TriggerIndexResult,
   ProviderAccount,
   AccountUsage,
@@ -162,10 +159,8 @@ function AccountUsageRow({
 
   // Gemini-specific live data
   const geminiToday = liveUsage?.today;
-  const geminiRateLimit = liveUsage?.api?.rate_limit;
-  const geminiUtilPct = geminiRateLimit
-    ? ((geminiRateLimit.limit - geminiRateLimit.remaining) / geminiRateLimit.limit) * 100
-    : null;
+  const geminiModels = liveUsage?.models;
+  const quotaBuckets = liveUsage?.quota_api?.buckets;
 
   // Determine bar color based on utilization
   function barColor(pct: number): "amber" | "red" {
@@ -265,39 +260,108 @@ function AccountUsageRow({
         )}
 
         {/* ── Gemini-specific usage display ────────────────────── */}
-        {account.provider === "google" && hasLive && geminiToday && (
+        {account.provider === "google" && (hasLive || quotaBuckets) && (
           <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2 text-[11px]">
-              <span className="text-blue-400/80 font-medium">Today</span>
-              <span className="rounded bg-[#111111] px-1.5 py-0.5 text-[10px] text-slate-300 tabular-nums">
-                {geminiToday.sessions} session{geminiToday.sessions !== 1 ? "s" : ""}
-              </span>
-              <span className="rounded bg-[#111111] px-1.5 py-0.5 text-[10px] text-slate-300 tabular-nums">
-                {geminiToday.messages} msg{geminiToday.messages !== 1 ? "s" : ""}
-              </span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-lg font-semibold text-blue-400 tabular-nums">
-                {formatTokens(geminiToday.tokens.total)}
-              </span>
-              <span className="text-[10px] text-slate-500">tokens used</span>
-            </div>
-            <div className="flex gap-3 text-[10px] text-slate-500">
-              <span>In: {formatTokens(geminiToday.tokens.input)}</span>
-              <span>Out: {formatTokens(geminiToday.tokens.output)}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Rate limited warning */}
-        {isRateLimited && (
-          <div className="flex items-center gap-2 px-2 py-1.5 rounded bg-red-500/10 border border-red-500/20">
-            <span className="text-red-400 text-[11px] font-semibold">Rate limited</span>
-            {fiveH?.resets_in_secs != null && fiveH.resets_in_secs > 0 && (
-              <span className="text-[11px] text-red-400/70 tabular-nums">
-                resets in {formatDuration(fiveH.resets_in_secs)}
-              </span>
+            {/* Today summary — single compact row */}
+            {geminiToday && (
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-slate-400">Today</span>
+                <div className="flex items-center gap-3 text-[11px] tabular-nums">
+                  <span className="text-slate-500">
+                    {geminiToday.sessions} session{geminiToday.sessions !== 1 ? "s" : ""}
+                    {" · "}
+                    {geminiToday.messages} msg{geminiToday.messages !== 1 ? "s" : ""}
+                  </span>
+                  <span className="text-blue-400 font-semibold">
+                    {formatTokens(geminiToday.tokens.total)}
+                  </span>
+                </div>
+              </div>
             )}
+
+            {/* Token split — inline row */}
+            {geminiToday && (
+              <div className="flex items-center gap-2 text-[10px] tabular-nums text-slate-600">
+                <span>{formatTokens(geminiToday.tokens.input)} in</span>
+                <span className="text-slate-700">·</span>
+                <span>{formatTokens(geminiToday.tokens.output)} out</span>
+                {geminiToday.tokens.cached > 0 && (
+                  <>
+                    <span className="text-slate-700">·</span>
+                    <span className="text-emerald-500/60">{formatTokens(geminiToday.tokens.cached)} cached</span>
+                  </>
+                )}
+                {geminiToday.tokens.thoughts > 0 && (
+                  <>
+                    <span className="text-slate-700">·</span>
+                    <span className="text-purple-400/60">{formatTokens(geminiToday.tokens.thoughts)} thinking</span>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Per-model quota bars — real usage % from Google API */}
+            {quotaBuckets && quotaBuckets.length > 0 && (() => {
+              // Collapse to one Pro + one Flash — variants share the same quota
+              const proBucket = quotaBuckets.find((b) => b.model_id.includes("pro"));
+              const flashBucket = quotaBuckets.find((b) => b.model_id.includes("flash") && !b.model_id.includes("lite"));
+              const dedupedBuckets = [
+                proBucket ? { ...proBucket, model_id: "Pro" } : null,
+                flashBucket ? { ...flashBucket, model_id: "Flash" } : null,
+              ].filter(Boolean) as typeof quotaBuckets;
+              return (
+              <div className="flex flex-col gap-2 mt-0.5">
+                {dedupedBuckets.map((b) => {
+                  const pct = b.used_pct ?? 0;
+                  const atLimit = b.remaining_fraction === 0;
+                  const resetLabel = b.reset_time
+                    ? (() => {
+                        const resetMs = new Date(b.reset_time).getTime() - Date.now();
+                        if (resetMs <= 0) return undefined;
+                        return `resets in ${formatDuration(Math.round(resetMs / 1000))}`;
+                      })()
+                    : undefined;
+                  return (
+                    <UsageBar
+                      key={b.model_id}
+                      pct={pct}
+                      label={b.model_id}
+                      resetLabel={atLimit ? "Limit" : resetLabel}
+                      color={pct >= 90 ? "red" : "amber"}
+                    />
+                  );
+                })}
+              </div>
+              );
+            })()}
+
+            {/* Fallback: show local model breakdown if no quota API data */}
+            {!quotaBuckets && geminiModels && geminiModels.length > 0 && (() => {
+              const maxTokens = Math.max(...geminiModels.map((m) => m.tokens.total));
+              return (
+                <div className="flex flex-col gap-1 mt-0.5">
+                  {geminiModels.map((m) => {
+                    const pct = maxTokens > 0 ? (m.tokens.total / maxTokens) * 100 : 0;
+                    return (
+                      <div key={m.model} className="flex items-center gap-2 min-w-0">
+                        <span className="text-[10px] text-slate-400 truncate w-28 shrink-0" title={m.model}>
+                          {m.model}
+                        </span>
+                        <div className="flex-1 h-1 rounded-full bg-amber-500/10 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-amber-500 transition-all duration-500"
+                            style={{ width: `${Math.min(100, pct)}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-slate-500 tabular-nums shrink-0 w-10 text-right">
+                          {formatTokens(m.tokens.total)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -360,7 +424,6 @@ let _cachedDashboard: {
   stats: IndexStats | null;
   sessions: SessionRow[];
   reviews: LocalReviewRow[];
-  agents: AgentProcess[];
   accounts: ProviderAccount[];
   usages: Record<string, AccountUsage>;
   liveUsages: Record<string, LiveUsageResult>;
@@ -370,14 +433,12 @@ let _cachedDashboard: {
 const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes
 
 export default function Home() {
-  const navigate = useNavigate();
   const isInitialLoad = useRef(true);
 
   // Data state — initialize from cache if available
   const [stats, setStats] = useState<IndexStats | null>(_cachedDashboard?.stats ?? null);
   const [recentSessions, setRecentSessions] = useState<SessionRow[]>(_cachedDashboard?.sessions ?? []);
   const [recentReviews, setRecentReviews] = useState<LocalReviewRow[]>(_cachedDashboard?.reviews ?? []);
-  const [activeAgents, setActiveAgents] = useState<AgentProcess[]>(_cachedDashboard?.agents ?? []);
   const [accounts, setAccounts] = useState<ProviderAccount[]>(_cachedDashboard?.accounts ?? []);
   const [accountUsages, setAccountUsages] = useState<Record<string, AccountUsage>>(_cachedDashboard?.usages ?? {});
   const [liveUsages, setLiveUsages] = useState<Record<string, LiveUsageResult>>(_cachedDashboard?.liveUsages ?? {});
@@ -402,12 +463,11 @@ export default function Home() {
 
     try {
       // Fire all requests in parallel
-      const [statsResult, sessionsResult, reviewsResult, agentsResult, accountsResult] =
+      const [statsResult, sessionsResult, reviewsResult, accountsResult] =
         await Promise.allSettled([
           getIndexStats(),
           listSessions(undefined, undefined, 4, 0),
           listReviews(4, 0),
-          listAgents(),
           listProviderAccounts(),
         ]);
 
@@ -419,9 +479,6 @@ export default function Home() {
       }
       if (reviewsResult.status === "fulfilled") {
         setRecentReviews(reviewsResult.value);
-      }
-      if (agentsResult.status === "fulfilled") {
-        setActiveAgents(agentsResult.value);
       }
 
       // Load accounts — auto-detect if none exist
@@ -460,7 +517,6 @@ export default function Home() {
         statsResult,
         sessionsResult,
         reviewsResult,
-        agentsResult,
       ].every((r) => r.status === "rejected");
       if (allFailed && statsResult.status === "rejected") {
         const msg =
@@ -490,13 +546,12 @@ export default function Home() {
       stats,
       sessions: recentSessions,
       reviews: recentReviews,
-      agents: activeAgents,
       accounts,
       usages: accountUsages,
       liveUsages,
       fetchedAt: Date.now(),
     };
-  }, [loading, stats, recentSessions, recentReviews, activeAgents, accounts, accountUsages, liveUsages]);
+  }, [loading, stats, recentSessions, recentReviews, accounts, accountUsages, liveUsages]);
 
   // Refresh without showing loading spinners (for background event updates)
   const refreshDashboard = useCallback(() => {
@@ -589,7 +644,6 @@ export default function Home() {
 
   // ─── Computed values ───────────────────────────────────────────────────
 
-  const runningAgents = activeAgents.filter((a) => a.status === "running");
   const completedReviews = recentReviews.filter(
     (r) => r.status === "completed"
   );
@@ -647,11 +701,6 @@ export default function Home() {
       {/* Stats strip */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {[
-          {
-            label: "Active Agents",
-            value: loading ? "--" : String(runningAgents.length),
-            color: "text-amber-400",
-          },
           {
             label: "Reviews",
             value: loading ? "--" : String(completedReviews.length),
@@ -819,9 +868,7 @@ export default function Home() {
             <h2 className="text-[13px] font-medium text-slate-300">
               Recent Sessions
             </h2>
-            <Button variant="link" size="sm" className="h-auto px-0 py-0 text-[11px] text-slate-500 hover:text-slate-300" asChild>
-              <Link to="/history">View all</Link>
-            </Button>
+            <span className="text-[11px] text-slate-600">Recent</span>
           </div>
           {loading ? (
             <div className="flex items-center justify-center py-8">
@@ -863,7 +910,6 @@ export default function Home() {
                 <div key={session.id} className="border-b border-[#1a1a1a]/50 last:border-b-0">
                   <SessionCard
                     session={session}
-                    onClick={() => navigate(`/sessions?id=${session.id}`)}
                   />
                 </div>
               ))}
@@ -876,7 +922,7 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <h2 className="text-[13px] font-medium text-slate-300">Reviews</h2>
             <Button variant="link" size="sm" className="h-auto px-0 py-0 text-[11px] text-slate-500 hover:text-slate-300" asChild>
-              <Link to="/board">New review</Link>
+              <Link to="/review">New review</Link>
             </Button>
           </div>
           {loading ? (
@@ -905,7 +951,7 @@ export default function Home() {
             <Card className="flex flex-col items-center justify-center py-8 border-[#1a1a1a]">
               <p className="text-[11px] text-slate-600">No reviews yet</p>
               <Button variant="link" size="sm" className="mt-1 h-auto px-0 py-0 text-[11px] text-slate-500 hover:text-slate-300" asChild>
-                <Link to="/board">Start a review</Link>
+                <Link to="/review">Start a review</Link>
               </Button>
             </Card>
           ) : (
@@ -940,84 +986,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Active Agents strip */}
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[13px] font-medium text-slate-300">
-            Agents
-          </h2>
-          <Button variant="link" size="sm" className="h-auto px-0 py-0 text-[11px] text-slate-500 hover:text-slate-300" asChild>
-            <Link to="/board">Mission Control</Link>
-          </Button>
-        </div>
-        <Card className="border-[#1a1a1a] overflow-hidden">
-          {loading ? (
-            <div className="flex items-center justify-center py-6">
-              <svg
-                className="h-4 w-4 animate-spin text-slate-500"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                />
-              </svg>
-            </div>
-          ) : (
-            <>
-              {activeAgents.map((agent) => (
-                <div
-                  key={agent.id}
-                  className="flex items-center gap-3 px-3 py-2 border-b border-[#1a1a1a]/50 last:border-b-0 transition-colors hover:bg-[#111111] min-w-0 overflow-hidden"
-                >
-                  <span
-                    className={`h-2 w-2 shrink-0 rounded-full ${
-                      agent.status === "running"
-                        ? "bg-emerald-400"
-                        : agent.status === "stopped"
-                        ? "bg-slate-600"
-                        : "bg-yellow-400"
-                    }`}
-                  />
-                  <span className="text-[13px] font-medium text-slate-200 capitalize truncate">
-                    {agent.display_name || agent.role || "Agent"}
-                  </span>
-                  <span className="text-[11px] text-slate-600 uppercase shrink-0">
-                    {agent.agent_type}
-                  </span>
-                  <span className="flex-1" />
-                  <span className="text-[11px] text-slate-500 truncate max-w-[160px] font-mono">
-                    {agent.project_path?.split("/").pop() || ""}
-                  </span>
-                  {showCosts && agent.estimated_cost_usd > 0 && (
-                    <span className="text-[11px] text-rose-400/70 tabular-nums">
-                      ${agent.estimated_cost_usd.toFixed(2)}
-                    </span>
-                  )}
-                </div>
-              ))}
-
-              <Link
-                to="/board"
-                className="flex items-center gap-2 px-3 py-2 text-slate-600 transition-colors hover:bg-[#111111] hover:text-slate-400"
-              >
-                <span className="text-sm">+</span>
-                <span className="text-[11px] font-medium">Launch Agent</span>
-              </Link>
-            </>
-          )}
-        </Card>
-      </div>
     </div>
   );
 }

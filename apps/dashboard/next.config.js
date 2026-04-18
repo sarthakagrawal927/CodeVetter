@@ -1,8 +1,0 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  reactStrictMode: true,
-  typedRoutes: false,
-  transpilePackages: ['@radix-ui/themes']
-};
-
-module.exports = nextConfig;

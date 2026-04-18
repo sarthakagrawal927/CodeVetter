@@ -222,3 +222,60 @@ Husky is configured with two hooks:
 - **pre-push** (`/.husky/pre-push`): Builds `shared-types`, runs ESLint on `apps/desktop/src/`, builds the Vite frontend, and runs unit tests in `packages/db` and `packages/ai-gateway-client`.
 
 Hooks are installed automatically via the `prepare` script when you run `npm install`.
+
+---
+
+## Common Setup Issues
+
+### 1. Rust/Tauri compilation fails on first `tauri:dev`
+
+**Symptom:** `cargo build` errors mentioning missing system libraries, linker errors, or Xcode toolchain issues.
+
+**Solution:** Make sure Xcode Command Line Tools are installed and up to date:
+
+```bash
+xcode-select --install
+# If already installed, reset the path
+sudo xcode-select --reset
+```
+
+Then verify Tauri prerequisites at [https://tauri.app/start/prerequisites/](https://tauri.app/start/prerequisites/). For Apple Silicon Macs the sidecar binary bundled in `apps/desktop/src-tauri/binaries/` is `aarch64-apple-darwin` — no additional steps are needed.
+
+### 2. `npm run build:packages` fails with "Cannot find module"
+
+**Symptom:** TypeScript errors referencing types from sibling packages during `build:packages`.
+
+**Solution:** The packages must build in order (`shared-types` first, then `db` and `ai-gateway-client`, then `review-core`). The root `build:packages` script enforces this order. If you ran individual package build commands out of order, reset with:
+
+```bash
+npm run build:packages
+```
+
+If the error persists, delete compiled output and rebuild:
+
+```bash
+find packages -name dist -type d -exec rm -rf {} + 2>/dev/null; npm run build:packages
+```
+
+### 3. Missing environment variables cause worker startup failures
+
+**Symptom:** `wrangler dev` throws validation errors such as `AI_GATEWAY_MODEL must not be empty` or `Invalid REVIEW_WORKER_POLL_MS`.
+
+**Solution:** Copy `.env.example` to `.env` and populate required values. For local worker development the minimum required secrets are:
+
+- `AI_GATEWAY_BASE_URL` and `AI_GATEWAY_API_KEY` — without these, review jobs are skipped.
+- `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` — without these, OAuth routes throw at invocation.
+
+Non-secret defaults (e.g. `AI_GATEWAY_MODEL`) are already set in each worker's `wrangler.toml` `[vars]` block and do not need to be in `.env`.
+
+### 4. Port `1420` already in use
+
+**Symptom:** Vite fails to bind with `EADDRINUSE: address already in use :::1420`.
+
+**Solution:** The desktop `dev` script already kills any process on port `1420` before starting (`lsof -ti:1420 | xargs kill -9`). If the error persists, kill the process manually:
+
+```bash
+lsof -ti:1420 | xargs kill -9
+```
+
+Or override the port in `apps/desktop/vite.config.ts` (`server.strictPort` is `false`, so Vite will auto-increment to the next available port if the kill fails).

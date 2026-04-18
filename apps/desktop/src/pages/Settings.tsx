@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
 
-import CostDashboard from "@/components/cost-dashboard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -311,7 +310,7 @@ function GitHubConnectionPanel() {
                   type="password"
                   value={manualToken}
                   onChange={(e) => setManualToken(e.target.value)}
-                  placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  placeholder="ghp_… (GitHub personal access token)"
                   className="mono flex-1 rounded-lg border-[#1a1a1a] bg-[#0a0c12] text-slate-200 placeholder-slate-600 focus-visible:ring-amber-500/50"
                 />
                 <Button
@@ -884,7 +883,7 @@ export default function Settings() {
               title="Usage"
               description="Token usage and cost breakdown across sessions."
             />
-            <CostDashboard />
+            <p className="text-sm text-slate-500 px-1">Usage data is shown on the Home page.</p>
           </div>
         );
 

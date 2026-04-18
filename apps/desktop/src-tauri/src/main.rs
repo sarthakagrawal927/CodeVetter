@@ -1,86 +1,35 @@
 // Prevent a console window from popping up on Windows release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod adapters;
-mod agent_monitor;
 mod commands;
-mod coordination;
 mod db;
-mod git_watcher;
-mod watcher;
+mod talk;
 
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
 /// Shared database state accessible from every Tauri command via
 /// `tauri::State<DbState>`.
-///
-/// Wrapped in `Arc` so background tasks (e.g. review sidecar) can clone
-/// a handle to the database without requiring `State` lifetime.
 #[derive(Clone)]
 pub struct DbState(pub Arc<Mutex<rusqlite::Connection>>);
 
 fn main() {
-    // Initialize a simple logger so that `log::info!` / `log::error!` calls
-    // from adapters and the watcher are visible during development.
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_process::init())
-        // .plugin(tauri_plugin_updater::Builder::new().build()) // disabled — no pubkey configured
         .setup(|app| {
-            // Resolve the app-local data directory for storing the SQLite DB.
             let app_data_dir = app
                 .path()
                 .app_data_dir()
                 .expect("failed to resolve app data dir");
 
-            // Open and migrate the database.
             let conn = db::init_db(app_data_dir.clone()).expect("failed to initialize database");
             app.manage(DbState(Arc::new(Mutex::new(conn))));
 
-            // ── Initialise coordination doc cache ─────────────────
-            app.manage(coordination::new_doc_cache());
-
-            // ── Initialise terminal state ─────────────────────────
-            commands::terminal::init_terminal_state(app);
-
-            // ── Start the background file watcher ────────────────
-            // Pass the AppHandle so the watcher can emit Tauri events.
-            let app_handle = app.handle().clone();
-            match watcher::start_watcher(app_handle) {
-                Ok(_watcher) => {
-                    // Leak the watcher handle so it lives for the lifetime of
-                    // the application.  We could store it in Tauri managed
-                    // state if we ever need to stop/restart it.
-                    std::mem::forget(_watcher);
-                    log::info!("File watcher started.");
-                }
-                Err(e) => {
-                    log::warn!("Could not start file watcher: {e}");
-                }
-            }
-
-            // ── Start git commit watcher ───────────────────────────
-            // Polls active agent project dirs for new commits.
-            let db_for_git = app.state::<DbState>().inner().clone();
-            let app_handle_git = app.handle().clone();
-            git_watcher::start_git_watcher(db_for_git, app_handle_git);
-            log::info!("Git watcher started.");
-
-            // ── Start agent process monitor ──────────────────────
-            // Checks if tracked agent PIDs are still alive.
-            let db_for_monitor = app.state::<DbState>().inner().clone();
-            let app_handle_monitor = app.handle().clone();
-            agent_monitor::start_agent_monitor(db_for_monitor, app_handle_monitor);
-            log::info!("Agent monitor started.");
-
             // ── Trigger initial index on startup ─────────────────
-            // Open a *separate* database connection for the background thread
-            // so we don't block the main Tauri command connection.  SQLite WAL
-            // mode allows concurrent readers.
             let bg_data_dir = app_data_dir;
             std::thread::Builder::new()
                 .name("initial-index".into())
@@ -91,7 +40,6 @@ fn main() {
                         Err(e) => log::error!("Quick index failed: {e}"),
                     }
 
-                    // Now run the full index to parse all messages/tokens.
                     log::info!("Starting full index...");
                     match run_full_index(bg_data_dir) {
                         Ok(msg) => log::info!("Full index complete: {msg}"),
@@ -100,7 +48,7 @@ fn main() {
                 })
                 .expect("failed to spawn initial-index thread");
 
-            // ── Periodic re-index (every 15 minutes) ────────────────────
+            // ── Periodic re-index (every 15 minutes) ─────────────
             let periodic_data_dir = app
                 .path()
                 .app_data_dir()
@@ -109,10 +57,7 @@ fn main() {
             std::thread::Builder::new()
                 .name("periodic-index".into())
                 .spawn(move || {
-                    // Wait 3 minutes before the first periodic run
-                    // (the initial index already ran at startup).
                     std::thread::sleep(std::time::Duration::from_secs(180));
-
                     loop {
                         log::info!("Periodic re-index starting...");
                         match db::init_db(periodic_data_dir.clone()) {
@@ -126,7 +71,6 @@ fn main() {
                                 log::error!("Periodic re-index DB init failed: {e}");
                             }
                         }
-                        // Sleep 15 minutes between runs
                         std::thread::sleep(std::time::Duration::from_secs(900));
                     }
                 })
@@ -135,7 +79,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            // Review commands
+            // Review
             commands::review::get_local_diff,
             commands::review::save_review,
             commands::review::get_review,
@@ -147,56 +91,28 @@ fn main() {
             commands::review::revert_files,
             // Blast radius (graph-aware PR analysis)
             commands::blast_radius::analyze_blast_radius,
-            // Session commands
+            // Sessions (used by Home for index stats)
             commands::sessions::list_sessions,
-            commands::sessions::get_session,
-            commands::sessions::search_messages,
-            commands::sessions::merge_sessions,
             commands::sessions::merge_projects,
-            commands::sessions::list_session_subagents,
-            commands::sessions::delete_session,
-            // History / indexer commands
+            // History / indexer
             commands::history::trigger_index,
             commands::history::get_index_stats,
             commands::history::detect_cursor,
-            // Agent commands
-            commands::agents::launch_agent,
-            commands::agents::stop_agent,
-            commands::agents::list_agents,
-            commands::agents::get_agent,
-            commands::agents::detect_running_agents,
-            commands::agents::list_agent_personas,
-            commands::agents::create_agent_persona,
-            commands::agents::update_agent_persona,
-            commands::agents::delete_agent_persona,
-            // Mission Control commands
-            commands::mission::create_task,
-            commands::mission::update_task,
-            commands::mission::list_tasks,
-            commands::mission::list_activity,
-            commands::mission::send_agent_message,
-            commands::mission::list_thread_messages,
-            commands::mission::get_cost_dashboard,
-            // Git commands
+            // Git
             commands::git::list_git_branches,
             commands::git::get_git_remote_info,
             commands::git::list_pull_requests,
             commands::git::check_github_auth,
             commands::git::sync_github_token,
             commands::git::get_git_changed_files,
-            // GitHub PR & CI operations
+            // GitHub PR & CI
             commands::github_ops::create_pull_request,
             commands::github_ops::list_pull_requests_for_repo,
             commands::github_ops::get_pull_request,
             commands::github_ops::merge_pull_request,
             commands::github_ops::list_ci_checks,
             commands::github_ops::rerun_failed_checks,
-            // Agent Presets
-            commands::presets::list_agent_presets,
-            commands::presets::create_agent_preset,
-            commands::presets::update_agent_preset,
-            commands::presets::delete_agent_preset,
-            // Provider Accounts
+            // Provider Accounts (Usage tab)
             commands::accounts::list_provider_accounts,
             commands::accounts::create_provider_account,
             commands::accounts::update_provider_account,
@@ -207,72 +123,23 @@ fn main() {
             // Preferences
             commands::preferences::get_preference,
             commands::preferences::set_preference,
-            // Linear
-            commands::linear::start_linear_oauth,
-            commands::linear::disconnect_linear,
-            commands::linear::check_linear_connection,
-            commands::linear::list_linear_issues,
-            commands::linear::import_linear_issues,
-            // Chat
-            commands::chat::send_chat_message,
-            commands::chat::list_chat_models,
-            // Chat Tabs
-            commands::chat_tabs::list_chat_tabs,
-            commands::chat_tabs::create_chat_tab,
-            commands::chat_tabs::update_chat_tab,
-            commands::chat_tabs::delete_chat_tab,
-            commands::chat_tabs::reorder_chat_tabs,
-            // Workspaces
-            commands::workspaces::list_workspaces,
-            commands::workspaces::create_workspace,
-            commands::workspaces::get_workspace,
-            commands::workspaces::update_workspace,
-            commands::workspaces::archive_workspace,
-            commands::workspaces::unarchive_workspace,
-            commands::workspaces::delete_workspace,
-            commands::workspaces::get_workspace_git_status,
-            // Terminal
-            commands::terminal::spawn_terminal,
-            commands::terminal::write_terminal,
-            commands::terminal::resize_terminal,
-            commands::terminal::close_terminal,
-            // System Monitor
-            commands::system_monitor::get_system_stats,
-            // Coordination (CRDT-based agent coordination)
-            commands::coordination::create_review_doc,
-            commands::coordination::get_review_state,
-            commands::coordination::claim_file,
-            commands::coordination::add_finding,
-            commands::coordination::update_agent_status,
-            commands::coordination::finalize_review,
-            // File Tree
+            // File operations (used by Review)
             commands::files::list_directory_tree,
             commands::files::read_file_preview,
             commands::files::read_file_around_line,
             commands::files::open_in_app,
-            // Diff Comments
-            commands::diff_comments::get_file_diff,
-            commands::diff_comments::list_diff_comments,
-            commands::diff_comments::create_diff_comment,
-            commands::diff_comments::update_diff_comment,
-            commands::diff_comments::delete_diff_comment,
-            // Playwright Test Generator
-            commands::playwright_gen::generate_playwright_test,
-            commands::playwright_gen::run_playwright_test,
-            commands::playwright_gen::iterate_playwright_test,
-            // Setup / onboarding
+            // Setup
             commands::setup::check_prerequisites,
+            // Agent Talks
+            commands::talks::get_talk,
+            commands::talks::list_project_talks,
+            commands::talks::get_latest_talk,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
 
 /// Run a lightweight startup index using its own database connection.
-///
-/// This quick-parses just the first few lines of each JSONL file to populate
-/// session metadata (session list, project names) so the UI has data
-/// immediately.  The full message-level index happens when the frontend
-/// calls `trigger_index`.
 fn run_initial_index(app_data_dir: std::path::PathBuf) -> Result<String, String> {
     use crate::db::queries;
 
@@ -336,7 +203,6 @@ fn run_initial_index(app_data_dir: std::path::PathBuf) -> Result<String, String>
                 .and_then(|m| m.modified().ok())
                 .map(|t| chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339());
 
-            // Skip files whose mtime has not changed since last index.
             if let Ok(Some(existing)) =
                 queries::get_session_by_jsonl_path(&conn, &jsonl_path_str)
             {
@@ -346,7 +212,6 @@ fn run_initial_index(app_data_dir: std::path::PathBuf) -> Result<String, String>
                 }
             }
 
-            // Quick-parse first few lines for session metadata.
             let (session_id, meta) = quick_parse_session_meta(jsonl_path);
 
             queries::upsert_session(
@@ -366,9 +231,9 @@ fn run_initial_index(app_data_dir: std::path::PathBuf) -> Result<String, String>
                     total_output_tokens: None,
                     model_used: meta.model,
                     slug: meta.slug,
-                    file_size_bytes: None,   // Don't set — full indexer needs to read from byte 0
-                    indexed_at: None,        // Not fully indexed yet
-                    file_mtime: None,        // Don't set — full indexer uses mtime to decide if it should run
+                    file_size_bytes: None,
+                    indexed_at: None,
+                    file_mtime: None,
                     cache_read_tokens: None,
                     cache_creation_tokens: None,
                     compaction_count: None,
@@ -396,17 +261,11 @@ fn run_initial_index(app_data_dir: std::path::PathBuf) -> Result<String, String>
     ))
 }
 
-/// Run a full index (including messages and token counts) using its own
-/// database connection.  This is the same logic as `trigger_index` but
-/// runs from a background thread at startup instead of from a Tauri command.
 fn run_full_index(app_data_dir: std::path::PathBuf) -> Result<String, String> {
     use crate::commands::history;
-
     let conn = db::init_db(app_data_dir).map_err(|e| e.to_string())?;
     history::run_full_index_with_conn(&conn)
 }
-
-// ─── Quick metadata parser for startup ──────────────────────────
 
 struct QuickMeta {
     version: Option<String>,
@@ -417,8 +276,6 @@ struct QuickMeta {
     first_timestamp: Option<String>,
 }
 
-/// Read just the first few lines of a JSONL file to extract session metadata
-/// without parsing the entire file.  Returns `(session_id, metadata)`.
 fn quick_parse_session_meta(path: &std::path::Path) -> (String, QuickMeta) {
     use std::io::BufRead;
 
@@ -440,7 +297,6 @@ fn quick_parse_session_meta(path: &std::path::Path) -> (String, QuickMeta) {
 
     let reader = std::io::BufReader::new(file);
 
-    // Read up to 10 lines to gather metadata.
     for line in reader.lines().take(10) {
         let line = match line {
             Ok(l) => l,
@@ -460,49 +316,25 @@ fn quick_parse_session_meta(path: &std::path::Path) -> (String, QuickMeta) {
             session_id = sid.to_string();
         }
         if meta.version.is_none() {
-            meta.version = parsed
-                .get("version")
-                .and_then(|v| v.as_str())
-                .map(String::from);
+            meta.version = parsed.get("version").and_then(|v| v.as_str()).map(String::from);
         }
         if meta.git_branch.is_none() {
-            meta.git_branch = parsed
-                .get("gitBranch")
-                .and_then(|v| v.as_str())
-                .map(String::from);
+            meta.git_branch = parsed.get("gitBranch").and_then(|v| v.as_str()).map(String::from);
         }
         if meta.cwd.is_none() {
-            meta.cwd = parsed
-                .get("cwd")
-                .and_then(|v| v.as_str())
-                .map(String::from);
+            meta.cwd = parsed.get("cwd").and_then(|v| v.as_str()).map(String::from);
         }
         if meta.slug.is_none() {
-            meta.slug = parsed
-                .get("slug")
-                .and_then(|v| v.as_str())
-                .map(String::from);
+            meta.slug = parsed.get("slug").and_then(|v| v.as_str()).map(String::from);
         }
         if meta.model.is_none() {
-            meta.model = parsed
-                .get("message")
-                .and_then(|m| m.get("model"))
-                .and_then(|v| v.as_str())
-                .map(String::from);
+            meta.model = parsed.get("message").and_then(|m| m.get("model")).and_then(|v| v.as_str()).map(String::from);
         }
         if meta.first_timestamp.is_none() {
-            meta.first_timestamp = parsed
-                .get("timestamp")
-                .and_then(|v| v.as_str())
-                .map(String::from);
+            meta.first_timestamp = parsed.get("timestamp").and_then(|v| v.as_str()).map(String::from);
         }
 
-        // If we have all metadata, stop early.
-        if meta.version.is_some()
-            && meta.git_branch.is_some()
-            && meta.cwd.is_some()
-            && meta.first_timestamp.is_some()
-        {
+        if meta.version.is_some() && meta.git_branch.is_some() && meta.cwd.is_some() && meta.first_timestamp.is_some() {
             break;
         }
     }
@@ -510,9 +342,6 @@ fn quick_parse_session_meta(path: &std::path::Path) -> (String, QuickMeta) {
     (session_id, meta)
 }
 
-// ─── Shared helpers (duplicated from history.rs for startup use) ─
-
-/// Collect all Claude profile project directories.
 fn resolve_all_claude_projects_dirs() -> Vec<std::path::PathBuf> {
     let home = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))

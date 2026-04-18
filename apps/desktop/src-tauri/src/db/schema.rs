@@ -316,4 +316,45 @@ CREATE TABLE IF NOT EXISTS diff_comments (
 
 CREATE INDEX IF NOT EXISTS idx_diff_comments_workspace
     ON diff_comments(workspace_id);
+
+-- ================================================================
+-- Agent Talks (structured handover between agent runs)
+-- ================================================================
+
+CREATE TABLE IF NOT EXISTS agent_talks (
+    id                      TEXT PRIMARY KEY,
+    agent_process_id        TEXT REFERENCES agent_processes(id),
+    review_id               TEXT REFERENCES local_reviews(id),
+    agent_type              TEXT NOT NULL,
+    project_path            TEXT NOT NULL,
+    role                    TEXT,
+
+    input_prompt            TEXT NOT NULL,
+    input_context           TEXT,
+
+    files_read              TEXT,
+    files_modified          TEXT,
+    actions_summary         TEXT,
+
+    output_raw              TEXT,
+    output_structured       TEXT,
+    exit_code               INTEGER,
+
+    unfinished_work         TEXT,
+    blockers                TEXT,
+
+    key_decisions           TEXT,
+    codebase_state          TEXT,
+    recommended_next_steps  TEXT,
+
+    duration_ms             INTEGER,
+    session_id              TEXT,
+    created_at              TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_talks_project
+    ON agent_talks(project_path, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_agent_talks_review
+    ON agent_talks(review_id);
 "#;

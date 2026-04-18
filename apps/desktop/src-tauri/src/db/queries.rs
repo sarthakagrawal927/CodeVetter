@@ -31,33 +31,6 @@ pub struct SessionRow {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MessageRow {
-    pub id: String,
-    pub session_id: String,
-    pub parent_uuid: Option<String>,
-    #[serde(rename = "type")]
-    pub msg_type: Option<String>,
-    pub role: Option<String>,
-    pub content_text: Option<String>,
-    pub model: Option<String>,
-    pub input_tokens: Option<i64>,
-    pub output_tokens: Option<i64>,
-    pub timestamp: Option<String>,
-    pub line_number: Option<i64>,
-    pub is_sidechain: i64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SearchResult {
-    pub message_id: String,
-    pub session_id: String,
-    pub content_text: String,
-    pub role: Option<String>,
-    pub timestamp: Option<String>,
-    pub rank: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LocalReviewRow {
     pub id: String,
     pub review_type: Option<String>,
@@ -92,46 +65,28 @@ pub struct LocalReviewFindingRow {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentProcessRow {
+pub struct AgentTalkRow {
     pub id: String,
-    pub agent_type: String,
-    pub project_path: Option<String>,
-    pub session_id: Option<String>,
-    pub pid: Option<i64>,
-    pub role: Option<String>,
-    pub display_name: Option<String>,
-    pub status: String,
-    pub total_input_tokens: i64,
-    pub total_output_tokens: i64,
-    pub estimated_cost_usd: f64,
-    pub started_at: Option<String>,
-    pub stopped_at: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentTaskRow {
-    pub id: String,
-    pub title: String,
-    pub description: Option<String>,
-    pub acceptance_criteria: Option<String>,
-    pub project_path: Option<String>,
-    pub workspace_id: Option<String>,
-    pub status: String,
-    pub assigned_agent: Option<String>,
+    pub agent_process_id: Option<String>,
     pub review_id: Option<String>,
-    pub review_score: Option<f64>,
-    pub review_attempts: i64,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActivityRow {
-    pub id: String,
-    pub agent_id: Option<String>,
-    pub event_type: Option<String>,
-    pub summary: Option<String>,
-    pub metadata: Option<String>,
+    pub agent_type: String,
+    pub project_path: String,
+    pub role: Option<String>,
+    pub input_prompt: String,
+    pub input_context: Option<String>,
+    pub files_read: Option<String>,
+    pub files_modified: Option<String>,
+    pub actions_summary: Option<String>,
+    pub output_raw: Option<String>,
+    pub output_structured: Option<String>,
+    pub exit_code: Option<i32>,
+    pub unfinished_work: Option<String>,
+    pub blockers: Option<String>,
+    pub key_decisions: Option<String>,
+    pub codebase_state: Option<String>,
+    pub recommended_next_steps: Option<String>,
+    pub duration_ms: Option<i64>,
+    pub session_id: Option<String>,
     pub created_at: String,
 }
 
@@ -223,25 +178,6 @@ pub struct LocalReviewFindingInput {
     pub line: Option<i64>,
     pub confidence: Option<f64>,
     pub fingerprint: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentTaskInput {
-    pub title: String,
-    pub description: Option<String>,
-    pub acceptance_criteria: Option<String>,
-    pub project_path: Option<String>,
-    pub workspace_id: Option<String>,
-    pub status: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentTaskUpdate {
-    pub status: Option<String>,
-    pub assigned_agent: Option<String>,
-    pub review_id: Option<String>,
-    pub review_score: Option<f64>,
-    pub review_attempts: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -460,62 +396,6 @@ pub fn upsert_session(conn: &Connection, s: &SessionInput) -> Result<(), rusqlit
 // Messages
 // ─────────────────────────────────────────────────────────────────
 
-pub fn get_session_messages(
-    conn: &Connection,
-    session_id: &str,
-) -> Result<Vec<MessageRow>, rusqlite::Error> {
-    let mut stmt = conn.prepare(
-        "SELECT id, session_id, parent_uuid, type, role, content_text,
-                model, input_tokens, output_tokens, timestamp, line_number, is_sidechain
-         FROM cc_messages
-         WHERE session_id = ?1
-         ORDER BY line_number ASC, timestamp ASC",
-    )?;
-    let rows = stmt.query_map(params![session_id], |row| {
-        Ok(MessageRow {
-            id: row.get(0)?,
-            session_id: row.get(1)?,
-            parent_uuid: row.get(2)?,
-            msg_type: row.get(3)?,
-            role: row.get(4)?,
-            content_text: row.get(5)?,
-            model: row.get(6)?,
-            input_tokens: row.get(7)?,
-            output_tokens: row.get(8)?,
-            timestamp: row.get(9)?,
-            line_number: row.get(10)?,
-            is_sidechain: row.get(11)?,
-        })
-    })?;
-    rows.collect()
-}
-
-pub fn search_messages(
-    conn: &Connection,
-    query: &str,
-) -> Result<Vec<SearchResult>, rusqlite::Error> {
-    let mut stmt = conn.prepare(
-        "SELECT m.id, m.session_id, m.content_text, m.role, m.timestamp,
-                fts.rank
-         FROM cc_messages_fts fts
-         JOIN cc_messages m ON m.rowid = fts.rowid
-         WHERE cc_messages_fts MATCH ?1
-         ORDER BY fts.rank
-         LIMIT 100",
-    )?;
-    let rows = stmt.query_map(params![query], |row| {
-        Ok(SearchResult {
-            message_id: row.get(0)?,
-            session_id: row.get(1)?,
-            content_text: row.get(2)?,
-            role: row.get(3)?,
-            timestamp: row.get(4)?,
-            rank: row.get(5)?,
-        })
-    })?;
-    rows.collect()
-}
-
 pub fn insert_message(conn: &Connection, m: &MessageInput) -> Result<(), rusqlite::Error> {
     conn.execute(
         "INSERT OR IGNORE INTO cc_messages (
@@ -624,14 +504,6 @@ pub fn insert_review_finding(
         ],
     )?;
     Ok(id)
-}
-
-pub fn list_local_reviews(
-    conn: &Connection,
-    limit: i64,
-    offset: i64,
-) -> Result<Vec<LocalReviewRow>, rusqlite::Error> {
-    list_local_reviews_filtered(conn, limit, offset, None)
 }
 
 pub fn list_local_reviews_filtered(
@@ -749,94 +621,6 @@ pub fn get_local_review_with_findings(
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Agent Tasks
-// ─────────────────────────────────────────────────────────────────
-
-pub fn create_agent_task(
-    conn: &Connection,
-    input: &AgentTaskInput,
-) -> Result<String, rusqlite::Error> {
-    let id = uuid::Uuid::new_v4().to_string();
-    let now = chrono::Utc::now().to_rfc3339();
-    conn.execute(
-        "INSERT INTO agent_tasks (id, title, description, acceptance_criteria, project_path, workspace_id, status, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-        params![
-            id,
-            input.title,
-            input.description,
-            input.acceptance_criteria,
-            input.project_path,
-            input.workspace_id,
-            input.status.as_deref().unwrap_or("todo"),
-            now,
-            now,
-        ],
-    )?;
-    Ok(id)
-}
-
-pub fn update_agent_task(
-    conn: &Connection,
-    id: &str,
-    u: &AgentTaskUpdate,
-) -> Result<(), rusqlite::Error> {
-    let now = chrono::Utc::now().to_rfc3339();
-    conn.execute(
-        "UPDATE agent_tasks SET
-            status          = COALESCE(?2, status),
-            assigned_agent  = COALESCE(?3, assigned_agent),
-            review_id       = COALESCE(?4, review_id),
-            review_score    = COALESCE(?5, review_score),
-            review_attempts = COALESCE(?6, review_attempts),
-            updated_at      = ?7
-         WHERE id = ?1",
-        params![
-            id,
-            u.status,
-            u.assigned_agent,
-            u.review_id,
-            u.review_score,
-            u.review_attempts,
-            now,
-        ],
-    )?;
-    Ok(())
-}
-
-pub fn list_agent_tasks(
-    conn: &Connection,
-    status: Option<&str>,
-) -> Result<Vec<AgentTaskRow>, rusqlite::Error> {
-    let mut stmt = conn.prepare(
-        "SELECT id, title, description, acceptance_criteria, project_path, workspace_id, status,
-                assigned_agent, review_id, review_score, review_attempts,
-                created_at, updated_at
-         FROM agent_tasks
-         WHERE (?1 IS NULL OR status = ?1)
-         ORDER BY updated_at DESC",
-    )?;
-    let rows = stmt.query_map(params![status], |row| {
-        Ok(AgentTaskRow {
-            id: row.get(0)?,
-            title: row.get(1)?,
-            description: row.get(2)?,
-            acceptance_criteria: row.get(3)?,
-            project_path: row.get(4)?,
-            workspace_id: row.get(5)?,
-            status: row.get(6)?,
-            assigned_agent: row.get(7)?,
-            review_id: row.get(8)?,
-            review_score: row.get(9)?,
-            review_attempts: row.get(10)?,
-            created_at: row.get(11)?,
-            updated_at: row.get(12)?,
-        })
-    })?;
-    rows.collect()
-}
-
-// ─────────────────────────────────────────────────────────────────
 // Activity Log
 // ─────────────────────────────────────────────────────────────────
 
@@ -848,365 +632,6 @@ pub fn log_activity(conn: &Connection, entry: &ActivityInput) -> Result<(), rusq
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         params![id, entry.agent_id, entry.event_type, entry.summary, entry.metadata, now],
     )?;
-    Ok(())
-}
-
-pub fn list_activity(
-    conn: &Connection,
-    agent_id: Option<&str>,
-    limit: i64,
-) -> Result<Vec<ActivityRow>, rusqlite::Error> {
-    let mut stmt = conn.prepare(
-        "SELECT id, agent_id, event_type, summary, metadata, created_at
-         FROM activity_log
-         WHERE (?1 IS NULL OR agent_id = ?1)
-         ORDER BY created_at DESC
-         LIMIT ?2",
-    )?;
-    let rows = stmt.query_map(params![agent_id, limit], |row| {
-        Ok(ActivityRow {
-            id: row.get(0)?,
-            agent_id: row.get(1)?,
-            event_type: row.get(2)?,
-            summary: row.get(3)?,
-            metadata: row.get(4)?,
-            created_at: row.get(5)?,
-        })
-    })?;
-    rows.collect()
-}
-
-// ─────────────────────────────────────────────────────────────────
-// Agent Processes
-// ─────────────────────────────────────────────────────────────────
-
-pub fn insert_agent_process(
-    conn: &Connection,
-    agent: &AgentProcessRow,
-) -> Result<(), rusqlite::Error> {
-    conn.execute(
-        "INSERT INTO agent_processes (
-            id, agent_type, project_path, session_id, pid, role,
-            display_name, status, total_input_tokens, total_output_tokens,
-            estimated_cost_usd, started_at, stopped_at
-         ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13)",
-        params![
-            agent.id,
-            agent.agent_type,
-            agent.project_path,
-            agent.session_id,
-            agent.pid,
-            agent.role,
-            agent.display_name,
-            agent.status,
-            agent.total_input_tokens,
-            agent.total_output_tokens,
-            agent.estimated_cost_usd,
-            agent.started_at,
-            agent.stopped_at,
-        ],
-    )?;
-    Ok(())
-}
-
-pub fn update_agent_process_status(
-    conn: &Connection,
-    id: &str,
-    status: &str,
-    stopped_at: Option<&str>,
-) -> Result<(), rusqlite::Error> {
-    conn.execute(
-        "UPDATE agent_processes SET status = ?2, stopped_at = COALESCE(?3, stopped_at) WHERE id = ?1",
-        params![id, status, stopped_at],
-    )?;
-    Ok(())
-}
-
-pub fn count_running_agents(conn: &Connection) -> Result<i64, rusqlite::Error> {
-    conn.query_row(
-        "SELECT COUNT(*) FROM agent_processes WHERE status = 'running'",
-        [],
-        |row| row.get(0),
-    )
-}
-
-pub fn list_agent_processes(conn: &Connection) -> Result<Vec<AgentProcessRow>, rusqlite::Error> {
-    let mut stmt = conn.prepare(
-        "SELECT id, agent_type, project_path, session_id, pid, role,
-                display_name, status, total_input_tokens, total_output_tokens,
-                estimated_cost_usd, started_at, stopped_at
-         FROM agent_processes
-         ORDER BY started_at DESC",
-    )?;
-    let rows = stmt.query_map([], |row| {
-        Ok(AgentProcessRow {
-            id: row.get(0)?,
-            agent_type: row.get(1)?,
-            project_path: row.get(2)?,
-            session_id: row.get(3)?,
-            pid: row.get(4)?,
-            role: row.get(5)?,
-            display_name: row.get(6)?,
-            status: row.get(7)?,
-            total_input_tokens: row.get(8)?,
-            total_output_tokens: row.get(9)?,
-            estimated_cost_usd: row.get(10)?,
-            started_at: row.get(11)?,
-            stopped_at: row.get(12)?,
-        })
-    })?;
-    rows.collect()
-}
-
-pub fn get_agent_process(
-    conn: &Connection,
-    id: &str,
-) -> Result<Option<AgentProcessRow>, rusqlite::Error> {
-    conn.query_row(
-        "SELECT id, agent_type, project_path, session_id, pid, role,
-                display_name, status, total_input_tokens, total_output_tokens,
-                estimated_cost_usd, started_at, stopped_at
-         FROM agent_processes WHERE id = ?1",
-        params![id],
-        |row| {
-            Ok(AgentProcessRow {
-                id: row.get(0)?,
-                agent_type: row.get(1)?,
-                project_path: row.get(2)?,
-                session_id: row.get(3)?,
-                pid: row.get(4)?,
-                role: row.get(5)?,
-                display_name: row.get(6)?,
-                status: row.get(7)?,
-                total_input_tokens: row.get(8)?,
-                total_output_tokens: row.get(9)?,
-                estimated_cost_usd: row.get(10)?,
-                started_at: row.get(11)?,
-                stopped_at: row.get(12)?,
-            })
-        },
-    )
-    .optional()
-}
-
-// ─────────────────────────────────────────────────────────────────
-// Agent Messages (inter-agent chat)
-// ─────────────────────────────────────────────────────────────────
-
-pub fn insert_agent_message(
-    conn: &Connection,
-    thread_id: &str,
-    sender_type: &str,
-    sender_agent_id: Option<&str>,
-    content: &str,
-    mentions: Option<&str>,
-) -> Result<String, rusqlite::Error> {
-    let id = uuid::Uuid::new_v4().to_string();
-    let now = chrono::Utc::now().to_rfc3339();
-    conn.execute(
-        "INSERT INTO agent_messages (id, thread_id, sender_type, sender_agent_id, content, mentions, delivered, created_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7)",
-        params![id, thread_id, sender_type, sender_agent_id, content, mentions, now],
-    )?;
-    Ok(id)
-}
-
-// ─────────────────────────────────────────────────────────────────
-// Agent Messages — thread listing
-// ─────────────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentMessageRow {
-    pub id: String,
-    pub thread_id: String,
-    pub sender_type: String,
-    pub sender_agent_id: Option<String>,
-    pub content: String,
-    pub mentions: Option<String>,
-    pub delivered: i64,
-    pub created_at: String,
-}
-
-pub fn list_agent_messages(
-    conn: &Connection,
-    thread_id: &str,
-    limit: i64,
-) -> Result<Vec<AgentMessageRow>, rusqlite::Error> {
-    let mut stmt = conn.prepare(
-        "SELECT id, thread_id, sender_type, sender_agent_id, content,
-                mentions, delivered, created_at
-         FROM agent_messages
-         WHERE thread_id = ?1
-         ORDER BY created_at ASC
-         LIMIT ?2",
-    )?;
-    let rows = stmt.query_map(params![thread_id, limit], |row| {
-        Ok(AgentMessageRow {
-            id: row.get(0)?,
-            thread_id: row.get(1)?,
-            sender_type: row.get(2)?,
-            sender_agent_id: row.get(3)?,
-            content: row.get(4)?,
-            mentions: row.get(5)?,
-            delivered: row.get(6)?,
-            created_at: row.get(7)?,
-        })
-    })?;
-    rows.collect()
-}
-
-// ─────────────────────────────────────────────────────────────────
-// Agent Cost — aggregation and logging
-// ─────────────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentCostSummary {
-    pub agent_id: String,
-    pub agent_type: String,
-    pub display_name: Option<String>,
-    pub total_input_tokens: i64,
-    pub total_output_tokens: i64,
-    pub total_cost_usd: f64,
-    pub entry_count: i64,
-}
-
-pub fn get_cost_dashboard(conn: &Connection) -> Result<Vec<AgentCostSummary>, rusqlite::Error> {
-    let mut stmt = conn.prepare(
-        "SELECT p.id, p.agent_type, p.display_name,
-                COALESCE(SUM(c.input_tokens), 0),
-                COALESCE(SUM(c.output_tokens), 0),
-                COALESCE(SUM(c.cost_usd), 0.0),
-                COUNT(c.id)
-         FROM agent_processes p
-         LEFT JOIN agent_cost_log c ON c.agent_id = p.id
-         GROUP BY p.id
-         ORDER BY COALESCE(SUM(c.cost_usd), 0.0) DESC",
-    )?;
-    let rows = stmt.query_map([], |row| {
-        Ok(AgentCostSummary {
-            agent_id: row.get(0)?,
-            agent_type: row.get(1)?,
-            display_name: row.get(2)?,
-            total_input_tokens: row.get(3)?,
-            total_output_tokens: row.get(4)?,
-            total_cost_usd: row.get(5)?,
-            entry_count: row.get(6)?,
-        })
-    })?;
-    rows.collect()
-}
-
-// ─────────────────────────────────────────────────────────────────
-// Agent Presets
-// ─────────────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentPresetRow {
-    pub id: String,
-    pub name: String,
-    pub adapter: String,
-    pub role: Option<String>,
-    pub system_prompt: Option<String>,
-    pub model: Option<String>,
-    pub max_turns: Option<i64>,
-    pub allowed_tools: Option<String>,
-    pub output_format: Option<String>,
-    pub print_mode: i64,
-    pub no_session_persist: i64,
-    pub approval_mode: Option<String>,
-    pub quiet_mode: i64,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-pub fn list_agent_presets(conn: &Connection) -> Result<Vec<AgentPresetRow>, rusqlite::Error> {
-    let mut stmt = conn.prepare(
-        "SELECT id, name, adapter, role, system_prompt, model, max_turns,
-                allowed_tools, output_format, print_mode, no_session_persist,
-                approval_mode, quiet_mode, created_at, updated_at
-         FROM agent_presets
-         ORDER BY name ASC",
-    )?;
-    let rows = stmt.query_map([], |row| {
-        Ok(AgentPresetRow {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            adapter: row.get(2)?,
-            role: row.get(3)?,
-            system_prompt: row.get(4)?,
-            model: row.get(5)?,
-            max_turns: row.get(6)?,
-            allowed_tools: row.get(7)?,
-            output_format: row.get(8)?,
-            print_mode: row.get(9)?,
-            no_session_persist: row.get(10)?,
-            approval_mode: row.get(11)?,
-            quiet_mode: row.get(12)?,
-            created_at: row.get(13)?,
-            updated_at: row.get(14)?,
-        })
-    })?;
-    rows.collect()
-}
-
-pub fn create_agent_preset(conn: &Connection, preset: &AgentPresetRow) -> Result<(), rusqlite::Error> {
-    conn.execute(
-        "INSERT INTO agent_presets (
-            id, name, adapter, role, system_prompt, model, max_turns,
-            allowed_tools, output_format, print_mode, no_session_persist,
-            approval_mode, quiet_mode, created_at, updated_at
-         ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)",
-        params![
-            preset.id,
-            preset.name,
-            preset.adapter,
-            preset.role,
-            preset.system_prompt,
-            preset.model,
-            preset.max_turns,
-            preset.allowed_tools,
-            preset.output_format,
-            preset.print_mode,
-            preset.no_session_persist,
-            preset.approval_mode,
-            preset.quiet_mode,
-            preset.created_at,
-            preset.updated_at,
-        ],
-    )?;
-    Ok(())
-}
-
-pub fn update_agent_preset(conn: &Connection, preset: &AgentPresetRow) -> Result<(), rusqlite::Error> {
-    conn.execute(
-        "UPDATE agent_presets SET
-            name = ?2, adapter = ?3, role = ?4, system_prompt = ?5,
-            model = ?6, max_turns = ?7, allowed_tools = ?8,
-            output_format = ?9, print_mode = ?10, no_session_persist = ?11,
-            approval_mode = ?12, quiet_mode = ?13, updated_at = ?14
-         WHERE id = ?1",
-        params![
-            preset.id,
-            preset.name,
-            preset.adapter,
-            preset.role,
-            preset.system_prompt,
-            preset.model,
-            preset.max_turns,
-            preset.allowed_tools,
-            preset.output_format,
-            preset.print_mode,
-            preset.no_session_persist,
-            preset.approval_mode,
-            preset.quiet_mode,
-            preset.updated_at,
-        ],
-    )?;
-    Ok(())
-}
-
-pub fn delete_agent_preset(conn: &Connection, id: &str) -> Result<(), rusqlite::Error> {
-    conn.execute("DELETE FROM agent_presets WHERE id = ?1", params![id])?;
     Ok(())
 }
 
@@ -1352,347 +777,211 @@ pub fn get_index_stats(conn: &Connection) -> Result<IndexStats, rusqlite::Error>
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Workspaces
+// Agent Talks
 // ─────────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorkspaceRow {
-    pub id: String,
-    pub name: String,
-    pub repo_path: String,
-    pub branch: String,
-    pub pr_number: Option<i64>,
-    pub pr_url: Option<String>,
-    pub status: String,
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AgentTalkInput {
+    pub agent_process_id: Option<String>,
+    pub review_id: Option<String>,
+    pub agent_type: String,
+    pub project_path: String,
+    pub role: Option<String>,
+    pub input_prompt: String,
+    pub input_context: Option<String>,
+    pub files_read: Option<String>,
+    pub files_modified: Option<String>,
+    pub actions_summary: Option<String>,
+    pub output_raw: Option<String>,
+    pub output_structured: Option<String>,
+    pub exit_code: Option<i32>,
+    pub unfinished_work: Option<String>,
+    pub blockers: Option<String>,
+    pub key_decisions: Option<String>,
+    pub codebase_state: Option<String>,
+    pub recommended_next_steps: Option<String>,
+    pub duration_ms: Option<i64>,
     pub session_id: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-    pub archived_at: Option<String>,
 }
 
-pub fn list_workspaces(
+pub fn insert_agent_talk(
     conn: &Connection,
-    status_filter: Option<&str>,
-) -> Result<Vec<WorkspaceRow>, rusqlite::Error> {
-    let sql = "
-        SELECT id, name, repo_path, branch, pr_number, pr_url,
-               status, session_id, created_at, updated_at, archived_at
-        FROM workspaces
-        WHERE (?1 IS NULL OR status = ?1)
-        ORDER BY updated_at DESC
-    ";
-    let mut stmt = conn.prepare(sql)?;
-    let rows = stmt.query_map(params![status_filter], |row| {
-        Ok(WorkspaceRow {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            repo_path: row.get(2)?,
-            branch: row.get(3)?,
-            pr_number: row.get(4)?,
-            pr_url: row.get(5)?,
-            status: row.get(6)?,
-            session_id: row.get(7)?,
-            created_at: row.get(8)?,
-            updated_at: row.get(9)?,
-            archived_at: row.get(10)?,
-        })
-    })?;
-    rows.collect()
+    input: &AgentTalkInput,
+) -> Result<String, rusqlite::Error> {
+    let id = uuid::Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().to_rfc3339();
+    conn.execute(
+        "INSERT INTO agent_talks (
+            id, agent_process_id, review_id, agent_type, project_path, role,
+            input_prompt, input_context,
+            files_read, files_modified, actions_summary,
+            output_raw, output_structured, exit_code,
+            unfinished_work, blockers,
+            key_decisions, codebase_state, recommended_next_steps,
+            duration_ms, session_id, created_at
+         ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22)",
+        params![
+            id,
+            input.agent_process_id,
+            input.review_id,
+            input.agent_type,
+            input.project_path,
+            input.role,
+            input.input_prompt,
+            input.input_context,
+            input.files_read,
+            input.files_modified,
+            input.actions_summary,
+            input.output_raw,
+            input.output_structured,
+            input.exit_code,
+            input.unfinished_work,
+            input.blockers,
+            input.key_decisions,
+            input.codebase_state,
+            input.recommended_next_steps,
+            input.duration_ms,
+            input.session_id,
+            now,
+        ],
+    )?;
+    Ok(id)
 }
 
-pub fn get_workspace(
+pub fn get_agent_talk(
     conn: &Connection,
     id: &str,
-) -> Result<Option<WorkspaceRow>, rusqlite::Error> {
+) -> Result<Option<AgentTalkRow>, rusqlite::Error> {
     conn.query_row(
-        "SELECT id, name, repo_path, branch, pr_number, pr_url,
-                status, session_id, created_at, updated_at, archived_at
-         FROM workspaces WHERE id = ?1",
+        "SELECT id, agent_process_id, review_id, agent_type, project_path, role,
+                input_prompt, input_context,
+                files_read, files_modified, actions_summary,
+                output_raw, output_structured, exit_code,
+                unfinished_work, blockers,
+                key_decisions, codebase_state, recommended_next_steps,
+                duration_ms, session_id, created_at
+         FROM agent_talks WHERE id = ?1",
         params![id],
         |row| {
-            Ok(WorkspaceRow {
+            Ok(AgentTalkRow {
                 id: row.get(0)?,
-                name: row.get(1)?,
-                repo_path: row.get(2)?,
-                branch: row.get(3)?,
-                pr_number: row.get(4)?,
-                pr_url: row.get(5)?,
-                status: row.get(6)?,
-                session_id: row.get(7)?,
-                created_at: row.get(8)?,
-                updated_at: row.get(9)?,
-                archived_at: row.get(10)?,
+                agent_process_id: row.get(1)?,
+                review_id: row.get(2)?,
+                agent_type: row.get(3)?,
+                project_path: row.get(4)?,
+                role: row.get(5)?,
+                input_prompt: row.get(6)?,
+                input_context: row.get(7)?,
+                files_read: row.get(8)?,
+                files_modified: row.get(9)?,
+                actions_summary: row.get(10)?,
+                output_raw: row.get(11)?,
+                output_structured: row.get(12)?,
+                exit_code: row.get(13)?,
+                unfinished_work: row.get(14)?,
+                blockers: row.get(15)?,
+                key_decisions: row.get(16)?,
+                codebase_state: row.get(17)?,
+                recommended_next_steps: row.get(18)?,
+                duration_ms: row.get(19)?,
+                session_id: row.get(20)?,
+                created_at: row.get(21)?,
             })
         },
     )
     .optional()
 }
 
-pub fn create_workspace(conn: &Connection, w: &WorkspaceRow) -> Result<(), rusqlite::Error> {
-    conn.execute(
-        "INSERT INTO workspaces (
-            id, name, repo_path, branch, pr_number, pr_url,
-            status, session_id, created_at, updated_at, archived_at
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-        params![
-            w.id,
-            w.name,
-            w.repo_path,
-            w.branch,
-            w.pr_number,
-            w.pr_url,
-            w.status,
-            w.session_id,
-            w.created_at,
-            w.updated_at,
-            w.archived_at,
-        ],
-    )?;
-    Ok(())
-}
-
-pub fn update_workspace(
+pub fn get_latest_talk_for_project(
     conn: &Connection,
-    id: &str,
-    name: Option<&str>,
-    branch: Option<&str>,
-    status: Option<&str>,
-    session_id: Option<&str>,
-    pr_number: Option<i64>,
-    pr_url: Option<&str>,
-    updated_at: &str,
-) -> Result<(), rusqlite::Error> {
-    conn.execute(
-        "UPDATE workspaces SET
-            name       = COALESCE(?2, name),
-            branch     = COALESCE(?3, branch),
-            status     = COALESCE(?4, status),
-            session_id = COALESCE(?5, session_id),
-            pr_number  = COALESCE(?6, pr_number),
-            pr_url     = COALESCE(?7, pr_url),
-            updated_at = ?8
-         WHERE id = ?1",
-        params![id, name, branch, status, session_id, pr_number, pr_url, updated_at],
-    )?;
-    Ok(())
+    project_path: &str,
+) -> Result<Option<AgentTalkRow>, rusqlite::Error> {
+    conn.query_row(
+        "SELECT id, agent_process_id, review_id, agent_type, project_path, role,
+                input_prompt, input_context,
+                files_read, files_modified, actions_summary,
+                output_raw, output_structured, exit_code,
+                unfinished_work, blockers,
+                key_decisions, codebase_state, recommended_next_steps,
+                duration_ms, session_id, created_at
+         FROM agent_talks
+         WHERE project_path = ?1
+         ORDER BY created_at DESC
+         LIMIT 1",
+        params![project_path],
+        |row| {
+            Ok(AgentTalkRow {
+                id: row.get(0)?,
+                agent_process_id: row.get(1)?,
+                review_id: row.get(2)?,
+                agent_type: row.get(3)?,
+                project_path: row.get(4)?,
+                role: row.get(5)?,
+                input_prompt: row.get(6)?,
+                input_context: row.get(7)?,
+                files_read: row.get(8)?,
+                files_modified: row.get(9)?,
+                actions_summary: row.get(10)?,
+                output_raw: row.get(11)?,
+                output_structured: row.get(12)?,
+                exit_code: row.get(13)?,
+                unfinished_work: row.get(14)?,
+                blockers: row.get(15)?,
+                key_decisions: row.get(16)?,
+                codebase_state: row.get(17)?,
+                recommended_next_steps: row.get(18)?,
+                duration_ms: row.get(19)?,
+                session_id: row.get(20)?,
+                created_at: row.get(21)?,
+            })
+        },
+    )
+    .optional()
 }
 
-pub fn archive_workspace(conn: &Connection, id: &str, now: &str) -> Result<(), rusqlite::Error> {
-    conn.execute(
-        "UPDATE workspaces SET archived_at = ?2, updated_at = ?2 WHERE id = ?1",
-        params![id, now],
-    )?;
-    Ok(())
-}
-
-pub fn unarchive_workspace(conn: &Connection, id: &str, now: &str) -> Result<(), rusqlite::Error> {
-    conn.execute(
-        "UPDATE workspaces SET archived_at = NULL, updated_at = ?2 WHERE id = ?1",
-        params![id, now],
-    )?;
-    Ok(())
-}
-
-pub fn delete_workspace(conn: &Connection, id: &str) -> Result<(), rusqlite::Error> {
-    conn.execute("DELETE FROM workspaces WHERE id = ?1", params![id])?;
-    Ok(())
-}
-
-// ─────────────────────────────────────────────────────────────────
-// Chat Tabs
-// ─────────────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChatTabRow {
-    pub id: String,
-    pub title: String,
-    pub session_id: Option<String>,
-    pub project_path: Option<String>,
-    pub model: String,
-    pub position: i64,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-pub fn list_chat_tabs(conn: &Connection) -> Result<Vec<ChatTabRow>, rusqlite::Error> {
-    let sql = "
-        SELECT id, title, session_id, project_path, model, position, created_at, updated_at
-        FROM chat_tabs
-        ORDER BY position ASC
-    ";
-    let mut stmt = conn.prepare(sql)?;
-    let rows = stmt.query_map([], |row| {
-        Ok(ChatTabRow {
-            id: row.get(0)?,
-            title: row.get(1)?,
-            session_id: row.get(2)?,
-            project_path: row.get(3)?,
-            model: row.get(4)?,
-            position: row.get(5)?,
-            created_at: row.get(6)?,
-            updated_at: row.get(7)?,
-        })
-    })?;
-    rows.collect()
-}
-
-pub fn create_chat_tab(conn: &Connection, tab: &ChatTabRow) -> Result<(), rusqlite::Error> {
-    conn.execute(
-        "INSERT INTO chat_tabs (id, title, session_id, project_path, model, position, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-        params![
-            tab.id,
-            tab.title,
-            tab.session_id,
-            tab.project_path,
-            tab.model,
-            tab.position,
-            tab.created_at,
-            tab.updated_at,
-        ],
-    )?;
-    Ok(())
-}
-
-pub fn update_chat_tab(
+pub fn list_talks_for_project(
     conn: &Connection,
-    id: &str,
-    title: Option<&str>,
-    session_id: Option<&str>,
-    model: Option<&str>,
-    project_path: Option<&str>,
-    position: Option<i64>,
-    updated_at: &str,
-) -> Result<(), rusqlite::Error> {
-    conn.execute(
-        "UPDATE chat_tabs SET
-            title        = COALESCE(?2, title),
-            session_id   = COALESCE(?3, session_id),
-            model        = COALESCE(?4, model),
-            project_path = COALESCE(?5, project_path),
-            position     = COALESCE(?6, position),
-            updated_at   = ?7
-         WHERE id = ?1",
-        params![id, title, session_id, model, project_path, position, updated_at],
-    )?;
-    Ok(())
-}
-
-pub fn delete_chat_tab(conn: &Connection, id: &str) -> Result<(), rusqlite::Error> {
-    conn.execute("DELETE FROM chat_tabs WHERE id = ?1", params![id])?;
-    Ok(())
-}
-
-pub fn reorder_chat_tabs(conn: &Connection, tab_ids: &[String], updated_at: &str) -> Result<(), rusqlite::Error> {
+    project_path: &str,
+    limit: i64,
+) -> Result<Vec<AgentTalkRow>, rusqlite::Error> {
     let mut stmt = conn.prepare(
-        "UPDATE chat_tabs SET position = ?2, updated_at = ?3 WHERE id = ?1",
+        "SELECT id, agent_process_id, review_id, agent_type, project_path, role,
+                input_prompt, input_context,
+                files_read, files_modified, actions_summary,
+                output_raw, output_structured, exit_code,
+                unfinished_work, blockers,
+                key_decisions, codebase_state, recommended_next_steps,
+                duration_ms, session_id, created_at
+         FROM agent_talks
+         WHERE project_path = ?1
+         ORDER BY created_at DESC
+         LIMIT ?2",
     )?;
-    for (i, id) in tab_ids.iter().enumerate() {
-        stmt.execute(params![id, i as i64, updated_at])?;
-    }
-    Ok(())
-}
-
-pub fn next_chat_tab_position(conn: &Connection) -> Result<i64, rusqlite::Error> {
-    let max: Option<i64> = conn.query_row(
-        "SELECT MAX(position) FROM chat_tabs",
-        [],
-        |row| row.get(0),
-    )?;
-    Ok(max.unwrap_or(-1) + 1)
-}
-
-// ─────────────────────────────────────────────────────────────────
-// Diff Comments
-// ─────────────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DiffCommentRow {
-    pub id: String,
-    pub workspace_id: String,
-    pub file_path: String,
-    pub start_line: i64,
-    pub end_line: i64,
-    pub content: String,
-    pub status: String,
-    pub github_comment_id: Option<String>,
-    pub author: String,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-pub fn list_diff_comments(
-    conn: &Connection,
-    workspace_id: &str,
-) -> Result<Vec<DiffCommentRow>, rusqlite::Error> {
-    let sql = "
-        SELECT id, workspace_id, file_path, start_line, end_line,
-               content, status, github_comment_id, author, created_at, updated_at
-        FROM diff_comments
-        WHERE workspace_id = ?1
-        ORDER BY file_path, start_line
-    ";
-    let mut stmt = conn.prepare(sql)?;
-    let rows = stmt.query_map(params![workspace_id], |row| {
-        Ok(DiffCommentRow {
+    let rows = stmt.query_map(params![project_path, limit], |row| {
+        Ok(AgentTalkRow {
             id: row.get(0)?,
-            workspace_id: row.get(1)?,
-            file_path: row.get(2)?,
-            start_line: row.get(3)?,
-            end_line: row.get(4)?,
-            content: row.get(5)?,
-            status: row.get(6)?,
-            github_comment_id: row.get(7)?,
-            author: row.get(8)?,
-            created_at: row.get(9)?,
-            updated_at: row.get(10)?,
+            agent_process_id: row.get(1)?,
+            review_id: row.get(2)?,
+            agent_type: row.get(3)?,
+            project_path: row.get(4)?,
+            role: row.get(5)?,
+            input_prompt: row.get(6)?,
+            input_context: row.get(7)?,
+            files_read: row.get(8)?,
+            files_modified: row.get(9)?,
+            actions_summary: row.get(10)?,
+            output_raw: row.get(11)?,
+            output_structured: row.get(12)?,
+            exit_code: row.get(13)?,
+            unfinished_work: row.get(14)?,
+            blockers: row.get(15)?,
+            key_decisions: row.get(16)?,
+            codebase_state: row.get(17)?,
+            recommended_next_steps: row.get(18)?,
+            duration_ms: row.get(19)?,
+            session_id: row.get(20)?,
+            created_at: row.get(21)?,
         })
     })?;
     rows.collect()
-}
-
-pub fn create_diff_comment(conn: &Connection, c: &DiffCommentRow) -> Result<(), rusqlite::Error> {
-    conn.execute(
-        "INSERT INTO diff_comments (
-            id, workspace_id, file_path, start_line, end_line,
-            content, status, github_comment_id, author, created_at, updated_at
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-        params![
-            c.id,
-            c.workspace_id,
-            c.file_path,
-            c.start_line,
-            c.end_line,
-            c.content,
-            c.status,
-            c.github_comment_id,
-            c.author,
-            c.created_at,
-            c.updated_at,
-        ],
-    )?;
-    Ok(())
-}
-
-pub fn update_diff_comment(
-    conn: &Connection,
-    id: &str,
-    content: Option<&str>,
-    status: Option<&str>,
-    updated_at: &str,
-) -> Result<(), rusqlite::Error> {
-    conn.execute(
-        "UPDATE diff_comments SET
-            content    = COALESCE(?2, content),
-            status     = COALESCE(?3, status),
-            updated_at = ?4
-         WHERE id = ?1",
-        params![id, content, status, updated_at],
-    )?;
-    Ok(())
-}
-
-pub fn delete_diff_comment(conn: &Connection, id: &str) -> Result<(), rusqlite::Error> {
-    conn.execute("DELETE FROM diff_comments WHERE id = ?1", params![id])?;
-    Ok(())
 }
