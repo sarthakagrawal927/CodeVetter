@@ -275,10 +275,10 @@ export default function QuickReview() {
     try {
       const data = await getReview(id);
       const review = data.review;
-      const findings = (data.findings ?? []).map((f: { severity: string; title: string; summary: string; suggestion?: string; file_path?: string; line?: number; confidence?: number }) => ({
-        severity: f.severity,
-        title: f.title,
-        summary: f.summary,
+      const findings = (data.findings ?? []).map((f) => ({
+        severity: f.severity ?? "info",
+        title: f.title ?? "",
+        summary: f.summary ?? "",
         suggestion: f.suggestion ?? undefined,
         filePath: f.file_path ?? undefined,
         line: f.line ?? undefined,

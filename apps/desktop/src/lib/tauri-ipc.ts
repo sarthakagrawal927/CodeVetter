@@ -201,32 +201,9 @@ export async function saveReview(
   return safeInvoke("save_review", input);
 }
 
-// Legacy wrappers — these now go through the webview review-core pipeline.
-// TODO: Replace callers with direct review-core integration.
-export async function startLocalReview(
-  repoPath: string,
-  diffRange?: string,
-  _tone?: ReviewTone
-): Promise<{ review_id: string; status: string; diff_bytes: number }> {
-  // Temporary: get diff and return a stub — full review-core integration in Phase 2
-  const diff = await getLocalDiff(repoPath, diffRange);
-  if (diff.empty) throw new Error("No changes to review");
-  return { review_id: "pending", status: "not_implemented", diff_bytes: diff.diff.length };
-}
-
-export async function startPrReview(
-  _owner: string,
-  _repo: string,
-  _prNumber: number,
-  _tone?: ReviewTone
-): Promise<{ review_id: string; status: string; diff_bytes: number }> {
-  // Temporary stub — full PR review via PAT in Phase 3
-  throw new Error("PR review via sidecar removed. Review-core integration coming in Phase 3.");
-}
-
 export async function getReview(
   id: string
-): Promise<{ review: Review; findings: ReviewFinding[] }> {
+): Promise<{ review: LocalReviewRow; findings: LocalReviewFindingRow[] }> {
   return safeInvoke("get_review", { id });
 }
 
