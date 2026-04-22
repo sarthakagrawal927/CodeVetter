@@ -675,7 +675,7 @@ export default function QuickReview() {
         )}
 
         {/* Two-column body */}
-        <PanelGroup direction="horizontal" className="flex-1">
+        <PanelGroup orientation="horizontal" className="flex-1">
           <Panel defaultSize={40} minSize={25}>
           <div className="flex h-full flex-col">
             {/* Blast Radius panel — graph-aware PR analysis */}
