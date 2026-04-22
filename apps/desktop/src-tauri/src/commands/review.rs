@@ -6,6 +6,47 @@ use serde_json::{json, Value};
 use std::process::Command as StdCommand;
 use tauri::{Emitter, Manager, State};
 
+/// Resolve a CLI binary (e.g. "claude", "gemini") to an absolute path.
+///
+/// Tauri apps on macOS don't always inherit the user's shell PATH — especially
+/// when launched outside a terminal — so `StdCommand::new("claude")` can fail
+/// with ENOENT even though the user has it installed. This helper walks the
+/// usual user-install locations (asdf shims, bun, pnpm, npm global, homebrew,
+/// `~/.local/bin`) and returns the first match. Falls back to the bare name
+/// so the existing PATH lookup still runs if none match.
+fn resolve_cli_path(name: &str) -> String {
+    // First, honor PATH if it works
+    if let Ok(path_var) = std::env::var("PATH") {
+        for dir in std::env::split_paths(&path_var) {
+            let candidate = dir.join(name);
+            if candidate.is_file() {
+                return candidate.to_string_lossy().into_owned();
+            }
+        }
+    }
+
+    // Common user-install locations not always in PATH of GUI-launched apps
+    if let Ok(home) = std::env::var("HOME") {
+        let fallbacks = [
+            format!("{home}/.local/bin/{name}"),
+            format!("{home}/.bun/bin/{name}"),
+            format!("{home}/.asdf/shims/{name}"),
+            format!("{home}/Library/pnpm/{name}"),
+            format!("{home}/.nvm/versions/node/current/bin/{name}"),
+            format!("/opt/homebrew/bin/{name}"),
+            format!("/usr/local/bin/{name}"),
+        ];
+        for c in fallbacks {
+            if std::path::Path::new(&c).is_file() {
+                return c;
+            }
+        }
+    }
+
+    // Give up — let Command::new fail with its usual error
+    name.to_string()
+}
+
 /// Look up the latest talk for this project and prepend it as context if fresh enough.
 fn maybe_prepend_talk_context(
     conn: &rusqlite::Connection,
@@ -295,12 +336,13 @@ Diff:
         "gemini" => "gemini",
         _ => "claude",
     };
+    let cli_path = resolve_cli_path(cli_cmd);
 
-    let cli_output = StdCommand::new(cli_cmd)
+    let cli_output = StdCommand::new(&cli_path)
         .args(["-p", &prompt])
         .current_dir(&repo_path)
         .output()
-        .map_err(|e| format!("Failed to spawn {cli_cmd}: {e}"))?;
+        .map_err(|e| format!("Failed to spawn {cli_cmd} (resolved to {cli_path}): {e}"))?;
 
     if !cli_output.status.success() {
         let stderr = String::from_utf8_lossy(&cli_output.stderr);
@@ -597,18 +639,20 @@ pub async fn fix_findings(
         "gemini" => "gemini",
         _ => "claude",
     };
+    let cli_path = resolve_cli_path(cli_cmd);
 
     // Spawn in a blocking thread so we don't block the Tauri event loop
     let app_handle = app.clone();
     let work_dir_clone = work_dir.clone();
+    let cli_path_clone = cli_path.clone();
     let (stdout, _success, duration_ms) = tokio::task::spawn_blocking(move || {
-        let mut child = StdCommand::new(cli_cmd)
+        let mut child = StdCommand::new(&cli_path_clone)
             .args(["-p", &prompt])
             .current_dir(&work_dir_clone)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .spawn()
-            .map_err(|e| format!("Failed to spawn {cli_cmd}: {e}"))?;
+            .map_err(|e| format!("Failed to spawn {cli_cmd} (resolved to {cli_path_clone}): {e}"))?;
 
         let mut stdout_text = String::new();
         if let Some(stdout_pipe) = child.stdout.take() {
