@@ -1,15 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Link } from "react-router-dom";
-import SessionCard from "@/components/session-card";
-import ScoreBadge from "@/components/score-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   getIndexStats,
   getTokenUsageStats,
-  listSessions,
-  listReviews,
   triggerIndex,
   listProviderAccounts,
   checkAccountUsage,
@@ -21,8 +16,6 @@ import {
 
 import type {
   IndexStats,
-  SessionRow,
-  LocalReviewRow,
   TriggerIndexResult,
   ProviderAccount,
   AccountUsage,
@@ -33,6 +26,7 @@ import type {
 // ─── Usage helpers ──────────────────────────────────────────────────────────
 
 function formatTokens(n: number): string {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(2)}B`;
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(0)}k`;
   return String(n);
@@ -391,32 +385,6 @@ function AccountUsageRow({
   );
 }
 
-// ─── Status badge for reviews ────────────────────────────────────────────────
-
-function ReviewStatusBadge({ status }: { status: string }) {
-  const config: Record<string, string> = {
-    pending: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
-    analyzing: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-    running: "bg-amber-500/10 text-amber-400 border-amber-500/20",
-    completed: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-    failed: "bg-red-500/10 text-red-400 border-red-500/20",
-  };
-  const labels: Record<string, string> = {
-    pending: "Pending",
-    analyzing: "Running",
-    running: "Running",
-    completed: "Done",
-    failed: "Failed",
-  };
-  return (
-    <Badge
-      variant="outline"
-      className={`text-[10px] px-1.5 py-0 ${config[status] ?? "text-slate-500"}`}
-    >
-      {labels[status] ?? status}
-    </Badge>
-  );
-}
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
@@ -424,8 +392,6 @@ function ReviewStatusBadge({ status }: { status: string }) {
 let _cachedDashboard: {
   stats: IndexStats | null;
   tokenUsage: TokenUsageStats | null;
-  sessions: SessionRow[];
-  reviews: LocalReviewRow[];
   accounts: ProviderAccount[];
   usages: Record<string, AccountUsage>;
   liveUsages: Record<string, LiveUsageResult>;
@@ -442,9 +408,12 @@ function TokenUsageChart({
   weekly: { week_start: string; tokens: number }[];
 }) {
   const [mode, setMode] = useState<"daily" | "weekly">("daily");
+  const [hover, setHover] = useState<number | null>(null);
   const data = mode === "daily" ? daily : weekly;
   const max = Math.max(1, ...data.map((d) => d.tokens));
+  const total = data.reduce((acc, d) => acc + d.tokens, 0);
   const n = data.length;
+  const hovered = hover != null ? data[hover] : null;
 
   // ViewBox in nice round units — scales responsively.
   const W = 600;
@@ -469,15 +438,20 @@ function TokenUsageChart({
       <div className="mb-3 flex items-center justify-between">
         <div>
           <div className="text-[11px] text-slate-500">Token usage</div>
-          <div className="text-xs text-slate-400">
-            {mode === "daily" ? "Last 30 days" : "Last 12 weeks"}
+          <div className="text-xs text-slate-400 tabular-nums">
+            {hovered
+              ? `${labelFor(hovered)} · ${formatTokens(hovered.tokens)}`
+              : `${mode === "daily" ? "Last 30 days" : "Last 12 weeks"} · peak ${formatTokens(max)} · total ${formatTokens(total)}`}
           </div>
         </div>
         <div className="inline-flex rounded-md border border-[#1a1a1a] bg-[#0b0d12] p-0.5">
           {(["daily", "weekly"] as const).map((m) => (
             <button
               key={m}
-              onClick={() => setMode(m)}
+              onClick={() => {
+                setMode(m);
+                setHover(null);
+              }}
               className={`px-2.5 py-1 text-[11px] font-medium rounded-sm transition-colors ${
                 mode === m
                   ? "bg-cyan-500/10 text-cyan-300"
@@ -494,6 +468,7 @@ function TokenUsageChart({
         viewBox={`0 0 ${W} ${H}`}
         className="w-full h-36"
         preserveAspectRatio="none"
+        onMouseLeave={() => setHover(null)}
       >
         {gridlines.map((y, i) => (
           <line
@@ -511,20 +486,27 @@ function TokenUsageChart({
           const x = padX + i * barW + barW * 0.15;
           const y = padTop + chartH - h;
           const w = barW * 0.7;
+          const isHover = hover === i;
           return (
             <g key={i}>
+              {/* Full-height hit target so mouse doesn't need to land on a short bar. */}
+              <rect
+                x={padX + i * barW}
+                y={padTop}
+                width={barW}
+                height={chartH}
+                fill="transparent"
+                onMouseEnter={() => setHover(i)}
+              />
               <rect
                 x={x}
                 y={y}
                 width={w}
                 height={Math.max(h, d.tokens > 0 ? 1 : 0)}
-                fill="#06b6d4"
-                opacity={0.85}
-              >
-                <title>
-                  {labelFor(d)}: {d.tokens.toLocaleString()} tokens
-                </title>
-              </rect>
+                fill={isHover ? "#22d3ee" : "#06b6d4"}
+                opacity={isHover ? 1 : 0.85}
+                pointerEvents="none"
+              />
             </g>
           );
         })}
@@ -561,8 +543,6 @@ export default function Home() {
   // Data state — initialize from cache if available
   const [stats, setStats] = useState<IndexStats | null>(_cachedDashboard?.stats ?? null);
   const [tokenUsage, setTokenUsage] = useState<TokenUsageStats | null>(_cachedDashboard?.tokenUsage ?? null);
-  const [recentSessions, setRecentSessions] = useState<SessionRow[]>(_cachedDashboard?.sessions ?? []);
-  const [recentReviews, setRecentReviews] = useState<LocalReviewRow[]>(_cachedDashboard?.reviews ?? []);
   const [accounts, setAccounts] = useState<ProviderAccount[]>(_cachedDashboard?.accounts ?? []);
   const [accountUsages, setAccountUsages] = useState<Record<string, AccountUsage>>(_cachedDashboard?.usages ?? {});
   const [liveUsages, setLiveUsages] = useState<Record<string, LiveUsageResult>>(_cachedDashboard?.liveUsages ?? {});
@@ -585,15 +565,35 @@ export default function Home() {
     setError(null);
 
     try {
-      // Fire all requests in parallel
-      const [statsResult, tokenUsageResult, sessionsResult, reviewsResult, accountsResult] =
-        await Promise.allSettled([
-          getIndexStats(),
-          getTokenUsageStats(),
-          listSessions(undefined, undefined, 4, 0),
-          listReviews(4, 0),
-          listProviderAccounts(),
-        ]);
+      // Kick off account usage in parallel with the rest of the dashboard.
+      // Uses cached account IDs so usage queries don't wait for the
+      // listProviderAccounts roundtrip. Any new accounts discovered below
+      // get their usage fetched in a small second wave.
+      const cachedAccounts = _cachedDashboard?.accounts ?? [];
+      const cachedUsagePromise = Promise.allSettled(
+        cachedAccounts.map(async (a) => [a.id, await checkAccountUsage(a.id)] as const)
+      );
+
+      const [
+        statsResult,
+        tokenUsageResult,
+        accountsResult,
+        cachedUsagesResult,
+      ] = await Promise.all([
+        getIndexStats().then(
+          (v) => ({ status: "fulfilled" as const, value: v }),
+          (e) => ({ status: "rejected" as const, reason: e })
+        ),
+        getTokenUsageStats().then(
+          (v) => ({ status: "fulfilled" as const, value: v }),
+          (e) => ({ status: "rejected" as const, reason: e })
+        ),
+        listProviderAccounts().then(
+          (v) => ({ status: "fulfilled" as const, value: v }),
+          (e) => ({ status: "rejected" as const, reason: e })
+        ),
+        cachedUsagePromise,
+      ]);
 
       if (statsResult.status === "fulfilled") {
         setStats(statsResult.value);
@@ -601,14 +601,16 @@ export default function Home() {
       if (tokenUsageResult.status === "fulfilled") {
         setTokenUsage(tokenUsageResult.value);
       }
-      if (sessionsResult.status === "fulfilled") {
-        setRecentSessions(sessionsResult.value);
-      }
-      if (reviewsResult.status === "fulfilled") {
-        setRecentReviews(reviewsResult.value);
-      }
 
-      // Load accounts — auto-detect if none exist
+      // Seed usage map with cached-ID results that came back alongside the rest.
+      const usageMap: Record<string, AccountUsage> = {};
+      cachedUsagesResult.forEach((r) => {
+        if (r.status === "fulfilled") {
+          const [id, usage] = r.value;
+          usageMap[id] = usage;
+        }
+      });
+
       if (accountsResult.status === "fulfilled") {
         let accts = accountsResult.value;
 
@@ -624,28 +626,27 @@ export default function Home() {
 
         setAccounts(accts);
 
-        // Fetch usage for each account in parallel
-        if (accts.length > 0) {
-          const usageResults = await Promise.allSettled(
-            accts.map((a) => checkAccountUsage(a.id))
+        // Fetch usage only for accounts that weren't covered by the cached
+        // parallel fetch (new accounts since last load, or first-ever load).
+        const cachedIds = new Set(cachedAccounts.map((a) => a.id));
+        const missing = accts.filter((a) => !cachedIds.has(a.id));
+        if (missing.length > 0) {
+          const extraResults = await Promise.allSettled(
+            missing.map((a) => checkAccountUsage(a.id))
           );
-          const usageMap: Record<string, AccountUsage> = {};
-          usageResults.forEach((r, i) => {
+          extraResults.forEach((r, i) => {
             if (r.status === "fulfilled") {
-              usageMap[accts[i].id] = r.value;
+              usageMap[missing[i].id] = r.value;
             }
           });
-          setAccountUsages(usageMap);
         }
+        setAccountUsages(usageMap);
+      } else if (Object.keys(usageMap).length > 0) {
+        setAccountUsages(usageMap);
       }
 
-      // If all failed, surface the first error
-      const allFailed = [
-        statsResult,
-        sessionsResult,
-        reviewsResult,
-      ].every((r) => r.status === "rejected");
-      if (allFailed && statsResult.status === "rejected") {
+      // If critical reads failed, surface the first error
+      if (statsResult.status === "rejected") {
         const msg =
           statsResult.reason instanceof Error
             ? statsResult.reason.message
@@ -672,14 +673,12 @@ export default function Home() {
     _cachedDashboard = {
       stats,
       tokenUsage,
-      sessions: recentSessions,
-      reviews: recentReviews,
       accounts,
       usages: accountUsages,
       liveUsages,
       fetchedAt: Date.now(),
     };
-  }, [loading, stats, tokenUsage, recentSessions, recentReviews, accounts, accountUsages, liveUsages]);
+  }, [loading, stats, tokenUsage, accounts, accountUsages, liveUsages]);
 
   // Refresh without showing loading spinners (for background event updates)
   const refreshDashboard = useCallback(() => {
@@ -934,131 +933,6 @@ export default function Home() {
         )}
       </div>
 
-      {/* Two-column layout: Sessions + Reviews */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
-        {/* Recent Sessions (3/5 width) */}
-        <div className="lg:col-span-3 flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <h2 className="text-[13px] font-medium text-slate-300">
-              Recent Sessions
-            </h2>
-            <span className="text-[11px] text-slate-600">Recent</span>
-          </div>
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <svg
-                className="h-4 w-4 animate-spin text-slate-500"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                />
-              </svg>
-            </div>
-          ) : recentSessions.length === 0 ? (
-            <Card className="flex flex-col items-center justify-center py-8 border-[#1a1a1a]">
-              <p className="text-[11px] text-slate-600">No sessions yet</p>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleTriggerIndex}
-                className="mt-1 h-auto px-2 py-0.5 text-[11px] text-slate-500 hover:text-slate-300"
-              >
-                Run indexer
-              </Button>
-            </Card>
-          ) : (
-            <Card className="border-[#1a1a1a] overflow-hidden">
-              {recentSessions.map((session) => (
-                <div key={session.id} className="border-b border-[#1a1a1a]/50 last:border-b-0">
-                  <SessionCard
-                    session={session}
-                  />
-                </div>
-              ))}
-            </Card>
-          )}
-        </div>
-
-        {/* Reviews (2/5 width) */}
-        <div className="lg:col-span-2 flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <h2 className="text-[13px] font-medium text-slate-300">Reviews</h2>
-            <Button variant="link" size="sm" className="h-auto px-0 py-0 text-[11px] text-slate-500 hover:text-slate-300" asChild>
-              <Link to="/review">New review</Link>
-            </Button>
-          </div>
-          {loading ? (
-            <div className="flex items-center justify-center py-6">
-              <svg
-                className="h-4 w-4 animate-spin text-slate-500"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                />
-              </svg>
-            </div>
-          ) : recentReviews.length === 0 ? (
-            <Card className="flex flex-col items-center justify-center py-8 border-[#1a1a1a]">
-              <p className="text-[11px] text-slate-600">No reviews yet</p>
-              <Button variant="link" size="sm" className="mt-1 h-auto px-0 py-0 text-[11px] text-slate-500 hover:text-slate-300" asChild>
-                <Link to="/review">Start a review</Link>
-              </Button>
-            </Card>
-          ) : (
-            <Card className="border-[#1a1a1a] overflow-hidden">
-              {recentReviews.map((review) => (
-                <div
-                  key={review.id}
-                  className="flex items-center gap-3 px-3 py-2 border-b border-[#1a1a1a]/50 last:border-b-0 transition-colors hover:bg-[#111111] overflow-hidden"
-                >
-                  {review.status === "completed" &&
-                  review.score_composite != null ? (
-                    <ScoreBadge
-                      score={Math.round(review.score_composite)}
-                      size="sm"
-                    />
-                  ) : (
-                    <span className="text-[10px] text-amber-400">{"\u25CF"}</span>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] text-slate-300 truncate">
-                      {review.source_label || review.repo_path || "Review"}
-                    </p>
-                  </div>
-                  <span className="text-[11px] text-slate-600 tabular-nums">
-                    {review.findings_count ?? 0}
-                  </span>
-                  <ReviewStatusBadge status={review.status} />
-                </div>
-              ))}
-            </Card>
-          )}
-        </div>
-      </div>
 
     </div>
   );

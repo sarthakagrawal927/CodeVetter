@@ -822,62 +822,118 @@ pub fn get_token_usage_stats(conn: &Connection) -> Result<TokenUsageStats, rusql
     let month_start = NaiveDate::from_ymd_opt(today.year(), today.month(), 1).unwrap();
     let year_start = NaiveDate::from_ymd_opt(today.year(), 1, 1).unwrap();
 
-    let today_ts = local_midnight_utc(today);
-    let week_ts = local_midnight_utc(monday);
-    let month_ts = local_midnight_utc(month_start);
     let year_ts = local_midnight_utc(year_start);
 
-    let sum_since = |since: &str| -> Result<i64, rusqlite::Error> {
-        conn.query_row(
-            "SELECT COALESCE(SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0)
-             FROM cc_messages
-             WHERE timestamp >= ?1",
-            params![since],
-            |r| r.get(0),
-        )
-    };
+    // Token accounting strategy:
+    //
+    // - Magnitude: session-level totals (cc_sessions.total_input_tokens +
+    //   total_output_tokens). These already include cache_creation +
+    //   cache_read per the indexer (see history.rs `effective_input`) and
+    //   are the canonical billable numbers — same methodology as ccusage.
+    //   cc_messages.input_tokens is subject to indexer retry artefacts and
+    //   over-counts ~2× in aggregate.
+    //
+    // - Day attribution: distribute each session's canonical total across
+    //   days proportionally to per-day message activity. A session spanning
+    //   two days with 30/70 message split gets 30%/70% of its tokens on
+    //   those days. Sessions active only on one day attribute fully to it.
+    //
+    // This keeps totals correct while fixing the "today spikes because an
+    // active session started yesterday" problem.
 
-    let today_sum = sum_since(&today_ts)?;
-    let week_sum = sum_since(&week_ts)?;
-    let month_sum = sum_since(&month_ts)?;
-    let year_sum = sum_since(&year_ts)?;
-
-    // Daily series: last 30 days, zero-filled, bucketed by local date.
-    let thirty_start = today - Duration::days(29);
-    let thirty_ts = local_midnight_utc(thirty_start);
+    // Build day-by-day token map over a wider window (full year) once.
+    // Cheaper than running three similar queries for today/week/month/year.
     let mut stmt = conn.prepare(
-        "SELECT strftime('%Y-%m-%d', timestamp, 'localtime') AS day,
-                COALESCE(SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0) AS tok
-         FROM cc_messages
-         WHERE timestamp >= ?1
-         GROUP BY day",
+        "WITH session_total_msgs AS (
+             SELECT session_id, COUNT(*) AS total_n
+             FROM cc_messages
+             WHERE timestamp IS NOT NULL
+             GROUP BY session_id
+         ),
+         daily AS (
+             SELECT session_id,
+                    strftime('%Y-%m-%d', timestamp, 'localtime') AS day,
+                    COUNT(*) AS n
+             FROM cc_messages
+             WHERE timestamp IS NOT NULL AND timestamp >= ?1
+             GROUP BY session_id, day
+         )
+         SELECT d.day,
+                SUM(
+                    (COALESCE(s.total_input_tokens, 0) + COALESCE(s.total_output_tokens, 0))
+                    * d.n * 1.0 / t.total_n
+                ) AS tokens
+         FROM daily d
+         JOIN session_total_msgs t ON t.session_id = d.session_id
+         JOIN cc_sessions s ON s.id = d.session_id
+         GROUP BY d.day",
     )?;
-    let mut daily_map: std::collections::HashMap<String, i64> = stmt
-        .query_map(params![thirty_ts], |r| {
-            Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))
+
+    let day_map: std::collections::HashMap<String, f64> = stmt
+        .query_map(params![year_ts], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, f64>(1)?))
         })?
         .collect::<Result<_, _>>()?;
 
+    let today_str = today.format("%Y-%m-%d").to_string();
+    let monday_str = monday.format("%Y-%m-%d").to_string();
+    let month_str = month_start.format("%Y-%m-%d").to_string();
+
+    let today_sum = day_map.get(&today_str).copied().unwrap_or(0.0).round() as i64;
+    let week_sum = day_map
+        .iter()
+        .filter(|(d, _)| d.as_str() >= monday_str.as_str())
+        .map(|(_, v)| v)
+        .sum::<f64>()
+        .round() as i64;
+    let month_sum = day_map
+        .iter()
+        .filter(|(d, _)| d.as_str() >= month_str.as_str())
+        .map(|(_, v)| v)
+        .sum::<f64>()
+        .round() as i64;
+    let year_sum = day_map.values().sum::<f64>().round() as i64;
+
+    // Daily series: last 30 days from the day_map (zero-filled).
     let mut daily_series = Vec::with_capacity(30);
     for i in 0..30 {
         let d = (today - Duration::days(29 - i)).format("%Y-%m-%d").to_string();
-        let tokens = daily_map.remove(&d).unwrap_or(0);
+        let tokens = day_map.get(&d).copied().unwrap_or(0.0).round() as i64;
         daily_series.push(DayBucket { date: d, tokens });
     }
 
     // Weekly series: last 12 ISO weeks (Monday-starting), zero-filled.
+    // We still need a second query for anything older than 12 months.
     let twelve_weeks_start = monday - Duration::weeks(11);
     let twelve_ts = local_midnight_utc(twelve_weeks_start);
     let mut stmt2 = conn.prepare(
-        "SELECT strftime('%Y-%m-%d', timestamp, 'localtime') AS day,
-                COALESCE(SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0) AS tok
-         FROM cc_messages
-         WHERE timestamp >= ?1
-         GROUP BY day",
+        "WITH session_total_msgs AS (
+             SELECT session_id, COUNT(*) AS total_n
+             FROM cc_messages
+             WHERE timestamp IS NOT NULL
+             GROUP BY session_id
+         ),
+         daily AS (
+             SELECT session_id,
+                    strftime('%Y-%m-%d', timestamp, 'localtime') AS day,
+                    COUNT(*) AS n
+             FROM cc_messages
+             WHERE timestamp IS NOT NULL AND timestamp >= ?1
+             GROUP BY session_id, day
+         )
+         SELECT d.day,
+                SUM(
+                    (COALESCE(s.total_input_tokens, 0) + COALESCE(s.total_output_tokens, 0))
+                    * d.n * 1.0 / t.total_n
+                ) AS tok
+         FROM daily d
+         JOIN session_total_msgs t ON t.session_id = d.session_id
+         JOIN cc_sessions s ON s.id = d.session_id
+         GROUP BY d.day",
     )?;
-    let day_rows: Vec<(String, i64)> = stmt2
+    let day_rows: Vec<(String, f64)> = stmt2
         .query_map(params![twelve_ts], |r| {
-            Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))
+            Ok((r.get::<_, String>(0)?, r.get::<_, f64>(1)?))
         })?
         .collect::<Result<_, _>>()?;
 
@@ -890,8 +946,9 @@ pub fn get_token_usage_stats(conn: &Connection) -> Result<TokenUsageStats, rusql
         let tokens: i64 = day_rows
             .iter()
             .filter(|(d, _)| d.as_str() >= ws_s.as_str() && d.as_str() < we_s.as_str())
-            .map(|(_, t)| t)
-            .sum();
+            .map(|(_, t)| *t)
+            .sum::<f64>()
+            .round() as i64;
         weekly_series.push(WeekBucket {
             week_start: ws_s,
             tokens,

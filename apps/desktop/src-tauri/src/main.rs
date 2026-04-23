@@ -30,7 +30,11 @@ fn main() {
             app.manage(DbState(Arc::new(Mutex::new(conn))));
 
             // ── Trigger initial index on startup ─────────────────
-            let bg_data_dir = app_data_dir.clone();
+            // Storage cleanup (one-time purge of cruft message rows) runs at
+            // the end of this thread so it never races with the indexer for
+            // the DB write lock. VACUUM is intentionally omitted here — it
+            // takes minutes and holds an exclusive lock, freezing the UI.
+            let bg_data_dir = app_data_dir;
             std::thread::Builder::new()
                 .name("initial-index".into())
                 .spawn(move || {
@@ -41,23 +45,12 @@ fn main() {
                     }
 
                     log::info!("Starting full index...");
-                    match run_full_index(bg_data_dir) {
+                    match run_full_index(bg_data_dir.clone()) {
                         Ok(msg) => log::info!("Full index complete: {msg}"),
                         Err(e) => log::error!("Full index failed: {e}"),
                     }
-                })
-                .expect("failed to spawn initial-index thread");
 
-            // ── One-time storage cleanup (background) ────────────
-            // Purges historical non-message metadata rows + VACUUMs. Runs once
-            // ever (guarded by a preference flag). Heavy I/O — kept off the
-            // main thread and delayed so the UI can settle first.
-            let cleanup_data_dir = app_data_dir;
-            std::thread::Builder::new()
-                .name("storage-cleanup".into())
-                .spawn(move || {
-                    std::thread::sleep(std::time::Duration::from_secs(10));
-                    match db::init_db(cleanup_data_dir) {
+                    match db::init_db(bg_data_dir) {
                         Ok(conn) => {
                             log::info!("Storage cleanup starting...");
                             db::schema::purge_message_cruft_once(&conn);
@@ -66,7 +59,7 @@ fn main() {
                         Err(e) => log::error!("Storage cleanup DB init failed: {e}"),
                     }
                 })
-                .expect("failed to spawn storage-cleanup thread");
+                .expect("failed to spawn initial-index thread");
 
             // ── Periodic re-index (every 15 minutes) ─────────────
             let periodic_data_dir = app

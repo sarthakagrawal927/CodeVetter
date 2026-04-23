@@ -12,11 +12,20 @@ pub fn init_db(app_data_dir: PathBuf) -> Result<Connection, rusqlite::Error> {
     let conn = Connection::open(db_path)?;
 
     // Performance pragmas ------------------------------------------------
+    // mmap_size: up to 256 MB mapped I/O — big speedup for warm reads
+    //   on the indexed message DB without actually using that much RAM
+    //   (pages page in on demand).
+    // temp_store=MEMORY: keeps sort/group temp tables in RAM — matters
+    //   for the GROUP BY strftime() used by the token usage chart.
+    // cache_size negative = KiB — 64 MB page cache for hot queries.
     conn.execute_batch(
-        "PRAGMA journal_mode = WAL;
-         PRAGMA synchronous  = NORMAL;
-         PRAGMA foreign_keys = ON;
-         PRAGMA busy_timeout = 5000;",
+        "PRAGMA journal_mode    = WAL;
+         PRAGMA synchronous     = NORMAL;
+         PRAGMA foreign_keys    = ON;
+         PRAGMA busy_timeout    = 5000;
+         PRAGMA mmap_size       = 268435456;
+         PRAGMA temp_store      = MEMORY;
+         PRAGMA cache_size      = -65536;",
     )?;
 
     schema::run_migrations(&conn)?;

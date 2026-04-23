@@ -29,25 +29,72 @@ pub fn purge_message_cruft_once(conn: &Connection) {
         return;
     }
 
-    let deleted = conn.execute(
-        "DELETE FROM cc_messages
-         WHERE type IN (
-             'queue-operation', 'last-prompt', 'permission-mode',
-             'pr-link', 'agent-name', 'custom-title', 'attachment',
-             'file-history-snapshot', 'progress'
-         )",
-        [],
+    // FTS sync triggers fire once per deleted row. On ~10M rows that turns
+    // a 10-second DELETE into a multi-hour ordeal. Drop the triggers, do
+    // the DELETE, then rebuild the FTS index from the survivors in one shot.
+    // Triggers are recreated (they're idempotent in MIGRATION_SQL and will
+    // come back on next startup; we also recreate them here so live search
+    // works until restart).
+    let tx_result: Result<u64, rusqlite::Error> = (|| {
+        conn.execute_batch(
+            "DROP TRIGGER IF EXISTS cc_messages_ai;
+             DROP TRIGGER IF EXISTS cc_messages_ad;
+             DROP TRIGGER IF EXISTS cc_messages_au;",
+        )?;
+
+        let deleted = conn.execute(
+            "DELETE FROM cc_messages
+             WHERE type IN (
+                 'queue-operation', 'last-prompt', 'permission-mode',
+                 'pr-link', 'agent-name', 'custom-title', 'attachment',
+                 'file-history-snapshot', 'progress'
+             )",
+            [],
+        )? as u64;
+
+        conn.execute_batch(
+            "INSERT INTO cc_messages_fts(cc_messages_fts) VALUES('rebuild');
+             CREATE TRIGGER IF NOT EXISTS cc_messages_ai AFTER INSERT ON cc_messages BEGIN
+                 INSERT INTO cc_messages_fts(rowid, content_text)
+                 VALUES (new.rowid, new.content_text);
+             END;
+             CREATE TRIGGER IF NOT EXISTS cc_messages_ad AFTER DELETE ON cc_messages BEGIN
+                 INSERT INTO cc_messages_fts(cc_messages_fts, rowid, content_text)
+                 VALUES ('delete', old.rowid, old.content_text);
+             END;
+             CREATE TRIGGER IF NOT EXISTS cc_messages_au AFTER UPDATE ON cc_messages BEGIN
+                 INSERT INTO cc_messages_fts(cc_messages_fts, rowid, content_text)
+                 VALUES ('delete', old.rowid, old.content_text);
+                 INSERT INTO cc_messages_fts(rowid, content_text)
+                 VALUES (new.rowid, new.content_text);
+             END;",
+        )?;
+        Ok(deleted)
+    })();
+
+    let total = match tx_result {
+        Ok(n) => n,
+        Err(e) => {
+            eprintln!("[storage] purge failed: {e}");
+            return;
+        }
+    };
+
+    eprintln!("[storage] purged {total} cruft message rows");
+
+    // Refresh query planner stats after a large shape change. ANALYZE
+    // rebuilds sqlite_stat1 so index choices reflect the new row counts.
+    // Also checkpoint and truncate the WAL — after a 10M-row DELETE it
+    // holds multi-GB of dead pages.
+    let _ = conn.execute_batch(
+        "ANALYZE cc_messages;
+         PRAGMA wal_checkpoint(TRUNCATE);",
     );
 
-    if let Ok(n) = deleted {
-        eprintln!("[storage] purged {n} cruft message rows");
-        // Reclaim disk space. VACUUM needs to run outside a transaction.
-        let _ = conn.execute_batch("VACUUM;");
-        let _ = conn.execute(
-            "INSERT OR REPLACE INTO preferences(key, value) VALUES ('cruft_purged_v1', '1')",
-            [],
-        );
-    }
+    let _ = conn.execute(
+        "INSERT OR REPLACE INTO preferences(key, value) VALUES ('cruft_purged_v1', '1')",
+        [],
+    );
 }
 
 const MIGRATION_SQL: &str = r#"
@@ -400,4 +447,15 @@ CREATE INDEX IF NOT EXISTS idx_cc_messages_timestamp
 
 CREATE INDEX IF NOT EXISTS idx_cc_messages_session_ts
     ON cc_messages(session_id, timestamp);
+
+-- Required by the one-time cruft purge (WHERE type IN (...)) — without this
+-- each batch does a full table scan, turning the purge into O(N²).
+CREATE INDEX IF NOT EXISTS idx_cc_messages_type
+    ON cc_messages(type);
+
+-- Token usage stats bucket by last_message (session-level aggregation —
+-- see queries::get_token_usage_stats for the rationale on session vs
+-- message granularity).
+CREATE INDEX IF NOT EXISTS idx_cc_sessions_last_message
+    ON cc_sessions(last_message);
 "#;
