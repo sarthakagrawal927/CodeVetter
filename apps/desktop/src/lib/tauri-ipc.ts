@@ -146,6 +146,25 @@ export interface TriggerIndexResult {
   projects_scanned: number;
 }
 
+export interface DayBucket {
+  date: string;
+  tokens: number;
+}
+
+export interface WeekBucket {
+  week_start: string;
+  tokens: number;
+}
+
+export interface TokenUsageStats {
+  today: number;
+  this_week: number;
+  this_month: number;
+  this_year: number;
+  daily_series: DayBucket[];
+  weekly_series: WeekBucket[];
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // BACKEND RESPONSE WRAPPERS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -439,6 +458,10 @@ export async function mergeProjects(
 
 export async function triggerIndex(): Promise<TriggerIndexResult> {
   return safeInvoke<TriggerIndexResult>("trigger_index");
+}
+
+export async function getTokenUsageStats(): Promise<TokenUsageStats> {
+  return safeInvoke<TokenUsageStats>("get_token_usage_stats");
 }
 
 export async function getIndexStats(): Promise<IndexStats> {

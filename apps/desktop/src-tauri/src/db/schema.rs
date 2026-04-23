@@ -14,6 +14,42 @@ pub fn run_migrations(conn: &Connection) -> Result<(), rusqlite::Error> {
     Ok(())
 }
 
+/// One-time cleanup: remove non-message metadata rows that used to be indexed
+/// and reclaim disk space. Guarded by a preference flag so it only runs once.
+/// Expensive on large databases — run on a background thread after startup.
+pub fn purge_message_cruft_once(conn: &Connection) {
+    let already: Option<String> = conn
+        .query_row(
+            "SELECT value FROM preferences WHERE key = 'cruft_purged_v1'",
+            [],
+            |r| r.get(0),
+        )
+        .ok();
+    if already.is_some() {
+        return;
+    }
+
+    let deleted = conn.execute(
+        "DELETE FROM cc_messages
+         WHERE type IN (
+             'queue-operation', 'last-prompt', 'permission-mode',
+             'pr-link', 'agent-name', 'custom-title', 'attachment',
+             'file-history-snapshot', 'progress'
+         )",
+        [],
+    );
+
+    if let Ok(n) = deleted {
+        eprintln!("[storage] purged {n} cruft message rows");
+        // Reclaim disk space. VACUUM needs to run outside a transaction.
+        let _ = conn.execute_batch("VACUUM;");
+        let _ = conn.execute(
+            "INSERT OR REPLACE INTO preferences(key, value) VALUES ('cruft_purged_v1', '1')",
+            [],
+        );
+    }
+}
+
 const MIGRATION_SQL: &str = r#"
 -- ================================================================
 -- Claude Code Session Index
@@ -357,4 +393,11 @@ CREATE INDEX IF NOT EXISTS idx_agent_talks_project
 
 CREATE INDEX IF NOT EXISTS idx_agent_talks_review
     ON agent_talks(review_id);
+
+-- Speed up time-windowed token stats (today/week/month/year, daily/weekly series).
+CREATE INDEX IF NOT EXISTS idx_cc_messages_timestamp
+    ON cc_messages(timestamp);
+
+CREATE INDEX IF NOT EXISTS idx_cc_messages_session_ts
+    ON cc_messages(session_id, timestamp);
 "#;

@@ -243,7 +243,20 @@ fn full_index_impl(conn: &rusqlite::Connection) -> Result<(u64, u64, u64), Strin
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
 
-                if msg_type == "progress" || msg_type == "file-history-snapshot" {
+                // Skip non-message metadata rows that bloat the DB without carrying
+                // tokens or displayable content. Dropping these cuts row count ~95%.
+                if matches!(
+                    msg_type,
+                    "progress"
+                        | "file-history-snapshot"
+                        | "queue-operation"
+                        | "last-prompt"
+                        | "permission-mode"
+                        | "pr-link"
+                        | "agent-name"
+                        | "custom-title"
+                        | "attachment"
+                ) {
                     line_number += 1;
                     continue;
                 }
@@ -599,6 +612,16 @@ pub async fn get_index_stats(db: State<'_, DbState>) -> Result<Value, String> {
     let mut result = json!(stats);
     result["last_indexed_at"] = json!(last_indexed_at);
     Ok(result)
+}
+
+/// Token usage stats: today / week / month / year totals + 30-day daily series
+/// + 12-week weekly series. Windows use the user's local timezone.
+#[tauri::command]
+pub async fn get_token_usage_stats(
+    db: State<'_, DbState>,
+) -> Result<queries::TokenUsageStats, String> {
+    let conn = conn_lock(&db)?;
+    queries::get_token_usage_stats(&conn).map_err(|e| e.to_string())
 }
 
 // ─────────────────────────────────────────────────────────────────

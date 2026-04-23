@@ -777,6 +777,138 @@ pub fn get_index_stats(conn: &Connection) -> Result<IndexStats, rusqlite::Error>
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Token Usage Stats (period totals + time series)
+// ─────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DayBucket {
+    pub date: String,
+    pub tokens: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WeekBucket {
+    pub week_start: String,
+    pub tokens: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TokenUsageStats {
+    pub today: i64,
+    pub this_week: i64,
+    pub this_month: i64,
+    pub this_year: i64,
+    pub daily_series: Vec<DayBucket>,
+    pub weekly_series: Vec<WeekBucket>,
+}
+
+pub fn get_token_usage_stats(conn: &Connection) -> Result<TokenUsageStats, rusqlite::Error> {
+    use chrono::{Datelike, Duration, Local, NaiveDate, TimeZone, Utc};
+
+    let now_local = Local::now();
+    let today = now_local.date_naive();
+
+    let local_midnight_utc = |d: NaiveDate| -> String {
+        let ndt = d.and_hms_opt(0, 0, 0).expect("valid midnight");
+        Local
+            .from_local_datetime(&ndt)
+            .single()
+            .unwrap_or_else(|| Utc.from_utc_datetime(&ndt).with_timezone(&Local))
+            .with_timezone(&Utc)
+            .to_rfc3339()
+    };
+
+    let monday = today - Duration::days(today.weekday().num_days_from_monday() as i64);
+    let month_start = NaiveDate::from_ymd_opt(today.year(), today.month(), 1).unwrap();
+    let year_start = NaiveDate::from_ymd_opt(today.year(), 1, 1).unwrap();
+
+    let today_ts = local_midnight_utc(today);
+    let week_ts = local_midnight_utc(monday);
+    let month_ts = local_midnight_utc(month_start);
+    let year_ts = local_midnight_utc(year_start);
+
+    let sum_since = |since: &str| -> Result<i64, rusqlite::Error> {
+        conn.query_row(
+            "SELECT COALESCE(SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0)
+             FROM cc_messages
+             WHERE timestamp >= ?1",
+            params![since],
+            |r| r.get(0),
+        )
+    };
+
+    let today_sum = sum_since(&today_ts)?;
+    let week_sum = sum_since(&week_ts)?;
+    let month_sum = sum_since(&month_ts)?;
+    let year_sum = sum_since(&year_ts)?;
+
+    // Daily series: last 30 days, zero-filled, bucketed by local date.
+    let thirty_start = today - Duration::days(29);
+    let thirty_ts = local_midnight_utc(thirty_start);
+    let mut stmt = conn.prepare(
+        "SELECT strftime('%Y-%m-%d', timestamp, 'localtime') AS day,
+                COALESCE(SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0) AS tok
+         FROM cc_messages
+         WHERE timestamp >= ?1
+         GROUP BY day",
+    )?;
+    let mut daily_map: std::collections::HashMap<String, i64> = stmt
+        .query_map(params![thirty_ts], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))
+        })?
+        .collect::<Result<_, _>>()?;
+
+    let mut daily_series = Vec::with_capacity(30);
+    for i in 0..30 {
+        let d = (today - Duration::days(29 - i)).format("%Y-%m-%d").to_string();
+        let tokens = daily_map.remove(&d).unwrap_or(0);
+        daily_series.push(DayBucket { date: d, tokens });
+    }
+
+    // Weekly series: last 12 ISO weeks (Monday-starting), zero-filled.
+    let twelve_weeks_start = monday - Duration::weeks(11);
+    let twelve_ts = local_midnight_utc(twelve_weeks_start);
+    let mut stmt2 = conn.prepare(
+        "SELECT strftime('%Y-%m-%d', timestamp, 'localtime') AS day,
+                COALESCE(SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0) AS tok
+         FROM cc_messages
+         WHERE timestamp >= ?1
+         GROUP BY day",
+    )?;
+    let day_rows: Vec<(String, i64)> = stmt2
+        .query_map(params![twelve_ts], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))
+        })?
+        .collect::<Result<_, _>>()?;
+
+    let mut weekly_series = Vec::with_capacity(12);
+    for i in 0..12 {
+        let ws = monday - Duration::weeks(11 - i);
+        let we = ws + Duration::days(7);
+        let ws_s = ws.format("%Y-%m-%d").to_string();
+        let we_s = we.format("%Y-%m-%d").to_string();
+        let tokens: i64 = day_rows
+            .iter()
+            .filter(|(d, _)| d.as_str() >= ws_s.as_str() && d.as_str() < we_s.as_str())
+            .map(|(_, t)| t)
+            .sum();
+        weekly_series.push(WeekBucket {
+            week_start: ws_s,
+            tokens,
+        });
+    }
+
+    Ok(TokenUsageStats {
+        today: today_sum,
+        this_week: week_sum,
+        this_month: month_sum,
+        this_year: year_sum,
+        daily_series,
+        weekly_series,
+    })
+}
+
+// ─────────────────────────────────────────────────────────────────
 // Agent Talks
 // ─────────────────────────────────────────────────────────────────
 

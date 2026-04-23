@@ -7,10 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   getIndexStats,
+  getTokenUsageStats,
   listSessions,
   listReviews,
   triggerIndex,
-  getPreference,
   listProviderAccounts,
   checkAccountUsage,
   checkLiveUsage,
@@ -27,6 +27,7 @@ import type {
   ProviderAccount,
   AccountUsage,
   LiveUsageResult,
+  TokenUsageStats,
 } from "@/lib/tauri-ipc";
 
 // ─── Usage helpers ──────────────────────────────────────────────────────────
@@ -422,6 +423,7 @@ function ReviewStatusBadge({ status }: { status: string }) {
 // Module-level cache so data persists across tab switches
 let _cachedDashboard: {
   stats: IndexStats | null;
+  tokenUsage: TokenUsageStats | null;
   sessions: SessionRow[];
   reviews: LocalReviewRow[];
   accounts: ProviderAccount[];
@@ -430,6 +432,127 @@ let _cachedDashboard: {
   fetchedAt: number;
 } | null = null;
 
+// ─── TokenUsageChart (inline, pure SVG, no deps) ────────────────────────────
+
+function TokenUsageChart({
+  daily,
+  weekly,
+}: {
+  daily: { date: string; tokens: number }[];
+  weekly: { week_start: string; tokens: number }[];
+}) {
+  const [mode, setMode] = useState<"daily" | "weekly">("daily");
+  const data = mode === "daily" ? daily : weekly;
+  const max = Math.max(1, ...data.map((d) => d.tokens));
+  const n = data.length;
+
+  // ViewBox in nice round units — scales responsively.
+  const W = 600;
+  const H = 140;
+  const padX = 4;
+  const padBottom = 14;
+  const padTop = 4;
+  const barW = n > 0 ? (W - padX * 2) / n : 0;
+  const chartH = H - padTop - padBottom;
+
+  const labelFor = (d: { date?: string; week_start?: string }): string => {
+    const iso = d.date ?? d.week_start ?? "";
+    if (!iso) return "";
+    const [, m, day] = iso.split("-");
+    return mode === "daily" ? `${m}/${day}` : `${m}/${day}`;
+  };
+
+  const gridlines = [0.25, 0.5, 0.75, 1].map((f) => padTop + chartH * (1 - f));
+
+  return (
+    <Card className="border-[#1a1a1a] bg-[#0f1117] p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <div>
+          <div className="text-[11px] text-slate-500">Token usage</div>
+          <div className="text-xs text-slate-400">
+            {mode === "daily" ? "Last 30 days" : "Last 12 weeks"}
+          </div>
+        </div>
+        <div className="inline-flex rounded-md border border-[#1a1a1a] bg-[#0b0d12] p-0.5">
+          {(["daily", "weekly"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className={`px-2.5 py-1 text-[11px] font-medium rounded-sm transition-colors ${
+                mode === m
+                  ? "bg-cyan-500/10 text-cyan-300"
+                  : "text-slate-500 hover:text-slate-300"
+              }`}
+            >
+              {m === "daily" ? "Daily" : "Weekly"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full h-36"
+        preserveAspectRatio="none"
+      >
+        {gridlines.map((y, i) => (
+          <line
+            key={i}
+            x1={padX}
+            x2={W - padX}
+            y1={y}
+            y2={y}
+            stroke="#1a1a1a"
+            strokeWidth={0.5}
+          />
+        ))}
+        {data.map((d, i) => {
+          const h = (d.tokens / max) * chartH;
+          const x = padX + i * barW + barW * 0.15;
+          const y = padTop + chartH - h;
+          const w = barW * 0.7;
+          return (
+            <g key={i}>
+              <rect
+                x={x}
+                y={y}
+                width={w}
+                height={Math.max(h, d.tokens > 0 ? 1 : 0)}
+                fill="#06b6d4"
+                opacity={0.85}
+              >
+                <title>
+                  {labelFor(d)}: {d.tokens.toLocaleString()} tokens
+                </title>
+              </rect>
+            </g>
+          );
+        })}
+        {data.map((d, i) => {
+          const showLabel =
+            mode === "daily"
+              ? i % 5 === 0 || i === n - 1
+              : i % 2 === 0 || i === n - 1;
+          if (!showLabel) return null;
+          const x = padX + i * barW + barW / 2;
+          return (
+            <text
+              key={`t-${i}`}
+              x={x}
+              y={H - 3}
+              textAnchor="middle"
+              fontSize={8}
+              fill="#475569"
+            >
+              {labelFor(d)}
+            </text>
+          );
+        })}
+      </svg>
+    </Card>
+  );
+}
+
 const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes
 
 export default function Home() {
@@ -437,6 +560,7 @@ export default function Home() {
 
   // Data state — initialize from cache if available
   const [stats, setStats] = useState<IndexStats | null>(_cachedDashboard?.stats ?? null);
+  const [tokenUsage, setTokenUsage] = useState<TokenUsageStats | null>(_cachedDashboard?.tokenUsage ?? null);
   const [recentSessions, setRecentSessions] = useState<SessionRow[]>(_cachedDashboard?.sessions ?? []);
   const [recentReviews, setRecentReviews] = useState<LocalReviewRow[]>(_cachedDashboard?.reviews ?? []);
   const [accounts, setAccounts] = useState<ProviderAccount[]>(_cachedDashboard?.accounts ?? []);
@@ -451,7 +575,6 @@ export default function Home() {
   const [indexResult, setIndexResult] = useState<TriggerIndexResult | null>(
     null
   );
-  const [showCosts, setShowCosts] = useState(true);
 
   // ─── Load all dashboard data ────────────────────────────────────────────
 
@@ -463,9 +586,10 @@ export default function Home() {
 
     try {
       // Fire all requests in parallel
-      const [statsResult, sessionsResult, reviewsResult, accountsResult] =
+      const [statsResult, tokenUsageResult, sessionsResult, reviewsResult, accountsResult] =
         await Promise.allSettled([
           getIndexStats(),
+          getTokenUsageStats(),
           listSessions(undefined, undefined, 4, 0),
           listReviews(4, 0),
           listProviderAccounts(),
@@ -473,6 +597,9 @@ export default function Home() {
 
       if (statsResult.status === "fulfilled") {
         setStats(statsResult.value);
+      }
+      if (tokenUsageResult.status === "fulfilled") {
+        setTokenUsage(tokenUsageResult.value);
       }
       if (sessionsResult.status === "fulfilled") {
         setRecentSessions(sessionsResult.value);
@@ -544,6 +671,7 @@ export default function Home() {
     if (loading) return;
     _cachedDashboard = {
       stats,
+      tokenUsage,
       sessions: recentSessions,
       reviews: recentReviews,
       accounts,
@@ -551,20 +679,12 @@ export default function Home() {
       liveUsages,
       fetchedAt: Date.now(),
     };
-  }, [loading, stats, recentSessions, recentReviews, accounts, accountUsages, liveUsages]);
+  }, [loading, stats, tokenUsage, recentSessions, recentReviews, accounts, accountUsages, liveUsages]);
 
   // Refresh without showing loading spinners (for background event updates)
   const refreshDashboard = useCallback(() => {
     loadDashboard(false);
   }, [loadDashboard]);
-
-  // Load cost visibility preference
-  useEffect(() => {
-    if (!isTauriAvailable()) return;
-    getPreference("show_costs").then((v) => {
-      if (v !== null) setShowCosts(v === "true");
-    }).catch(() => {});
-  }, []);
 
   // Initial load — skip if cache is fresh (< 3 min old)
   useEffect(() => {
@@ -642,12 +762,6 @@ export default function Home() {
     }
   }, [refreshDashboard]);
 
-  // ─── Computed values ───────────────────────────────────────────────────
-
-  const completedReviews = recentReviews.filter(
-    (r) => r.status === "completed"
-  );
-
   // ─── Render ────────────────────────────────────────────────────────────
 
   return (
@@ -698,61 +812,13 @@ export default function Home() {
         </div>
       )}
 
-      {/* Stats strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      {/* Token period cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          {
-            label: "Reviews",
-            value: loading ? "--" : String(completedReviews.length),
-            color: "text-emerald-400",
-          },
-          {
-            label: "Sessions",
-            value: loading
-              ? "--"
-              : String(stats?.session_count ?? recentSessions.length),
-            color: "text-cyan-400",
-          },
-          {
-            label: "Messages",
-            value: loading
-              ? "--"
-              : stats?.message_count
-              ? stats.message_count > 999
-                ? `${(stats.message_count / 1000).toFixed(1)}k`
-                : String(stats.message_count)
-              : "0",
-            color: "text-yellow-400",
-          },
-          ...(showCosts
-            ? [
-                {
-                  label: "Total Cost",
-                  value: loading
-                    ? "--"
-                    : stats?.total_cost_usd != null
-                    ? `$${stats.total_cost_usd.toFixed(2)}`
-                    : "$0.00",
-                  color: "text-rose-400",
-                },
-              ]
-            : []),
-          {
-            label: "Tokens",
-            value: loading
-              ? "--"
-              : (() => {
-                  const total =
-                    (stats?.total_input_tokens ?? 0) +
-                    (stats?.total_output_tokens ?? 0);
-                  if (total === 0) return "0";
-                  if (total < 1000) return String(total);
-                  if (total < 1_000_000)
-                    return `${(total / 1000).toFixed(1)}k`;
-                  return `${(total / 1_000_000).toFixed(1)}M`;
-                })(),
-            color: "text-cyan-400",
-          },
+          { label: "Today", value: tokenUsage?.today ?? 0, color: "text-cyan-400" },
+          { label: "This week", value: tokenUsage?.this_week ?? 0, color: "text-emerald-400" },
+          { label: "This month", value: tokenUsage?.this_month ?? 0, color: "text-yellow-400" },
+          { label: "This year", value: tokenUsage?.this_year ?? 0, color: "text-rose-400" },
         ].map((stat) => (
           <Card
             key={stat.label}
@@ -760,11 +826,19 @@ export default function Home() {
           >
             <span className="text-[11px] text-slate-500 truncate mr-2">{stat.label}</span>
             <span className={`text-sm font-semibold tabular-nums shrink-0 ${stat.color}`}>
-              {stat.value}
+              {loading && !tokenUsage ? "--" : formatTokens(stat.value)}
             </span>
           </Card>
         ))}
       </div>
+
+      {/* Token usage chart */}
+      {tokenUsage && (
+        <TokenUsageChart
+          daily={tokenUsage.daily_series}
+          weekly={tokenUsage.weekly_series}
+        />
+      )}
 
       {/* Usage — remaining per account */}
       <div className="flex flex-col gap-2">

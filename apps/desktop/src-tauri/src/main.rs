@@ -30,7 +30,7 @@ fn main() {
             app.manage(DbState(Arc::new(Mutex::new(conn))));
 
             // ── Trigger initial index on startup ─────────────────
-            let bg_data_dir = app_data_dir;
+            let bg_data_dir = app_data_dir.clone();
             std::thread::Builder::new()
                 .name("initial-index".into())
                 .spawn(move || {
@@ -47,6 +47,26 @@ fn main() {
                     }
                 })
                 .expect("failed to spawn initial-index thread");
+
+            // ── One-time storage cleanup (background) ────────────
+            // Purges historical non-message metadata rows + VACUUMs. Runs once
+            // ever (guarded by a preference flag). Heavy I/O — kept off the
+            // main thread and delayed so the UI can settle first.
+            let cleanup_data_dir = app_data_dir;
+            std::thread::Builder::new()
+                .name("storage-cleanup".into())
+                .spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_secs(10));
+                    match db::init_db(cleanup_data_dir) {
+                        Ok(conn) => {
+                            log::info!("Storage cleanup starting...");
+                            db::schema::purge_message_cruft_once(&conn);
+                            log::info!("Storage cleanup done.");
+                        }
+                        Err(e) => log::error!("Storage cleanup DB init failed: {e}"),
+                    }
+                })
+                .expect("failed to spawn storage-cleanup thread");
 
             // ── Periodic re-index (every 15 minutes) ─────────────
             let periodic_data_dir = app
@@ -97,6 +117,7 @@ fn main() {
             // History / indexer
             commands::history::trigger_index,
             commands::history::get_index_stats,
+            commands::history::get_token_usage_stats,
             commands::history::detect_cursor,
             // Git
             commands::git::list_git_branches,
