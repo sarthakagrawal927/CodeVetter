@@ -49,3 +49,7 @@ jobs:
           releaseBody: ${{ github.event.release.body }}
           releaseDraft: false
           prerelease: false
+          # Emit latest.json manifest with signatures so the in-app updater
+          # can detect + verify releases.
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: false

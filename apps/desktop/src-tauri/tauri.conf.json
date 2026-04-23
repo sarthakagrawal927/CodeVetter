@@ -25,7 +25,16 @@
       "csp": "default-src 'self'; script-src 'self'; connect-src 'self' https://api.codevetter.com https://api.github.com; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:"
     }
   },
-  "plugins": {},
+  "plugins": {
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://github.com/sarthakagrawal927/CodeVetter/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI4Q0JDRTlBNDRCRkEzNTkKUldSWm83OUVtczdMS05wTzZHN0tWVEdJTzdyT3N1S2Q2aE43SUE0dHU5a2dSV05vU1NQRUdxdGsK",
+      "dialog": false
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
