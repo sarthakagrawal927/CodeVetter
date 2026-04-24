@@ -1,48 +1,56 @@
-# CodeVetter — Agent Context
+# agents.md — CodeVetter
 
-## What is this?
-CodeVetter is an AI code review platform. Desktop-first (Tauri + React), with a web variant planned later.
+## Purpose
+AI desktop code review tool for agent-generated code — runs offline as a Tauri binary, reviews diffs with pluggable LLM providers.
 
-## Architecture
-Monorepo with:
-- `apps/desktop/` — Tauri + React + Vite desktop app (THE product)
-- `apps/landing-page/` — Next.js marketing site
-- `apps/dashboard/` — Next.js web dashboard (being deprecated, useful parts to fold into desktop)
-- `workers/api/` — Cloudflare Worker, Hono REST API (auth, workspaces, webhooks)
-- `workers/review/` — Cloudflare Worker, async review/indexing queue
-- `packages/review-core/` — Shared review logic (scoring, prompts, parsing) — used by desktop AND workers
-- `packages/ai-gateway-client/` — LLM API client (OpenAI-compatible)
-- `packages/db/` — Database abstraction (D1, Postgres, in-memory)
-- `packages/shared-types/` — TypeScript types shared across all packages
+## Stack
+- Framework: Tauri 2 (Rust backend) + React 19 + Vite (desktop frontend)
+- Language: TypeScript (frontend), Rust (backend)
+- Styling: Tailwind CSS v3 + shadcn/ui (Radix + CVA), warm amber accent (#d4a039)
+- DB: SQLite via `@tauri-apps/plugin-sql` (local only, no server)
+- Auth: None (local desktop app; LLM API keys stored in user settings)
+- Testing: Playwright (e2e)
+- Deploy: GitHub Releases (Tauri build + `@tauri-apps/plugin-updater` auto-updater)
+- Package manager: npm workspaces (root) — NOT pnpm
 
-## Tech Stack
-- **Desktop**: Tauri 2 (Rust backend) + React 19 + Vite + React Router
-- **Styling**: Tailwind CSS + shadcn/ui, warm amber accent (#d4a039), dark backgrounds
-- **Web**: Next.js 15 (landing page), Hono (API worker)
-- **Database**: Local SQLite (desktop), Cloudflare D1 (cloud)
-- **Testing**: Vitest (unit), Playwright (e2e)
-- **Package manager**: npm workspaces
+## Repo structure
+```
+apps/
+  desktop/              # Tauri 2 + React 19 desktop app (the active product)
+    src/                # React frontend: components/, lib/, pages/, App.tsx
+    src-tauri/          # Rust backend: src/main.rs, commands/, db/, talk.rs
+    src/lib/tauri-ipc.ts  # Typed invoke() wrappers for all Tauri commands
+    vite.config.ts      # Vite config
+    playwright.config.ts # e2e test config
+    tests/              # Playwright e2e tests
+docs/                   # Architecture, testing, development docs
+.github/workflows/
+  ci.yml                # Lint + Playwright tests
+  release.yml           # Tauri platform binaries → GitHub Releases
+.planning/codebase/     # Architecture, conventions, integrations
+```
 
-## Key Conventions
-- `isTauriAvailable()` guards all Tauri IPC calls — same React code works in browser
-- Tauri IPC is in `apps/desktop/src/lib/tauri-ipc.ts` (typed wrappers around `invoke()`)
-- Rust commands are in `apps/desktop/src-tauri/src/commands/`
-- Agent personas loaded from `~/.claude/agents/` (markdown + YAML frontmatter)
-- review-core is pure functions — no side effects, no I/O (except GitHub API reads)
+## Key commands
+```bash
+# From apps/desktop/
+npm run dev           # Vite dev server (port 1420)
+npm run tauri:dev     # Full Tauri app in dev mode (requires Rust toolchain)
+npm run tauri:build   # Production Tauri binary
+npm run test          # Playwright e2e tests
+npm run lint          # ESLint
 
-## Current Focus
-Desktop app — three active tabs only:
-1. **Dashboard** — provider usage (Claude rate limits, Gemini local token counts, Codex)
-2. **History** — session indexing + full-text search (Claude + Codex)
-3. **Review** (`/review`) — CLI-agent-powered code review with findings, code viewer, fix with AI, diff view, revert
+# From repo root
+npm install           # Install all workspace deps
+```
 
-Other tabs (Board, Workspaces, old Reviews) are legacy — do not invest in them.
+## Architecture notes
+- **Desktop binary, no server.** Review engine runs entirely in the webview (TypeScript). Works offline.
+- **Multi-LLM provider**: Anthropic, OpenAI, OpenRouter. Keys stored in user settings.
+- **Tauri IPC**: all Rust commands called via typed wrappers in `src/lib/tauri-ipc.ts` → `invoke()` → `src-tauri/src/commands/`.
+- **`isTauriAvailable()` guard**: all IPC calls wrapped so React code also works in plain browser.
+- **FIXED**: Dead `@code-reviewer/*` workspace deps removed — `packages/` dir no longer exists and is no longer referenced. Build passes.
+- **Active screens**: Dashboard (usage/token analytics), History (session search), Review (`/review` — AI code review with diff + fix). Other tabs (Board, Workspaces) are legacy — do not invest in them.
+- **GH Actions**: `ci.yml` runs lint + Playwright; `release.yml` builds platform binaries and uploads to GitHub Releases.
+- Husky pre-commit runs lint-staged on `apps/desktop/src/**/*.{ts,tsx}`; pre-push hook also configured.
 
-## What NOT to do
-- Don't add server dependencies to desktop features — desktop works offline
-- Don't use the sidecar pattern — import review-core directly in the webview
-- Don't modify apps/landing-page without explicit request
-- Don't add Supabase, Webpack, or yarn
-- Don't commit .env files, API keys, or the Rust target/ directory
-- Don't invest in Board, Workspaces, or old Reviews pages — they are legacy
-- Don't add features to review-core API pipeline — the active review flow uses CLI agents (claude -p, gemini -p)
+## Active context
