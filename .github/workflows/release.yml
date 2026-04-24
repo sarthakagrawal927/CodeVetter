@@ -50,6 +50,9 @@ jobs:
           releaseDraft: false
           prerelease: false
           # Emit latest.json manifest with signatures so the in-app updater
-          # can detect + verify releases.
+          # can detect + verify releases. The explicit --bundles list forces
+          # tauri build to also produce the updater (.tar.gz + .sig) artifacts;
+          # without it tauri-action silently skips the signature upload.
+          args: --target aarch64-apple-darwin --bundles app,dmg,updater
           includeUpdaterJson: true
           updaterJsonPreferNsis: false
