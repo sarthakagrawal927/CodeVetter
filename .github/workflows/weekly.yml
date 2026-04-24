@@ -1,0 +1,10 @@
+name: Weekly Quality Check
+on:
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+jobs:
+  foundry-weekly:
+    uses: sarthakagrawal927/saas-maker/.github/workflows/foundry-weekly.yml@main
+
