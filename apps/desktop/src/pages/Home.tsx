@@ -417,18 +417,32 @@ function TokenUsageChart({
 
   // ViewBox in nice round units — scales responsively.
   const W = 600;
-  const H = 140;
+  const H = 160;
   const padX = 4;
-  const padBottom = 14;
+  const padBottom = 22;
   const padTop = 4;
   const barW = n > 0 ? (W - padX * 2) / n : 0;
   const chartH = H - padTop - padBottom;
 
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
   const labelFor = (d: { date?: string; week_start?: string }): string => {
     const iso = d.date ?? d.week_start ?? "";
     if (!iso) return "";
-    const [, m, day] = iso.split("-");
-    return mode === "daily" ? `${m}/${day}` : `${m}/${day}`;
+    const [, mm, dd] = iso.split("-");
+    const mIdx = parseInt(mm, 10) - 1;
+    const day = parseInt(dd, 10);
+    return `${MONTHS[mIdx] ?? mm} ${day}`;
+  };
+
+  // Daily: label only on Mondays + first/last bar to avoid clutter.
+  // Weekly: label every other bar, plus the most recent.
+  const shouldLabel = (i: number, iso: string): boolean => {
+    if (i === n - 1 || i === 0) return true;
+    if (mode === "weekly") return i % 2 === 0;
+    // daily: Monday or 1st of month
+    const dt = new Date(`${iso}T00:00:00`);
+    return dt.getDay() === 1 || dt.getDate() === 1;
   };
 
   const gridlines = [0.25, 0.5, 0.75, 1].map((f) => padTop + chartH * (1 - f));
@@ -466,7 +480,7 @@ function TokenUsageChart({
 
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full h-36"
+        className="w-full h-40"
         preserveAspectRatio="none"
         onMouseLeave={() => setHover(null)}
       >
@@ -510,21 +524,54 @@ function TokenUsageChart({
             </g>
           );
         })}
-        {data.map((d, i) => {
-          const showLabel =
-            mode === "daily"
-              ? i % 5 === 0 || i === n - 1
-              : i % 2 === 0 || i === n - 1;
-          if (!showLabel) return null;
+        {/* Hover guideline */}
+        {hover != null && (
+          <line
+            x1={padX + hover * barW + barW / 2}
+            x2={padX + hover * barW + barW / 2}
+            y1={padTop}
+            y2={padTop + chartH}
+            stroke="#22d3ee"
+            strokeWidth={0.5}
+            strokeDasharray="2 2"
+            opacity={0.4}
+            pointerEvents="none"
+          />
+        )}
+        {/* Tick marks */}
+        {data.map((_, i) => {
+          if (i % (mode === "daily" ? 5 : 1) !== 0 && i !== n - 1) return null;
           const x = padX + i * barW + barW / 2;
+          return (
+            <line
+              key={`tick-${i}`}
+              x1={x}
+              x2={x}
+              y1={padTop + chartH}
+              y2={padTop + chartH + 3}
+              stroke="#334155"
+              strokeWidth={0.5}
+            />
+          );
+        })}
+        {/* X-axis labels */}
+        {data.map((d, i) => {
+          const iso = (d as { date?: string; week_start?: string }).date
+            ?? (d as { date?: string; week_start?: string }).week_start
+            ?? "";
+          if (!shouldLabel(i, iso)) return null;
+          const x = padX + i * barW + barW / 2;
+          const isHover = hover === i;
+          const isLast = i === n - 1;
           return (
             <text
               key={`t-${i}`}
               x={x}
-              y={H - 3}
+              y={H - 6}
               textAnchor="middle"
-              fontSize={8}
-              fill="#475569"
+              fontSize={9}
+              fontWeight={isHover || isLast ? 600 : 400}
+              fill={isHover ? "#22d3ee" : isLast ? "#cbd5e1" : "#64748b"}
             >
               {labelFor(d)}
             </text>
