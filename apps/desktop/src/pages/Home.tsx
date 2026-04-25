@@ -13,6 +13,7 @@ import {
   detectProviderAccounts,
   isTauriAvailable,
   setTrayText,
+  setTrayMenu,
 } from "@/lib/tauri-ipc";
 
 import type {
@@ -801,6 +802,47 @@ export default function Home() {
     const today = formatTokens(tokenUsage.today);
     setTrayText(today).catch(() => {});
   }, [tokenUsage]);
+
+  // ─── Push per-account live usage into the tray menu ────────────────────
+  useEffect(() => {
+    if (!isTauriAvailable()) return;
+    if (accounts.length === 0) return;
+
+    const lines = accounts.map((a) => {
+      const live = liveUsages[a.id];
+      const label = a.name || a.provider;
+      const plan = a.plan ? ` (${a.plan})` : "";
+      if (!live) return `${label}${plan} — …`;
+
+      if (a.provider === "anthropic") {
+        const fh = live.five_h?.utilization_pct;
+        const sd = live.seven_d?.utilization_pct;
+        const parts: string[] = [];
+        if (fh != null) parts.push(`5h ${Math.round(fh)}%`);
+        if (sd != null) parts.push(`7d ${Math.round(sd)}%`);
+        return parts.length
+          ? `${label}${plan} — ${parts.join(" · ")}`
+          : `${label}${plan} — no data`;
+      }
+
+      if (a.provider === "google") {
+        const t = live.today?.tokens?.total;
+        return t != null
+          ? `${label} — ${formatTokens(t)} today`
+          : `${label} — no data`;
+      }
+
+      if (a.provider === "openai") {
+        return live.supported
+          ? `${label} — ${live.status ?? "ok"}`
+          : `${label} — ${live.reason ?? "n/a"}`;
+      }
+
+      return `${label} — ${live.status ?? "ok"}`;
+    });
+
+    setTrayMenu(lines).catch(() => {});
+  }, [accounts, liveUsages]);
 
   // ─── Trigger re-index ──────────────────────────────────────────────────
 

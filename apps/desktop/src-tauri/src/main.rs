@@ -7,7 +7,7 @@ mod talk;
 
 use std::sync::{Arc, Mutex};
 use tauri::menu::{MenuBuilder, MenuItemBuilder};
-use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::tray::TrayIconBuilder;
 use tauri::Manager;
 
 /// Shared database state accessible from every Tauri command via
@@ -72,6 +72,7 @@ fn main() {
                 .path()
                 .app_data_dir()
                 .expect("failed to resolve app data dir");
+            let periodic_handle = app.handle().clone();
 
             std::thread::Builder::new()
                 .name("periodic-index".into())
@@ -85,12 +86,26 @@ fn main() {
                                     Ok(msg) => log::info!("Periodic re-index complete: {msg}"),
                                     Err(e) => log::error!("Periodic re-index failed: {e}"),
                                 }
+
+                                // After each index pass, refresh the menu-bar
+                                // tray title with today's tokens. Decoupled
+                                // from the UI so it updates even when the app
+                                // window is hidden or on a non-Home page.
+                                if let Ok(stats) = crate::db::queries::get_token_usage_stats(&conn) {
+                                    let text = format_tokens_compact(stats.today);
+                                    if let Some(tray) = periodic_handle.tray_by_id("main") {
+                                        let _ = tray.set_title(Some(&text));
+                                        let _ = tray.set_tooltip(Some(&format!(
+                                            "CodeVetter\nToday: {text}"
+                                        )));
+                                    }
+                                }
                             }
                             Err(e) => {
                                 log::error!("Periodic re-index DB init failed: {e}");
                             }
                         }
-                        std::thread::sleep(std::time::Duration::from_secs(60));
+                        std::thread::sleep(std::time::Duration::from_secs(30));
                     }
                 })
                 .expect("failed to spawn periodic-index thread");
@@ -107,7 +122,7 @@ fn main() {
                 .icon(app.default_window_icon().expect("default icon").clone())
                 .icon_as_template(true)
                 .menu(&menu)
-                .show_menu_on_left_click(false)
+                .show_menu_on_left_click(true)
                 .tooltip("CodeVetter")
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "show" => {
@@ -120,21 +135,19 @@ fn main() {
                     "quit" => app.exit(0),
                     _ => {}
                 })
-                .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click {
-                        button: MouseButton::Left,
-                        button_state: MouseButtonState::Up,
-                        ..
-                    } = event
-                    {
-                        if let Some(w) = tray.app_handle().get_webview_window("main") {
-                            let _ = w.show();
-                            let _ = w.unminimize();
-                            let _ = w.set_focus();
-                        }
-                    }
-                })
                 .build(app)?;
+
+            // Intercept window close (X button): hide instead of quit so the
+            // tray icon stays alive and the user can reopen via "Open CodeVetter".
+            if let Some(window) = app.get_webview_window("main") {
+                let w = window.clone();
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        let _ = w.hide();
+                        api.prevent_close();
+                    }
+                });
+            }
 
             Ok(())
         })
@@ -197,9 +210,22 @@ fn main() {
             commands::talks::get_latest_talk,
             // Tray
             commands::tray::set_tray_text,
+            commands::tray::set_tray_menu,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+fn format_tokens_compact(n: i64) -> String {
+    if n >= 1_000_000_000 {
+        format!("{:.2}B", n as f64 / 1_000_000_000.0)
+    } else if n >= 1_000_000 {
+        format!("{:.1}M", n as f64 / 1_000_000.0)
+    } else if n >= 1_000 {
+        format!("{}k", n / 1_000)
+    } else {
+        n.to_string()
+    }
 }
 
 /// Run a lightweight startup index using its own database connection.
