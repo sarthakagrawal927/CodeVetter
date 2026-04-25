@@ -1,6 +1,6 @@
 # CodeVetter Project Log
 
-**Last updated**: 2026-04-05
+**Last updated**: 2026-04-24
 **Status**: Active development (desktop app)
 
 ---
@@ -183,6 +183,24 @@ Currently revert is file-level only. Users want to revert individual hunks withi
 - Better loading states during long-running agent calls
 - Gemini History tab (blocked: Gemini CLI doesn't write session transcripts)
 
+### Decision Intelligence (prior-intent layer)
+
+Surface past design intent to the LLM during review so it catches *intent regression* -- agent PRs that silently contradict earlier decisions. Target failure mode: the agent "cleans up" code in a direction that breaks an invariant nobody wrote down. Generic review misses this because the LLM has no memory of why the current shape exists. Three sources, ordered cheapest first:
+
+1. **Inline markers**: grep `WHY:|DECISION:|TRADEOFF:` in changed files + their blast-radius callers. Convention is grep-simple; the value comes from teams adopting it once and compounding over time.
+2. **Git log mining**: for each touched file, `git log --grep='decision\|chose\|trade-?off\|why' -n 5 -- <file>`, pick top by recency. Surfaces decisions that were only ever captured in commit messages.
+3. **ADR pickup**: if `docs/adr/` or `docs/decisions/` exists, include any ADR whose body references a changed symbol.
+
+Output: a "Prior decisions touching this change" block prepended to the review prompt, next to the existing blast-radius summary. Plugs into `apps/desktop/src-tauri/src/commands/review.rs:291` right after `compute_blast_radius`. Estimated 1 day of work for v1 (markers + git-log); ADR pickup and staleness tracking deferred to v2.
+
+Differentiator context: no existing review tool (CodeRabbit, Greptile, Claude Code `/review`, Copilot review) does this. Maps directly to the "review agent-generated code" niche because intent-regression is the dominant failure mode of agent PRs.
+
+### Published Catch-Rate Benchmark
+
+Curated dataset of 20-30 real agent-generated PRs from public repos with known issues (regressions, intent drift, silent behavior changes). Run CodeVetter against them and measure catch rate per severity. Same dataset baselined against CodeRabbit free tier and Claude Code `/review`. Publish as a separate `codevetter-bench` repo with reproducible harness, per-task tables, and the raw data.
+
+Turns "better for agent code" from vibes into a chart. Highest-leverage marketing asset because it's the first question every prospect asks and the one competitors can't refute without running the same bench. Hardest part is curation (hand-labeling ground truth); evaluator harness is ~200 lines. Precedent: `repowise-bench` demonstrates the model works even for small projects -- paired tasks, third-party ground truth, LLM judge.
+
 ---
 
 ## 6. What Was Explored and Discarded
@@ -353,6 +371,7 @@ Phases 1-7 were completed before the current rebuild. They represent the origina
 
 Extends from point-in-time PR review to longitudinal intelligence. Not actively being built — documented for future reference.
 
+- **Review Memory (compounding artifact)** — each review writes learned context (inferred conventions, captured invariants, recurring quirks) into a per-repo `.codevetter/review-memory.md`; later reviews read it as context before running. Turns amnesiac stateless reviews into a system that gets sharper the more it's used on the same repo. Complement to Decision Intelligence (§5): DI pulls intent humans wrote down, Review Memory accumulates intent the reviews themselves discover. Requires write-back step, staleness handling (cite commit SHAs; flag claims whose referenced code changed), and eventual team sync. Moat vs. Greptile/CodeRabbit/Cursor Bugbot, which are all stateless. Pattern borrowed from Karpathy's "LLM Wiki" (2026-04-04).
 - Architecture drift detection
 - Hotspot prediction and instability alerts
 - Ownership and review quality trends per team/author
