@@ -9,3 +9,4 @@ pub mod review;
 pub mod sessions;
 pub mod setup;
 pub mod talks;
+pub mod tray;

@@ -12,6 +12,7 @@ import {
   deleteProviderAccount,
   detectProviderAccounts,
   isTauriAvailable,
+  setTrayText,
 } from "@/lib/tauri-ipc";
 
 import type {
@@ -792,6 +793,14 @@ export default function Home() {
 
     return () => clearInterval(interval);
   }, [accounts, refreshLiveUsage]);
+
+  // ─── Push compact stats to macOS menu-bar tray ─────────────────────────
+  useEffect(() => {
+    if (!isTauriAvailable()) return;
+    if (!tokenUsage) return;
+    const today = formatTokens(tokenUsage.today);
+    setTrayText(today).catch(() => {});
+  }, [tokenUsage]);
 
   // ─── Trigger re-index ──────────────────────────────────────────────────
 

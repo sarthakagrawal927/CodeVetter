@@ -6,6 +6,8 @@ mod db;
 mod talk;
 
 use std::sync::{Arc, Mutex};
+use tauri::menu::{MenuBuilder, MenuItemBuilder};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::Manager;
 
 /// Shared database state accessible from every Tauri command via
@@ -93,6 +95,47 @@ fn main() {
                 })
                 .expect("failed to spawn periodic-index thread");
 
+            // ── Menu-bar tray icon ───────────────────────────────
+            // Surfaces token-usage stats next to volume/battery on macOS.
+            // Frontend pushes a compact string via `set_tray_text` whenever
+            // the dashboard polls (every 60s).
+            let show = MenuItemBuilder::with_id("show", "Open CodeVetter").build(app)?;
+            let quit = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
+            let menu = MenuBuilder::new(app).items(&[&show, &quit]).build()?;
+
+            TrayIconBuilder::with_id("main")
+                .icon(app.default_window_icon().expect("default icon").clone())
+                .icon_as_template(true)
+                .menu(&menu)
+                .show_menu_on_left_click(false)
+                .tooltip("CodeVetter")
+                .on_menu_event(|app, event| match event.id().as_ref() {
+                    "show" => {
+                        if let Some(w) = app.get_webview_window("main") {
+                            let _ = w.show();
+                            let _ = w.unminimize();
+                            let _ = w.set_focus();
+                        }
+                    }
+                    "quit" => app.exit(0),
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        if let Some(w) = tray.app_handle().get_webview_window("main") {
+                            let _ = w.show();
+                            let _ = w.unminimize();
+                            let _ = w.set_focus();
+                        }
+                    }
+                })
+                .build(app)?;
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -152,6 +195,8 @@ fn main() {
             commands::talks::get_talk,
             commands::talks::list_project_talks,
             commands::talks::get_latest_talk,
+            // Tray
+            commands::tray::set_tray_text,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

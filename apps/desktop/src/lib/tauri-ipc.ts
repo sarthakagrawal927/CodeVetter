@@ -464,6 +464,10 @@ export async function getTokenUsageStats(): Promise<TokenUsageStats> {
   return safeInvoke<TokenUsageStats>("get_token_usage_stats");
 }
 
+export async function setTrayText(text: string): Promise<void> {
+  return safeInvoke<void>("set_tray_text", { text });
+}
+
 export async function getIndexStats(): Promise<IndexStats> {
   return safeInvoke<IndexStats>("get_index_stats");
 }
