@@ -62,7 +62,10 @@ fn main() {
                 })
                 .expect("failed to spawn initial-index thread");
 
-            // ── Periodic re-index (every 15 minutes) ─────────────
+            // ── Periodic re-index (every 60 seconds) ─────────────
+            // Indexing is incremental (mtime + byte-offset skip), so a tight
+            // loop is cheap and keeps token-usage stats near-realtime instead
+            // of "frozen until restart".
             let periodic_data_dir = app
                 .path()
                 .app_data_dir()
@@ -71,7 +74,7 @@ fn main() {
             std::thread::Builder::new()
                 .name("periodic-index".into())
                 .spawn(move || {
-                    std::thread::sleep(std::time::Duration::from_secs(180));
+                    std::thread::sleep(std::time::Duration::from_secs(15));
                     loop {
                         log::info!("Periodic re-index starting...");
                         match db::init_db(periodic_data_dir.clone()) {
@@ -85,7 +88,7 @@ fn main() {
                                 log::error!("Periodic re-index DB init failed: {e}");
                             }
                         }
-                        std::thread::sleep(std::time::Duration::from_secs(900));
+                        std::thread::sleep(std::time::Duration::from_secs(60));
                     }
                 })
                 .expect("failed to spawn periodic-index thread");

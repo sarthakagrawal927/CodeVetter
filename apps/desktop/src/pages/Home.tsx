@@ -741,14 +741,16 @@ export default function Home() {
     loadDashboard();
   }, [loadDashboard]);
 
-  // ─── Periodic background sync every 3 minutes ──────────────────────────
+  // ─── Periodic background sync every 60s ───────────────────────────────
+  // Tight loop keeps token-usage counters near-realtime. Backend indexer
+  // also runs every 60s so fresh JSONL bytes land in the DB before we read.
 
   useEffect(() => {
     if (!isTauriAvailable()) return;
 
     const interval = setInterval(() => {
       refreshDashboard();
-    }, CACHE_TTL_MS);
+    }, 60_000);
 
     return () => clearInterval(interval);
   }, [refreshDashboard]);
