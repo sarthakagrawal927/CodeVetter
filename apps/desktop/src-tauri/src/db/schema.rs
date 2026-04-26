@@ -36,6 +36,8 @@ pub fn purge_message_cruft_once(conn: &Connection) {
     // come back on next startup; we also recreate them here so live search
     // works until restart).
     let tx_result: Result<u64, rusqlite::Error> = (|| {
+        // FTS triggers are dropped here and never recreated — the new
+        // content-text purge migration drops the FTS table entirely.
         conn.execute_batch(
             "DROP TRIGGER IF EXISTS cc_messages_ai;
              DROP TRIGGER IF EXISTS cc_messages_ad;
@@ -52,23 +54,6 @@ pub fn purge_message_cruft_once(conn: &Connection) {
             [],
         )? as u64;
 
-        conn.execute_batch(
-            "INSERT INTO cc_messages_fts(cc_messages_fts) VALUES('rebuild');
-             CREATE TRIGGER IF NOT EXISTS cc_messages_ai AFTER INSERT ON cc_messages BEGIN
-                 INSERT INTO cc_messages_fts(rowid, content_text)
-                 VALUES (new.rowid, new.content_text);
-             END;
-             CREATE TRIGGER IF NOT EXISTS cc_messages_ad AFTER DELETE ON cc_messages BEGIN
-                 INSERT INTO cc_messages_fts(cc_messages_fts, rowid, content_text)
-                 VALUES ('delete', old.rowid, old.content_text);
-             END;
-             CREATE TRIGGER IF NOT EXISTS cc_messages_au AFTER UPDATE ON cc_messages BEGIN
-                 INSERT INTO cc_messages_fts(cc_messages_fts, rowid, content_text)
-                 VALUES ('delete', old.rowid, old.content_text);
-                 INSERT INTO cc_messages_fts(rowid, content_text)
-                 VALUES (new.rowid, new.content_text);
-             END;",
-        )?;
         Ok(deleted)
     })();
 
@@ -95,6 +80,54 @@ pub fn purge_message_cruft_once(conn: &Connection) {
         "INSERT OR REPLACE INTO preferences(key, value) VALUES ('cruft_purged_v1', '1')",
         [],
     );
+}
+
+/// One-time cleanup: NULL out cc_messages.content_text and drop the FTS index.
+/// We only need per-message timestamps + counts to compute token usage; the
+/// stored JSONL bodies were ballooning the DB to 4 GB. Saves ~75% disk.
+pub fn purge_content_text_once(conn: &Connection) {
+    let already: Option<String> = conn
+        .query_row(
+            "SELECT value FROM preferences WHERE key = 'content_purged_v1'",
+            [],
+            |r| r.get(0),
+        )
+        .ok();
+    if already.is_some() {
+        return;
+    }
+
+    let result: Result<(), rusqlite::Error> = (|| {
+        // Drop FTS triggers + table — we no longer offer message search.
+        conn.execute_batch(
+            "DROP TRIGGER IF EXISTS cc_messages_ai;
+             DROP TRIGGER IF EXISTS cc_messages_ad;
+             DROP TRIGGER IF EXISTS cc_messages_au;
+             DROP TABLE IF EXISTS cc_messages_fts;",
+        )?;
+
+        // NULL existing content. Faster than ALTER TABLE DROP COLUMN on a
+        // multi-GB table and keeps the schema migration simple.
+        conn.execute("UPDATE cc_messages SET content_text = NULL", [])?;
+        Ok(())
+    })();
+
+    if let Err(e) = result {
+        eprintln!("[storage] content purge failed: {e}");
+        return;
+    }
+
+    // Reclaim freed pages. VACUUM rewrites the file — slow but one-time.
+    let _ = conn.execute_batch(
+        "PRAGMA wal_checkpoint(TRUNCATE);
+         VACUUM;",
+    );
+
+    let _ = conn.execute(
+        "INSERT OR REPLACE INTO preferences(key, value) VALUES ('content_purged_v1', '1')",
+        [],
+    );
+    eprintln!("[storage] content_text purged + VACUUM done");
 }
 
 const MIGRATION_SQL: &str = r#"
@@ -150,36 +183,8 @@ CREATE TABLE IF NOT EXISTS cc_messages (
     is_sidechain  INTEGER NOT NULL DEFAULT 0
 );
 
--- FTS5 virtual table for full-text search across messages.
--- We use an external-content table so that inserts go through
--- cc_messages and are mirrored via triggers.
-CREATE VIRTUAL TABLE IF NOT EXISTS cc_messages_fts USING fts5(
-    content_text,
-    content=cc_messages,
-    content_rowid=rowid
-);
-
--- Triggers to keep the FTS index in sync ----------------------------
-
--- After INSERT on cc_messages
-CREATE TRIGGER IF NOT EXISTS cc_messages_ai AFTER INSERT ON cc_messages BEGIN
-    INSERT INTO cc_messages_fts(rowid, content_text)
-    VALUES (new.rowid, new.content_text);
-END;
-
--- After DELETE on cc_messages
-CREATE TRIGGER IF NOT EXISTS cc_messages_ad AFTER DELETE ON cc_messages BEGIN
-    INSERT INTO cc_messages_fts(cc_messages_fts, rowid, content_text)
-    VALUES ('delete', old.rowid, old.content_text);
-END;
-
--- After UPDATE on cc_messages
-CREATE TRIGGER IF NOT EXISTS cc_messages_au AFTER UPDATE ON cc_messages BEGIN
-    INSERT INTO cc_messages_fts(cc_messages_fts, rowid, content_text)
-    VALUES ('delete', old.rowid, old.content_text);
-    INSERT INTO cc_messages_fts(rowid, content_text)
-    VALUES (new.rowid, new.content_text);
-END;
+-- FTS removed: we no longer store message bodies, so search has no
+-- corpus. purge_content_text_once() drops the legacy table + triggers.
 
 
 -- ================================================================

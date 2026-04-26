@@ -57,6 +57,7 @@ fn main() {
                         Ok(conn) => {
                             log::info!("Storage cleanup starting...");
                             db::schema::purge_message_cruft_once(&conn);
+                            db::schema::purge_content_text_once(&conn);
                             log::info!("Storage cleanup done.");
                         }
                         Err(e) => log::error!("Storage cleanup DB init failed: {e}"),

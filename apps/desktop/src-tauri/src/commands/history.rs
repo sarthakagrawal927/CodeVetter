@@ -70,6 +70,12 @@ fn full_index_impl(conn: &rusqlite::Connection) -> Result<(u64, u64, u64), Strin
 
     for project_entry in &project_dirs {
         let project_path = project_entry.path();
+        // Per-project IIFE so a failure in one project (bad JSONL row, locked
+        // file, etc.) only skips that project instead of aborting the whole
+        // re-index. Previously a single `?` here meant new project dirs added
+        // late in the iteration order (e.g. after a repo move) were never
+        // scanned, freezing token-usage stats.
+        let project_result: Result<(), String> = (|| {
         let project_dir_name = project_path
             .file_name()
             .unwrap_or_default()
@@ -345,9 +351,6 @@ fn full_index_impl(conn: &rusqlite::Connection) -> Result<(u64, u64, u64), Strin
                     .and_then(|v| v.as_str())
                     .map(String::from);
 
-                // ── Content text extraction ───────────────────────
-                let content_text = extract_content_text(&parsed);
-
                 // ── Token usage ──────────────────────────────────
                 let usage = parsed
                     .get("message")
@@ -405,7 +408,10 @@ fn full_index_impl(conn: &rusqlite::Connection) -> Result<(u64, u64, u64), Strin
                         parent_uuid,
                         msg_type: Some(msg_type.to_string()),
                         role,
-                        content_text,
+                        // content_text intentionally not stored — UI only needs
+                        // counts/tokens, and storing JSONL bodies blew the DB
+                        // up to 4 GB. Saves ~75% of disk.
+                        content_text: None,
                         model: model_used.clone(),
                         input_tokens: effective_input,
                         output_tokens,
@@ -491,6 +497,12 @@ fn full_index_impl(conn: &rusqlite::Connection) -> Result<(u64, u64, u64), Strin
                 "UPDATE cc_projects SET display_name = ?2 WHERE id = ?1",
                 rusqlite::params![project_id, better_name],
             );
+        }
+
+        Ok(())
+        })();
+        if let Err(e) = project_result {
+            log::error!("Skipping project {project_path:?}: {e}");
         }
     }
 
@@ -628,14 +640,7 @@ pub async fn get_token_usage_stats(
 // Content text extraction
 // ─────────────────────────────────────────────────────────────────
 
-/// Extract a human-readable text representation from a JSONL message.
-///
-/// - **user messages** with string `message.content`: use directly.
-/// - **user messages** with array `message.content` containing `tool_result`
-///   blocks: produce a summary like `[tool_result for toolu_...]`.
-/// - **assistant messages** with array `message.content`: concatenate all
-///   `text` blocks, skipping `thinking` blocks.
-/// - **tool_result user messages** (top-level `toolUseResult`): summarise.
+#[allow(dead_code)]
 fn extract_content_text(parsed: &Value) -> Option<String> {
     let message = parsed.get("message")?;
     let content = message.get("content")?;
@@ -941,25 +946,6 @@ fn parse_codex_session(
             if let Some(p) = payload {
                 let role = p.get("role").and_then(|v| v.as_str()).map(String::from);
 
-                // Extract content text from content array
-                let content_text = p.get("content").and_then(|c| {
-                    if let Some(arr) = c.as_array() {
-                        let texts: Vec<&str> = arr.iter().filter_map(|block| {
-                            let bt = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
-                            if bt == "output_text" || bt == "text" || bt == "input_text" {
-                                block.get("text").and_then(|v| v.as_str())
-                            } else {
-                                None
-                            }
-                        }).collect();
-                        if texts.is_empty() { None } else { Some(texts.join("\n\n")) }
-                    } else if let Some(s) = c.as_str() {
-                        Some(s.to_string())
-                    } else {
-                        None
-                    }
-                });
-
                 // Extract token usage from response_item.payload.usage (if present)
                 if let Some(usage) = p.get("usage") {
                     let input_t = usage.get("input_tokens").and_then(|v| v.as_i64()).unwrap_or(0);
@@ -991,7 +977,7 @@ fn parse_codex_session(
                         parent_uuid: None,
                         msg_type: Some("response_item".to_string()),
                         role,
-                        content_text,
+                        content_text: None,
                         model: model_used.clone(),
                         input_tokens: None,
                         output_tokens: None,
@@ -1619,7 +1605,7 @@ fn parse_cursor_conversation(
                 parent_uuid: None,
                 msg_type: Some("message".to_string()),
                 role,
-                content_text,
+                content_text: None,
                 model: model_used.clone(),
                 input_tokens: None,
                 output_tokens: None,
