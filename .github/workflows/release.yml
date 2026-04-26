@@ -64,30 +64,37 @@ jobs:
           includeUpdaterJson: true
           updaterJsonPreferNsis: false
 
-      # tauri-action sometimes silently skips the .sig + latest.json upload
-      # ("Signature not found for the updater JSON. Skipping upload..."). The
-      # auto-updater needs both, so synthesise + upload them ourselves from the
-      # known bundle path. Idempotent — `gh release upload --clobber` overwrites
-      # whatever tauri-action managed to upload.
-      - name: Force-upload updater manifest + signature
+      # tauri-action repackages the .app -> .tar.gz AFTER tauri build signed
+      # the original tarball, so the on-disk .sig is stale (or absent). Sign
+      # the final tarball ourselves with the same minisign key, then upload
+      # .sig + latest.json. Idempotent via gh release upload --clobber.
+      - name: Sign updater tarball + upload manifest
+        if: always() && hashFiles('apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/CodeVetter.app.tar.gz') != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.event.release.tag_name }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           set -euxo pipefail
           BUNDLE=apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos
-          SIG_FILE="$BUNDLE/CodeVetter.app.tar.gz.sig"
           TAR_FILE="$BUNDLE/CodeVetter.app.tar.gz"
-          if [ ! -f "$SIG_FILE" ] || [ ! -f "$TAR_FILE" ]; then
-            echo "Updater artifacts missing — bundling failed silently." >&2
-            ls -la "$BUNDLE" || true
-            exit 1
-          fi
+          SIG_FILE="$TAR_FILE.sig"
+
+          # Re-sign the (possibly repackaged) tarball. tauri-cli writes the
+          # signature next to the input file as <input>.sig.
+          cd apps/desktop
+          pnpm exec tauri signer sign \
+            --private-key "$TAURI_SIGNING_PRIVATE_KEY" \
+            --password "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" \
+            "../../$TAR_FILE"
+          cd ../..
+
+          test -f "$SIG_FILE" || { echo "tauri signer did not produce $SIG_FILE" >&2; exit 1; }
+
           VERSION="${TAG#v}"
           PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           URL="https://github.com/sarthakagrawal927/CodeVetter/releases/download/$TAG/CodeVetter_aarch64.app.tar.gz"
-          # Use jq to JSON-encode the signature — minisign sigs contain newlines
-          # that would break a naive heredoc.
           jq -n \
             --arg version "$VERSION" \
             --arg pub_date "$PUB_DATE" \
@@ -104,6 +111,7 @@ jobs:
                 }
               }
             }' > latest.json
+
           gh release upload "$TAG" \
             "$SIG_FILE#CodeVetter_aarch64.app.tar.gz.sig" \
             "latest.json" \
