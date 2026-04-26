@@ -194,18 +194,28 @@ fn full_index_impl(conn: &rusqlite::Connection) -> Result<(u64, u64, u64), Strin
             let mut first_message: Option<String> = None;
             let mut last_message: Option<String> = None;
 
+            // Per-day message counts. Flushed to cc_session_days once the
+            // file is fully parsed. We only persist counts (not raw rows) —
+            // see purge_messages_to_buckets_once for the rationale.
+            let mut day_counts: std::collections::HashMap<String, i64> =
+                std::collections::HashMap::new();
+
             // If doing a full re-read (offset == 0) we need the first message
             // timestamp.  For incremental we keep whatever is in the DB.
             let is_incremental = byte_offset > 0;
 
             if !is_incremental {
-                // Full read: reset accumulators.
+                // Full read: reset accumulators + per-day buckets so we
+                // don't double-count when re-parsing from scratch.
                 msg_count = 0;
                 total_input = 0;
                 total_output = 0;
                 total_cache_read = 0;
                 total_cache_creation = 0;
                 compaction_count = 0;
+                if let Some(ref meta) = existing {
+                    let _ = queries::reset_session_days(&conn, &meta.id);
+                }
             }
 
             // Seek to the byte offset for incremental reading.
@@ -398,33 +408,35 @@ fn full_index_impl(conn: &rusqlite::Connection) -> Result<(u64, u64, u64), Strin
                     session_slug = Some(s.to_string());
                 }
 
-                // ── Insert message into DB ───────────────────────
-                let sid = session_id.as_deref().unwrap_or("");
-                queries::insert_message(
-                    &conn,
-                    &queries::MessageInput {
-                        id: msg_id,
-                        session_id: sid.to_string(),
-                        parent_uuid,
-                        msg_type: Some(msg_type.to_string()),
-                        role,
-                        // content_text intentionally not stored — UI only needs
-                        // counts/tokens, and storing JSONL bodies blew the DB
-                        // up to 4 GB. Saves ~75% of disk.
-                        content_text: None,
-                        model: model_used.clone(),
-                        input_tokens: effective_input,
-                        output_tokens,
-                        timestamp: ts,
-                        line_number: Some(line_number),
-                        is_sidechain: Some(if is_sidechain { 1 } else { 0 }),
-                    },
-                )
-                .map_err(|e| e.to_string())?;
+                // ── Increment per-day bucket ─────────────────────
+                // We accumulate in-memory and flush once per file below.
+                // Day = local-time date of the message timestamp.
+                if let Some(ts_str) = ts.as_deref() {
+                    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(ts_str) {
+                        let day = dt
+                            .with_timezone(&chrono::Local)
+                            .format("%Y-%m-%d")
+                            .to_string();
+                        *day_counts.entry(day).or_insert(0) += 1;
+                    }
+                }
+                // msg_id, parent_uuid, role, msg_type, is_sidechain — no longer
+                // persisted; UI never read them. Kept locally above because
+                // future log lines may reference them via parent_uuid chains.
+                let _ = (msg_id, parent_uuid, role, is_sidechain, msg_type);
 
                 msg_count += 1;
                 new_messages += 1;
                 line_number += 1;
+            }
+
+            // Flush per-day bucket counts to cc_session_days. Ignore errors
+            // for individual buckets — partial writes are fine, we'll re-bump
+            // on the next pass.
+            if let Some(ref sid) = session_id {
+                for (day, n) in &day_counts {
+                    let _ = queries::bump_session_day(&conn, sid, day, *n);
+                }
             }
 
             // ── Upsert session ───────────────────────────────────
@@ -877,6 +889,8 @@ fn parse_codex_session(
     let mut last_message: Option<String> = None;
     let mut new_messages: u64 = 0;
     let mut line_number: i64 = 0;
+    let mut day_counts: std::collections::HashMap<String, i64> =
+        std::collections::HashMap::new();
 
     for line_result in reader.lines() {
         let line = match line_result {
@@ -966,26 +980,16 @@ fn parse_codex_session(
                 }
                 last_message = ts.clone();
 
-                let msg_id = uuid::Uuid::new_v4().to_string();
-                let sid = session_id.as_deref().unwrap_or("");
-
-                let _ = queries::insert_message(
-                    conn,
-                    &queries::MessageInput {
-                        id: msg_id,
-                        session_id: sid.to_string(),
-                        parent_uuid: None,
-                        msg_type: Some("response_item".to_string()),
-                        role,
-                        content_text: None,
-                        model: model_used.clone(),
-                        input_tokens: None,
-                        output_tokens: None,
-                        timestamp: ts,
-                        line_number: Some(line_number),
-                        is_sidechain: Some(0),
-                    },
-                );
+                let _ = role;
+                if let Some(ts_str) = ts.as_deref() {
+                    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(ts_str) {
+                        let day = dt
+                            .with_timezone(&chrono::Local)
+                            .format("%Y-%m-%d")
+                            .to_string();
+                        *day_counts.entry(day).or_insert(0) += 1;
+                    }
+                }
 
                 msg_count += 1;
                 new_messages += 1;
@@ -993,6 +997,12 @@ fn parse_codex_session(
         }
 
         line_number += 1;
+    }
+
+    if let Some(ref sid) = session_id {
+        for (day, n) in &day_counts {
+            let _ = queries::bump_session_day(conn, sid, day, *n);
+        }
     }
 
     // If we didn't get a session_id from the file, generate one
@@ -1488,12 +1498,12 @@ fn parse_cursor_conversation(
     let mut last_message: Option<String> = None;
     let mut model_used: Option<String> = None;
     let mut new_messages: u64 = 0;
+    let mut day_counts: std::collections::HashMap<String, i64> =
+        std::collections::HashMap::new();
 
-    // Delete existing messages for this session before re-indexing
-    let _ = app_conn.execute(
-        "DELETE FROM cc_messages WHERE session_id = ?1",
-        rusqlite::params![session_id],
-    );
+    // Reset existing per-day buckets for this session — Cursor sessions
+    // are always re-read in full (no incremental byte-offset tracking).
+    let _ = queries::reset_session_days(app_conn, &session_id);
 
     for (i, msg) in messages.iter().enumerate() {
         let role = msg
@@ -1595,25 +1605,16 @@ fn parse_cursor_conversation(
             total_output += output_t;
         }
 
-        let msg_id = format!("{}-msg-{}", session_id, i);
-
-        let _ = queries::insert_message(
-            app_conn,
-            &queries::MessageInput {
-                id: msg_id,
-                session_id: session_id.clone(),
-                parent_uuid: None,
-                msg_type: Some("message".to_string()),
-                role,
-                content_text: None,
-                model: model_used.clone(),
-                input_tokens: None,
-                output_tokens: None,
-                timestamp: ts,
-                line_number: Some(i as i64),
-                is_sidechain: Some(0),
-            },
-        );
+        let _ = (role, i);
+        if let Some(ts_str) = ts.as_deref() {
+            if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(ts_str) {
+                let day = dt
+                    .with_timezone(&chrono::Local)
+                    .format("%Y-%m-%d")
+                    .to_string();
+                *day_counts.entry(day).or_insert(0) += 1;
+            }
+        }
 
         msg_count += 1;
         new_messages += 1;
@@ -1621,6 +1622,10 @@ fn parse_cursor_conversation(
 
     if msg_count == 0 {
         return Ok((0, 0));
+    }
+
+    for (day, n) in &day_counts {
+        let _ = queries::bump_session_day(app_conn, &session_id, day, *n);
     }
 
     let estimated_cost = estimate_cost(

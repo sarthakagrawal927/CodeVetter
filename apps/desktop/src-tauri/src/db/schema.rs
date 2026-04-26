@@ -130,6 +130,53 @@ pub fn purge_content_text_once(conn: &Connection) {
     eprintln!("[storage] content_text purged + VACUUM done");
 }
 
+/// One-time cleanup: aggregate cc_messages into cc_session_days buckets,
+/// then DROP cc_messages entirely. UI only needs per-day token attribution
+/// which is computable from `(session_id, day, msg_count)` tuples — typically
+/// thousands of rows instead of millions of per-message rows.
+pub fn purge_messages_to_buckets_once(conn: &Connection) {
+    let already: Option<String> = conn
+        .query_row(
+            "SELECT value FROM preferences WHERE key = 'messages_bucketed_v1'",
+            [],
+            |r| r.get(0),
+        )
+        .ok();
+    if already.is_some() {
+        return;
+    }
+
+    let result: Result<(), rusqlite::Error> = (|| {
+        conn.execute_batch(
+            "INSERT OR REPLACE INTO cc_session_days (session_id, day, msg_count)
+             SELECT session_id,
+                    strftime('%Y-%m-%d', timestamp, 'localtime') AS day,
+                    COUNT(*)
+             FROM cc_messages
+             WHERE timestamp IS NOT NULL
+             GROUP BY session_id, day;
+             DROP TABLE IF EXISTS cc_messages;",
+        )?;
+        Ok(())
+    })();
+
+    if let Err(e) = result {
+        eprintln!("[storage] message bucketing failed: {e}");
+        return;
+    }
+
+    let _ = conn.execute_batch(
+        "PRAGMA wal_checkpoint(TRUNCATE);
+         VACUUM;",
+    );
+
+    let _ = conn.execute(
+        "INSERT OR REPLACE INTO preferences(key, value) VALUES ('messages_bucketed_v1', '1')",
+        [],
+    );
+    eprintln!("[storage] cc_messages → cc_session_days bucketed + dropped + VACUUM done");
+}
+
 const MIGRATION_SQL: &str = r#"
 -- ================================================================
 -- Claude Code Session Index
@@ -168,6 +215,22 @@ CREATE TABLE IF NOT EXISTS cc_sessions (
     estimated_cost_usd REAL NOT NULL DEFAULT 0
 );
 
+-- Per-session per-day message counts. Replaces per-message rows: the UI
+-- only needs token totals attributed across days, which only requires the
+-- count of messages per (session, day). Cuts the message-row footprint
+-- ~50× vs storing one row per message.
+CREATE TABLE IF NOT EXISTS cc_session_days (
+    session_id  TEXT NOT NULL REFERENCES cc_sessions(id) ON DELETE CASCADE,
+    day         TEXT NOT NULL,
+    msg_count   INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (session_id, day)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cc_session_days_day ON cc_session_days(day);
+
+-- Legacy cc_messages table kept for backfill compatibility. Dropped by
+-- purge_messages_to_buckets_once() once data is aggregated into
+-- cc_session_days. New code never reads or writes this table.
 CREATE TABLE IF NOT EXISTS cc_messages (
     id            TEXT PRIMARY KEY,
     session_id    TEXT NOT NULL REFERENCES cc_sessions(id) ON DELETE CASCADE,
@@ -182,9 +245,6 @@ CREATE TABLE IF NOT EXISTS cc_messages (
     line_number   INTEGER,
     is_sidechain  INTEGER NOT NULL DEFAULT 0
 );
-
--- FTS removed: we no longer store message bodies, so search has no
--- corpus. purge_content_text_once() drops the legacy table + triggers.
 
 
 -- ================================================================
