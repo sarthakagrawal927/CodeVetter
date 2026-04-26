@@ -43,6 +43,7 @@ jobs:
         run: pnpm install --ignore-scripts
 
       - name: Build Tauri app
+        id: tauri
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -62,3 +63,48 @@ jobs:
           args: --target aarch64-apple-darwin --bundles app,dmg,updater
           includeUpdaterJson: true
           updaterJsonPreferNsis: false
+
+      # tauri-action sometimes silently skips the .sig + latest.json upload
+      # ("Signature not found for the updater JSON. Skipping upload..."). The
+      # auto-updater needs both, so synthesise + upload them ourselves from the
+      # known bundle path. Idempotent — `gh release upload --clobber` overwrites
+      # whatever tauri-action managed to upload.
+      - name: Force-upload updater manifest + signature
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euxo pipefail
+          BUNDLE=apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos
+          SIG_FILE="$BUNDLE/CodeVetter.app.tar.gz.sig"
+          TAR_FILE="$BUNDLE/CodeVetter.app.tar.gz"
+          if [ ! -f "$SIG_FILE" ] || [ ! -f "$TAR_FILE" ]; then
+            echo "Updater artifacts missing — bundling failed silently." >&2
+            ls -la "$BUNDLE" || true
+            exit 1
+          fi
+          VERSION="${TAG#v}"
+          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          URL="https://github.com/sarthakagrawal927/CodeVetter/releases/download/$TAG/CodeVetter_aarch64.app.tar.gz"
+          # Use jq to JSON-encode the signature — minisign sigs contain newlines
+          # that would break a naive heredoc.
+          jq -n \
+            --arg version "$VERSION" \
+            --arg pub_date "$PUB_DATE" \
+            --arg url "$URL" \
+            --rawfile sig "$SIG_FILE" \
+            '{
+              version: $version,
+              notes: "See release notes",
+              pub_date: $pub_date,
+              platforms: {
+                "darwin-aarch64": {
+                  signature: $sig,
+                  url: $url
+                }
+              }
+            }' > latest.json
+          gh release upload "$TAG" \
+            "$SIG_FILE#CodeVetter_aarch64.app.tar.gz.sig" \
+            "latest.json" \
+            --clobber --repo sarthakagrawal927/CodeVetter
