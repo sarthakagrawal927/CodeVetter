@@ -1,5 +1,6 @@
 ---
 import Icon from './Icon.astro';
+import GitHubIcon from './GitHubIcon.astro';
 
 const cols = [
   {
@@ -32,7 +33,7 @@ const cols = [
     items: [
       { l: 'About', h: '/about' },
       { l: 'Contact', h: '/contact' },
-      { l: 'Source', h: 'https://github.com/Codevetter/codevetter', icon: 'github' },
+      { l: 'Source', h: 'https://github.com/Codevetter/codevetter', icon: 'github', iconOnly: true },
       { l: 'Twitter', h: 'https://x.com/sarthakcodes', icon: 'twitter' },
       { l: 'Email', h: 'mailto:hello@codevetter.dev', icon: 'mail' },
     ],
@@ -72,14 +73,26 @@ const year = new Date().getFullYear();
             <li>
               <a
                 href={it.h}
+                aria-label={it.iconOnly ? 'GitHub repository' : undefined}
+                title={it.iconOnly ? 'GitHub repository' : undefined}
+                target={it.iconOnly ? '_blank' : undefined}
+                rel={it.iconOnly ? 'noopener noreferrer' : undefined}
                 class="flex items-center gap-2 text-sm text-gray-300 hover:text-white transition-colors group"
               >
-                {it.icon && (
+                {it.iconOnly ? (
                   <span class="text-gray-400 group-hover:text-blue-300 transition-colors">
-                    <Icon name={it.icon} width={14} height={14} class="w-3.5 h-3.5" />
+                    <GitHubIcon width={20} height={20} />
                   </span>
+                ) : (
+                  <>
+                    {it.icon && (
+                      <span class="text-gray-400 group-hover:text-blue-300 transition-colors">
+                        <Icon name={it.icon} width={14} height={14} class="w-3.5 h-3.5" />
+                      </span>
+                    )}
+                    {it.l}
+                  </>
                 )}
-                {it.l}
               </a>
             </li>
           ))}

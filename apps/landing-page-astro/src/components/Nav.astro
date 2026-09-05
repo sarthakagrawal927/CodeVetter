@@ -1,4 +1,5 @@
 ---
+import GitHubIcon from './GitHubIcon.astro';
 const links = [
   { href: '/#features', label: 'Contract' },
   { href: '/#how', label: 'How it works' },
@@ -31,9 +32,13 @@ const links = [
     <div class="flex items-center gap-2">
       <a
         href="https://github.com/Codevetter/codevetter"
-        class="group hidden sm:inline-flex items-center gap-2 h-9 px-4 text-xs font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-300 rounded-full"
+        aria-label="GitHub repository"
+        title="GitHub repository"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="group hidden sm:inline-flex items-center justify-center h-9 w-9 text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-300 rounded-full"
       >
-        GitHub
+        <GitHubIcon width={20} height={20} />
       </a>
       <a
         href="/#download"
