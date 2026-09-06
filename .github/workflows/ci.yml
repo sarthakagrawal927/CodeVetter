@@ -77,6 +77,12 @@ jobs:
           workspaces: crates/codevetter-core
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
+      # Fails in a second on version drift. `core:qualify-cli` catches the same
+      # mistake, but only after lint, code health, the Astro build, and a full
+      # Rust companion build — ~3 minutes in, behind a message about the CLI
+      # rather than about the bump that caused it.
+      - name: Require one version across every shipped surface
+        run: pnpm version:check
       - name: Lint
         run: pnpm lint
       - name: Fetch code-health base
@@ -102,6 +108,7 @@ jobs:
         run: |
           pnpm test:automation
           pnpm test:release-manifest
+          pnpm test:version-sync
           pnpm test:corpus-contracts
           pnpm test:retrieval
           pnpm test:core-tools
