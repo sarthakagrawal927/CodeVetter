@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-09-05
+Last updated: 2026-09-06
 
 ## Why / What
 
@@ -54,6 +54,21 @@ Internal (fleet):
 - Local SQLite via `rusqlite` in `crates/codevetter-core` — desktop only, no server.
 
 ## Timeline
+
+- **2026-09-06 — First release cut through the gated pipeline (1.13.3):** a
+  patch bump that carries no product change; its purpose is to exercise the
+  release gate landed in #259 end to end, which no run has ever done. The
+  release is created as a draft on an explicitly created tag, `release.yml`
+  verifies the published asset manifest before flipping the draft to
+  published, and `auto-release.yml` waits on the dispatched run and re-verifies
+  the manifest, so a green auto-release run now means a downloadable release
+  exists. `/download` and `/download.md` read the tag, installer filename,
+  update archive, and appcast presence from the GitHub release feed at build
+  time rather than hardcoding them, and `src/data/privacy.ts` is the single
+  source for `/privacy`, `/privacy.md`, and the page JSON-LD. The
+  installed-upgrade proof's incumbent is pinned to `v1.11.1`, whose bundled CLI
+  has the `rubrics` command the proof needs. The shipped tag is cut from `main`
+  at HEAD, so the qualified archive and the repository agree on one commit.
 
 - **2026-09-05 — Usage revalidates on its own (1.13.2):** the Usage section
   keeps itself current while it is open instead of collecting once per
