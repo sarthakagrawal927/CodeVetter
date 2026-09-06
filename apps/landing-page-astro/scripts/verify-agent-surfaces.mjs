@@ -154,6 +154,121 @@ for (const route of routeSet) {
 if (routes.length === 0) failures.push('public sitemap contains no routes');
 if (surfaces.length === 0) failures.push('/api/ai contains no surfaces');
 
+// ── Privacy surface parity (#254) ──────────────────────────────────────────
+// /privacy and /privacy.md used to be two hand-maintained copies and drifted:
+// the Markdown surface — the one an LLM retriever fetches — silently lost the
+// last-updated date and the named provider list. Both are now projected from
+// src/data/privacy.ts. These checks fail the build if anyone re-forks them.
+
+function decodeEntities(value) {
+  return value
+    .replaceAll(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replaceAll('&nbsp;', ' ')
+    .replaceAll('&quot;', '"')
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&amp;', '&');
+}
+
+/** Readable text of an HTML document, with markup, scripts, and styles removed. */
+function htmlToText(html) {
+  const stripped = html
+    .replaceAll(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+    .replaceAll(/<[^>]+>/g, ' ');
+  return decodeEntities(stripped).replaceAll(/\s+/g, ' ').trim();
+}
+
+/** Plain text of one Markdown block: bullet markers, bold, and code spans removed. */
+function markdownToText(block) {
+  return block
+    .replace(/^[-*]\s+/, '')
+    .replace(/^#+\s+/, '')
+    .replaceAll('**', '')
+    .replaceAll('`', '')
+    .replaceAll(/\s+/g, ' ')
+    .trim();
+}
+
+const privacyMarkdownFile = path.join(dist, 'privacy.md');
+const privacyHtmlFile = path.join(dist, 'privacy.html');
+let privacyProviderList = null;
+
+if (!fs.existsSync(privacyMarkdownFile) || !fs.existsSync(privacyHtmlFile)) {
+  failures.push('privacy parity: /privacy.md or /privacy.html is missing from the build');
+} else {
+  const privacyMarkdown = fs.readFileSync(privacyMarkdownFile, 'utf8');
+  const privacyText = htmlToText(fs.readFileSync(privacyHtmlFile, 'utf8'));
+
+  // Compare only the policy body: drop the `# title` / `> Canonical page:`
+  // preamble and the shared "Public product links" footer that page() appends.
+  const body = privacyMarkdown
+    .replace(/^[\s\S]*?^> Canonical page:.*$/m, '')
+    .split('\n## Public product links')[0];
+
+  const claims = body
+    .split(/\n{2,}/)
+    .flatMap((block) => block.split('\n'))
+    .map(markdownToText)
+    .filter((claim) => claim.length > 0);
+
+  // Compare with whitespace removed: inline markup (`<code>`, `<strong>`)
+  // makes the HTML side gain spaces the Markdown side has no reason to carry.
+  const squash = (value) => value.replaceAll(/\s+/g, '');
+  const squashedPrivacyText = squash(privacyText);
+
+  if (claims.length < 8) {
+    failures.push(
+      `privacy parity: /privacy.md carries only ${claims.length} claims; expected the full policy`
+    );
+  }
+  for (const claim of claims) {
+    if (!squashedPrivacyText.includes(squash(claim))) {
+      failures.push(
+        `privacy parity: /privacy.md states a claim absent from /privacy — "${claim.slice(0, 90)}"`
+      );
+    }
+  }
+
+  const lastUpdated = privacyMarkdown.match(/Last updated: (\d{4}-\d{2}-\d{2})\./);
+  if (!lastUpdated) {
+    failures.push('privacy parity: /privacy.md carries no "Last updated: YYYY-MM-DD." line');
+  } else if (!privacyText.includes(`Last updated: ${lastUpdated[1]}.`)) {
+    failures.push(
+      `privacy parity: /privacy dates the policy differently from /privacy.md (${lastUpdated[1]})`
+    );
+  }
+
+  // The provider list is the second fact the Markdown surface used to drop,
+  // and the comparison pages quote the sentence verbatim. Treat the list in
+  // /privacy.md as canonical and require every other surface to match it.
+  const providers = privacyMarkdown.match(/whichever provider \(([^)]+)\)/);
+  if (providers) {
+    privacyProviderList = providers[1];
+  } else {
+    failures.push('privacy parity: /privacy.md no longer names the model providers');
+  }
+}
+
+if (privacyProviderList) {
+  const quotedProviders = /whichever provider \(([^)]+)\)/g;
+  const walk = (dir) =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) return walk(full);
+      return /\.(html|md|txt)$/.test(entry.name) ? [full] : [];
+    });
+  for (const file of walk(dist)) {
+    const source = decodeEntities(fs.readFileSync(file, 'utf8'));
+    for (const [, quoted] of source.matchAll(quotedProviders)) {
+      if (quoted !== privacyProviderList) {
+        failures.push(
+          `privacy parity: ${path.relative(dist, file)} misquotes the provider list as "${quoted}" (privacy says "${privacyProviderList}")`
+        );
+      }
+    }
+  }
+}
+
 if (failures.length > 0) {
   console.error(failures.join('\n'));
   process.exit(1);
@@ -170,3 +285,4 @@ console.log(
 console.log(
   `PASS ${skillsIndex.skills.length} published skill digest and ${aiCatalog.entries.length} AI Catalog entries`
 );
+console.log(`PASS /privacy and /privacy.md state the same claims, date, and provider list`);

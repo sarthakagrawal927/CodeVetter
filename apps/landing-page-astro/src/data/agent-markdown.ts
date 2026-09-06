@@ -4,6 +4,7 @@ import examples from '@/data/xray-examples.json';
 import docsIndexSource from '../../../../docs/index.md?raw';
 import { verificationContent } from '@/data/verification-content';
 import { currentReleaseUrl } from '@/data/release';
+import { privacyMarkdownBody, privacyPolicy } from '@/data/privacy';
 import {
   optimizationCaseStudies,
   type OptimizationCaseStudy,
@@ -182,24 +183,9 @@ A rejected experiment remains visible. Historical research capability is labeled
 - Codex and Claude sessions gained provider-aware controls, attention states, searchable history, and safe archiving.
 - A local Plan, Build, Review, Verify, Done board keeps sessions attached to repository context.`
   ),
-  privacy: page(
-    'CodeVetter privacy',
-    '/privacy',
-    `CodeVetter is a local desktop application. Repository context, diffs, notes, and review history are stored in a local SQLite database; CodeVetter has no hosted review server.
-
-## External requests
-
-- A configured LLM provider receives code and prompt content only when the user initiates a provider-backed review. The provider's privacy policy applies.
-- The optional updater checks GitHub Releases for new versions.
-
-## Telemetry and deletion
-
-CodeVetter does not enable crash or usage telemetry by default. A user can remove local state by uninstalling the application and deleting its local application-data directory.
-
-## Public website analytics
-
-The public codevetter.com marketing and benchmark pages use PostHog and Microsoft Clarity to understand page visits and interactions. Those pages have no repository upload or CodeVetter account surface. This does not add telemetry to the desktop application.`
-  ),
+  // Projected from src/data/privacy.ts so /privacy.md cannot drift from the
+  // /privacy HTML page. Edit the policy there, never here (#254).
+  privacy: page(privacyPolicy.title, privacyPolicy.path, privacyMarkdownBody()),
   about: page(
     'About CodeVetter',
     '/about',

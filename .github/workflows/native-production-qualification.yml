@@ -206,6 +206,24 @@ jobs:
             --qualification "$NATIVE_QUALIFICATION" \
             --out artifacts/native-production-ci/appcast-proof.json
 
+      # The incumbent must satisfy two constraints at once: it has to still
+      # carry `CodeVetter_aarch64.app.tar.gz` (only Tauri releases do), and its
+      # bundled `codevetter` CLI has to understand `rubrics`, because that is
+      # how the proof below seeds the durable record whose survival across
+      # upgrade and rollback is the thing being proven.
+      #
+      # v1.11.0 fails the second constraint: its CLI predates `rubrics` and
+      # exposes only `check` and `trex`, so the gate could never pass and no
+      # release has ever published assets (#252).
+      #
+      # v1.11.1 satisfies both. `rubrics` landed in 44390309 (2026-09-02), one
+      # day before v1.11.1 was tagged, with exactly the `--id/--name/--focus/
+      # --check/--json` flags the proof passes; the release carries all four
+      # Tauri assets. It is also the newest tag with any assets at all, so it
+      # is the last release that can serve as a cross-shell incumbent.
+      #
+      # To revert: change v1.11.1 back to v1.11.0 here. Doing so restores the
+      # failure above, so prefer narrowing the proof instead (see #252).
       - name: Download retained Tauri release for isolated migration proof
         env:
           GH_TOKEN: ${{ github.token }}
@@ -214,7 +232,7 @@ jobs:
           set -euo pipefail
           INCUMBENT_ROOT="$RUNNER_TEMP/codevetter-incumbent"
           mkdir -p "$INCUMBENT_ROOT"
-          gh release download v1.11.0 \
+          gh release download v1.11.1 \
             --repo "$GITHUB_REPOSITORY" \
             --pattern 'CodeVetter_aarch64.app.tar.gz' \
             --dir "$INCUMBENT_ROOT"
