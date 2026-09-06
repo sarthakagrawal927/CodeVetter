@@ -1,12 +1,100 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+// Single source of release truth for /download, /download.md, and the CTAs.
+//
+// #253: the page hardcoded a version, a filename pattern, and an auto-update
+// claim, and all three drifted from the release feed — it linked to releases
+// that shipped nothing, documented `CodeVetter-<version>-arm64.dmg` while every
+// published asset was `CodeVetter_<version>_aarch64.dmg`, and asserted Sparkle
+// updates that no published release carried. Every claim below is now read from
+// the release feed at build time, so the page can only say what is actually
+// downloadable.
 
-const nativeConfig = readFileSync(
-  resolve(process.cwd(), '../macos/Config/Shared.xcconfig'),
-  'utf8'
-);
-const version = nativeConfig.match(/^MARKETING_VERSION\s*=\s*(\S+)\s*$/m)?.[1];
-if (!version) throw new Error('Native CodeVetter version is missing');
+const REPOSITORY = 'Codevetter/codevetter';
+const RELEASES_URL = `https://github.com/${REPOSITORY}/releases`;
 
-const currentReleaseVersion = `v${version}`;
-export const currentReleaseUrl = `https://github.com/Codevetter/codevetter/releases/tag/${currentReleaseVersion}`;
+interface PublishedRelease {
+  tag: string;
+  url: string;
+  /** Drag-to-Applications installer, always present: a release is chosen by it. */
+  installer: string;
+  /** Sparkle update archive, when the release publishes one. */
+  updateArchive: string | null;
+  /** Sparkle appcast, when the release publishes one. */
+  appcastUrl: string | null;
+}
+
+interface FeedAsset {
+  name: string;
+  browser_download_url: string;
+}
+
+interface FeedRelease {
+  tag_name: string;
+  draft: boolean;
+  prerelease: boolean;
+  html_url: string;
+  assets: FeedAsset[];
+}
+
+/**
+ * Newest published release that actually carries an installer. Returns `null`
+ * when the feed is unreachable — an offline or rate-limited build falls back to
+ * claiming nothing rather than to claiming something stale.
+ */
+async function resolvePublishedRelease(): Promise<PublishedRelease | null> {
+  const headers: Record<string, string> = { Accept: 'application/vnd.github+json' };
+  const token = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let feed: FeedRelease[];
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/${REPOSITORY}/releases?per_page=50`,
+      {
+        headers,
+        signal: AbortSignal.timeout(8000),
+      }
+    );
+    if (!response.ok) throw new Error(`GitHub returned HTTP ${response.status}`);
+    feed = (await response.json()) as FeedRelease[];
+  } catch (error) {
+    console.warn(`[release] download claims fall back to the releases index: ${error}`);
+    return null;
+  }
+
+  for (const release of feed) {
+    if (release.draft || release.prerelease) continue;
+    const installer = release.assets.find((asset) => asset.name.endsWith('.dmg'));
+    if (!installer) continue;
+    return {
+      tag: release.tag_name,
+      url: release.html_url,
+      installer: installer.name,
+      updateArchive: release.assets.find((asset) => asset.name.endsWith('.zip'))?.name ?? null,
+      appcastUrl:
+        release.assets.find((asset) => asset.name === 'appcast.xml')?.browser_download_url ?? null,
+    };
+  }
+  return null;
+}
+
+export const publishedRelease = await resolvePublishedRelease();
+
+/** Where "Download" and "Latest release" point. Never a release with no build. */
+export const currentReleaseUrl = publishedRelease?.url ?? RELEASES_URL;
+
+/**
+ * Sparkle only updates installed copies once a release publishes the signed
+ * appcast the updater reads. Until then the page must say updates are manual:
+ * the app itself refuses to update without an HTTPS feed and an EdDSA key
+ * (`NativeUpdaterConfiguration.ready`).
+ */
+const automaticUpdates = Boolean(publishedRelease?.appcastUrl);
+
+/** Installer filename claim. Only ever a name the release feed actually lists. */
+export const installerLabel = publishedRelease
+  ? publishedRelease.installer
+  : 'the Apple-silicon macOS DMG attached to the newest release';
+
+/** Update mechanism claim, shared verbatim by /download and /download.md. */
+export const updateSummary = automaticUpdates
+  ? 'Installed copies update in place through the signed Sparkle appcast published with each release.'
+  : 'Installed copies do not update themselves yet: no published release carries the signed Sparkle appcast the in-app updater requires, so update by downloading the newest release.';

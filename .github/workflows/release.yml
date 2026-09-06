@@ -49,6 +49,9 @@ jobs:
         with:
           ref: ${{ github.event.release.tag_name || inputs.tag }}
           persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
       - name: Download exact qualified production candidate
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
         with:
@@ -76,13 +79,35 @@ jobs:
             "$ZIP#CodeVetter-$VERSION-arm64.zip" \
             "$APPCAST#appcast.xml" \
             --clobber --repo "$GITHUB_REPOSITORY"
-      - name: Verify published release contract
+      # Required gate (#253). Fails the run when any contract asset is missing,
+      # empty, still uploading, or attached under a non-contract name. The
+      # release stays a draft — invisible to /releases/latest and to the
+      # download page — unless this receipt qualifies.
+      - name: Verify published release manifest
         shell: bash
         run: |
           set -euo pipefail
-          ASSETS="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
-          grep -Fx "CodeVetter-${RELEASE_TAG#v}-arm64.dmg" <<<"$ASSETS"
-          grep -Fx "CodeVetter-${RELEASE_TAG#v}-arm64.zip" <<<"$ASSETS"
-          grep -Fx appcast.xml <<<"$ASSETS"
-          curl --fail --silent --show-error --location \
+          mkdir -p artifacts
+          node scripts/verify-release-manifest.mjs \
+            --tag "$RELEASE_TAG" \
+            --out artifacts/release-manifest-verification.json
+      - name: Publish the verified release
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release edit "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft=false \
+            --latest
+      - name: Verify the public update feed resolves
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --retry 5 --retry-delay 5 \
             "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/appcast.xml" >/dev/null
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: release-manifest-verification
+          path: artifacts/release-manifest-verification.json
+          if-no-files-found: warn
