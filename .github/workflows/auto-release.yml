@@ -58,6 +58,9 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
+      # Match against the full release list, not `gh release view`: a draft is
+      # not always resolvable by tag, and GitHub happily creates a *second*
+      # draft under a tag that already has one. This keeps the re-run a no-op.
       - name: Check if release already exists
         id: check
         env:
@@ -65,8 +68,8 @@ jobs:
           RELEASE_TAG: ${{ steps.ver.outputs.tag }}
         run: |
           set -euo pipefail
-          if gh release view "$RELEASE_TAG" \
-              --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+          if gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+              --jq '.[].tag_name' | grep -Fxq "$RELEASE_TAG"; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
             echo "Release $RELEASE_TAG already exists — skipping."
           else
