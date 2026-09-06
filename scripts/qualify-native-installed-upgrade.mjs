@@ -233,30 +233,70 @@ async function launchAndObserve(app, appData, kind) {
     cwd: repositoryRoot,
     detached: true,
     env: { ...process.env, CODEVETTER_APP_DATA_DIR: appData },
-    stdio: 'ignore',
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
+  // Retained so a launch that never presents a window can say why. The pipes
+  // have to be drained regardless: a chatty startup otherwise fills the buffer
+  // and blocks the very launch this is trying to observe.
+  const output = [];
+  const retain = (chunk) => {
+    output.push(chunk);
+    if (output.length > 200) output.shift();
+  };
+  child.stdout.setEncoding('utf8').on('data', retain);
+  child.stderr.setEncoding('utf8').on('data', retain);
   try {
-    await waitForVisibleWindow(child, 25_000);
+    await waitForVisibleWindow(child, kind, WINDOW_TIMEOUT_MS, output);
     return { kind, visible_window: true, bundle_identifier: info.CFBundleIdentifier };
   } finally {
     await terminateOwnedProcess(child);
   }
 }
 
-async function waitForVisibleWindow(child, timeoutMs) {
+// A cold GUI launch on a hosted runner follows a full Xcode build and a
+// notarization round trip, so the app competes for a loaded machine.
+const WINDOW_TIMEOUT_MS = 90_000;
+
+// `whose` binds to the nearest preceding collection. Without the parentheses
+// this reads as "windows ... whose unix id is", filtering windows by a property
+// only processes carry, so every poll throws -1728 and the gate can never pass
+// on any machine (#253). The parentheses scope the filter to the process.
+export function buildWindowCountScript(pid) {
+  return `tell application "System Events" to count windows of (first process whose unix id is ${pid})`;
+}
+
+async function waitForVisibleWindow(child, kind, timeoutMs, output = []) {
   const deadline = Date.now() + timeoutMs;
+  let lastObservation = 'the process never appeared in the System Events process list';
   while (Date.now() < deadline) {
-    if (child.exitCode !== null) throw new Error(`Application exited before showing a window`);
-    const script = `tell application "System Events" to count windows of first process whose unix id is ${child.pid}`;
+    if (child.exitCode !== null)
+      throw new Error(
+        `Application exited before showing a window (${kind}, code ${child.exitCode})${formatLaunchOutput(output)}`
+      );
     try {
-      const count = Number(execFileSync('osascript', ['-e', script], { encoding: 'utf8' }).trim());
+      // stderr is piped rather than inherited so a failing poll is reported
+      // once, instead of spraying one -1728 line per 250 ms into the job log.
+      const count = Number(
+        execFileSync('osascript', ['-e', buildWindowCountScript(child.pid)], {
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe'],
+        }).trim()
+      );
       if (count > 0) return;
-    } catch {
-      // The process may not have registered with System Events yet.
+      lastObservation = 'System Events saw the process but it reported no windows';
+    } catch (error) {
+      lastObservation = `System Events could not read the process: ${String(error.stderr ?? error.message).trim()}`;
     }
     await delay(250);
   }
-  throw new Error(`Application ${child.pid} did not show a visible window within ${timeoutMs} ms`);
+  throw new Error(
+    `Application ${child.pid} (${kind}) did not show a visible window within ${timeoutMs} ms; ${lastObservation}${formatLaunchOutput(output)}`
+  );
+}
+
+function formatLaunchOutput(output) {
+  const text = output.join('').trim();
+  return text ? `\n--- application output ---\n${text.slice(-2000)}` : '';
 }
 
 async function terminateOwnedProcess(child) {

@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   assertHostedUpgradeContext,
   buildInstalledUpgradeProof,
+  buildWindowCountScript,
   parseArguments,
 } from './qualify-native-installed-upgrade.mjs';
 
@@ -47,6 +48,16 @@ test('hosted upgrade proof requires every launch, rubric, and durable identity',
     launches: input().launches.filter((item) => item.kind !== 'native_relaunch'),
   });
   assert.equal(failed.status, 'failed');
+});
+
+test('the window probe scopes its filter to the process, not to windows', () => {
+  const script = buildWindowCountScript(4321);
+
+  // Regression guard for #253: `count windows of first process whose unix id
+  // is N` binds `whose` to `windows`, which carry no unix id, so System Events
+  // answers -1728 on every poll and no release can ever clear the gate.
+  assert.match(script, /count windows of \(first process whose unix id is 4321\)/);
+  assert.doesNotMatch(script, /windows of first process whose/);
 });
 
 test('execution is restricted to an explicit GitHub-hosted temporary child', () => {
