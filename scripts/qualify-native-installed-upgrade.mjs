@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { execFileSync, spawn } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +10,8 @@ import { captureDataSnapshot, compareDataSnapshots } from './qualify-native-data
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const productionBundleIdentifier = 'com.codevetter.desktop';
 const proofSchema = 'codevetter.native-installed-upgrade-proof/v1';
+const lsregisterPath =
+  '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister';
 const qualificationSchema = 'codevetter.native-package-qualification/v1';
 
 export function parseArguments(argv) {
@@ -104,6 +106,7 @@ export function buildInstalledUpgradeProof({
     data_continuity: continuity,
     limitations: [
       'The install, relaunch, and rollback occurred only inside RUNNER_TEMP on an isolated hosted Mac.',
+      'Each launch went through LaunchServices; a visible window is observed through System Events, or, when accessibility never answers, through the LaunchServices visible-process record named in observed_via.',
       'No application under /Applications and no operator data or credentials were read or changed.',
       'Public release and replacement of the retained Tauri application remain separately authorized actions.',
     ],
@@ -227,53 +230,149 @@ function runCLI(command, appData, arguments_) {
 async function launchAndObserve(app, appData, kind) {
   const info = readPlist(join(app, 'Contents/Info.plist'));
   const executable = join(app, 'Contents/MacOS', info.CFBundleExecutable);
-  const arguments_ =
-    info.CFBundleExecutable === 'CodeVetterNative' ? ['--ui-test-section', 'Runs'] : [];
-  const child = spawn(executable, arguments_, {
-    cwd: repositoryRoot,
-    detached: true,
-    env: { ...process.env, CODEVETTER_APP_DATA_DIR: appData },
-    stdio: 'ignore',
-  });
+  const pid = await launchThroughLaunchServices(app, info, appData, executable);
   try {
-    await waitForVisibleWindow(child, 25_000);
-    return { kind, visible_window: true, bundle_identifier: info.CFBundleIdentifier };
+    // A cold hosted runner takes noticeably longer than a warm local Mac to
+    // present a first window, and a timeout here costs a whole release run.
+    const observedVia = await waitForVisibleWindow(pid, executable, 60_000);
+    return {
+      kind,
+      visible_window: true,
+      observed_via: observedVia,
+      bundle_identifier: info.CFBundleIdentifier,
+    };
   } finally {
-    await terminateOwnedProcess(child);
+    await terminateLaunchedApplication(pid, executable);
   }
 }
 
-async function waitForVisibleWindow(child, timeoutMs) {
-  const deadline = Date.now() + timeoutMs;
+// The bundle is opened through LaunchServices rather than by executing
+// Contents/MacOS directly: a directly spawned bundle executable never becomes a
+// registered GUI application, so no window server or accessibility observation
+// of it can ever succeed (#252).
+async function launchThroughLaunchServices(app, info, appData, executable) {
+  const existing = new Set(runningProcessIdentifiers(executable));
+  bestEffort('xattr', ['-dr', 'com.apple.quarantine', app]);
+  bestEffort(lsregisterPath, ['-f', app]);
+  const launchArguments =
+    info.CFBundleExecutable === 'CodeVetterNative' ? ['--args', '--ui-test-section', 'Runs'] : [];
+  execFileSync(
+    'open',
+    ['-n', '-F', '--env', `CODEVETTER_APP_DATA_DIR=${appData}`, '-a', app, ...launchArguments],
+    { cwd: repositoryRoot, stdio: 'ignore' }
+  );
+  const deadline = Date.now() + 20_000;
   while (Date.now() < deadline) {
-    if (child.exitCode !== null) throw new Error(`Application exited before showing a window`);
-    const script = `tell application "System Events" to count windows of first process whose unix id is ${child.pid}`;
-    try {
-      const count = Number(execFileSync('osascript', ['-e', script], { encoding: 'utf8' }).trim());
-      if (count > 0) return;
-    } catch {
-      // The process may not have registered with System Events yet.
-    }
-    await delay(250);
+    const launched = runningProcessIdentifiers(executable).find((pid) => !existing.has(pid));
+    if (launched) return launched;
+    await delay(100);
   }
-  throw new Error(`Application ${child.pid} did not show a visible window within ${timeoutMs} ms`);
+  throw new Error(`LaunchServices did not start ${executable} within 20000 ms`);
 }
 
-async function terminateOwnedProcess(child) {
-  if (child.exitCode !== null) return;
+// System Events is polled with backoff because a freshly registered application
+// answers accessibility queries only once its own event loop is running. When it
+// never answers at all, LaunchServices' own record that the application is a
+// visible foreground process stands in, and the receipt names which one proved
+// the launch.
+async function waitForVisibleWindow(pid, executable, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let interval = 100;
+  while (Date.now() < deadline) {
+    if (!runningProcessIdentifiers(executable).includes(pid)) {
+      throw new Error(`Application ${pid} exited before showing a window`);
+    }
+    if (accessibilityWindowCount(pid) > 0) return 'system_events_window';
+    await delay(interval);
+    interval = Math.min(interval * 2, 1_000);
+  }
+  if (launchServicesShowsVisibleProcess(pid)) return 'launch_services_visible_process';
+  throw new Error(`Application ${pid} did not show a visible window within ${timeoutMs} ms`);
+}
+
+// `whose` has to bind to the process. The one-line form
+// `count windows of first process whose unix id is N` binds it to the windows
+// instead and fails every poll with "Can't get unix id of window (-1728)", even
+// against an application that is showing a window (#252).
+function accessibilityWindowCount(pid) {
+  const script = [
+    'on run argv',
+    'set targetPid to (item 1 of argv) as integer',
+    'tell application "System Events"',
+    'set matches to (every process whose unix id is targetPid)',
+    'if (count of matches) is 0 then return "-1"',
+    'return (count of windows of item 1 of matches) as text',
+    'end tell',
+    'end run',
+  ];
   try {
-    process.kill(-child.pid, 'SIGTERM');
+    const output = execFileSync(
+      'osascript',
+      [...script.flatMap((line) => ['-e', line]), '--', String(pid)],
+      { cwd: repositoryRoot, encoding: 'utf8', timeout: 5_000, stdio: ['ignore', 'pipe', 'ignore'] }
+    );
+    return Number.parseInt(output.trim(), 10) || 0;
+  } catch {
+    return -1;
+  }
+}
+
+function launchServicesShowsVisibleProcess(pid) {
+  try {
+    const asn = execFileSync('lsappinfo', ['find', `pid=${pid}`], {
+      cwd: repositoryRoot,
+      encoding: 'utf8',
+      timeout: 5_000,
+    }).trim();
+    if (!asn) return false;
+    const visible = execFileSync('lsappinfo', ['visibleProcessList'], {
+      cwd: repositoryRoot,
+      encoding: 'utf8',
+      timeout: 5_000,
+    });
+    return visible.includes(asn.replace(/:$/, ''));
+  } catch {
+    return false;
+  }
+}
+
+function runningProcessIdentifiers(executable) {
+  const table = execFileSync('ps', ['-axww', '-o', 'pid=,command='], {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
+  });
+  return table.split('\n').flatMap((line) => {
+    const match = /^\s*(\d+)\s+(.+)$/.exec(line);
+    if (!match) return [];
+    const command = match[2].trimEnd();
+    return command === executable || command.startsWith(`${executable} `) ? [Number(match[1])] : [];
+  });
+}
+
+async function terminateLaunchedApplication(pid, executable) {
+  const running = () => runningProcessIdentifiers(executable).includes(pid);
+  if (!running()) return;
+  try {
+    process.kill(pid, 'SIGTERM');
   } catch {
     return;
   }
   const deadline = Date.now() + 3_000;
-  while (Date.now() < deadline && child.exitCode === null) await delay(100);
-  if (child.exitCode === null) {
+  while (Date.now() < deadline && running()) await delay(100);
+  if (running()) {
     try {
-      process.kill(-child.pid, 'SIGKILL');
+      process.kill(pid, 'SIGKILL');
     } catch {
-      // The owned process group already exited.
+      // The launched application already exited.
     }
+  }
+}
+
+function bestEffort(command, arguments_) {
+  try {
+    execFileSync(command, arguments_, { cwd: repositoryRoot, stdio: 'ignore', timeout: 30_000 });
+  } catch {
+    // Quarantine removal and registration refresh are hygiene, not requirements.
   }
 }
 

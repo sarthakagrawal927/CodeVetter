@@ -18,6 +18,7 @@
     "du",
     "go",
     "gitleaks",
+    "lsappinfo",
     "lsof",
     "netstat",
     "osascript",

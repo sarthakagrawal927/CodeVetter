@@ -89,6 +89,32 @@ Only a Tauri release can serve here, so this pin cannot advance past `v1.11.1`.
 When cross-shell migration stops being worth proving, narrow the proof to data
 the candidate writes itself rather than repointing the pin.
 
+## Launching the proof's applications
+
+Both shells are started through LaunchServices (`open -n -F --env
+CODEVETTER_APP_DATA_DIR=… -a <bundle>`), never by executing
+`Contents/MacOS/<executable>` directly, because a directly spawned bundle
+executable is not a registered GUI application and nothing about its windows can
+then be observed.
+
+The launched process is resolved from the process table by exact executable
+path, then polled with backoff: `System Events` window count first, and, only
+when accessibility never answers within the timeout, the LaunchServices
+visible-process record. Each launch entry in the proof names the signal that
+proved it in `observed_via`.
+
+The window query must bind its filter to the process, not to the windows:
+
+```applescript
+set matches to (every process whose unix id is targetPid)
+return (count of windows of item 1 of matches) as text
+```
+
+The one-line form `count windows of first process whose unix id is N` binds
+`whose` to `windows` instead, so every poll fails with `Can't get unix id of
+window (-1728)` even against an application showing a window. That, together
+with the direct spawn, is why the proof failed at its first launch (#252).
+
 ## Assets
 
 Exactly these three, and nothing else:
