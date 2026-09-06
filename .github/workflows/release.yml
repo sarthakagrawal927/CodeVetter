@@ -49,9 +49,10 @@ jobs:
         with:
           ref: ${{ github.event.release.tag_name || inputs.tag }}
           persist-credentials: false
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: '22'
+      # No actions/setup-node here: the runner's preinstalled Node runs the
+      # verifier, which uses only stable built-ins. setup-node's dependency
+      # cache is a cache-poisoning surface in a workflow that can publish
+      # releases (zizmor cache-poisoning).
       - name: Download exact qualified production candidate
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
         with:
