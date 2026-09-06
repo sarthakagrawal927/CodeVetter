@@ -2,8 +2,17 @@
 
 import { spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { basename, dirname, resolve } from 'node:path';
-import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, dirname, join, resolve } from 'node:path';
+import {
+  copyFileSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const snapshotSchema = 'codevetter.native-data-snapshot/v1';
@@ -156,9 +165,42 @@ export function compareDataSnapshots(before, afterUpgrade, afterRollback) {
   };
 }
 
+// The application database runs in WAL mode, and SQLite cannot open a WAL
+// database through a read-only connection unless the -wal and -shm sidecars
+// already exist: it may not create them, so the open fails with
+// `unable to open database file (14)` before a single statement runs. A
+// cleanly closed application deletes both sidecars, and the upgrade harness
+// terminates the app before every capture — so the sidecar-less database is
+// the normal case here, not an edge case, and `sqlite3 -readonly` could never
+// probe it (#253).
+//
+// The probe therefore never opens the user's database at all. It copies the
+// database and whichever sidecars exist into a private throwaway directory and
+// reads that copy, which keeps the original untouched by construction while
+// letting SQLite rebuild the sidecars it needs to replay commits that are still
+// WAL-resident. Dropping the -wal would silently under-count those commits, so
+// every sidecar present is copied. `PRAGMA query_only=ON` guards each statement.
 function queryDatabase(database) {
   if (!existsSync(sqlite)) throw new Error(`${sqlite} is unavailable`);
-  const integrity = runSqlite(database, 'PRAGMA query_only=ON; PRAGMA quick_check;').trim();
+  const probeRoot = mkdtempSync(join(tmpdir(), 'codevetter-continuity-probe-'));
+  try {
+    return queryDatabaseCopy(copyDatabaseForProbe(database, probeRoot));
+  } finally {
+    rmSync(probeRoot, { recursive: true, force: true });
+  }
+}
+
+function copyDatabaseForProbe(database, probeRoot) {
+  const probe = join(probeRoot, 'codevetter.db');
+  for (const suffix of ['', '-wal', '-shm']) {
+    if (existsSync(`${database}${suffix}`))
+      copyFileSync(`${database}${suffix}`, `${probe}${suffix}`);
+  }
+  return probe;
+}
+
+function queryDatabaseCopy(database) {
+  const integrity = runSqlite(database, 'PRAGMA quick_check;').trim();
   if (integrity !== 'ok') throw new Error(`SQLite quick_check failed: ${integrity || 'no result'}`);
   const tableRows = runJSON(
     database,
@@ -224,7 +266,7 @@ function runJSON(database, sql) {
 }
 
 function runSqlite(database, sql, extraArguments = []) {
-  const result = spawnSync(sqlite, ['-readonly', ...extraArguments, database, sql], {
+  const result = spawnSync(sqlite, [...extraArguments, database, `PRAGMA query_only=ON; ${sql}`], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   });
