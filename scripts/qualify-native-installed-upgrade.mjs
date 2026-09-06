@@ -232,7 +232,9 @@ async function launchAndObserve(app, appData, kind) {
   const executable = join(app, 'Contents/MacOS', info.CFBundleExecutable);
   const pid = await launchThroughLaunchServices(app, info, appData, executable);
   try {
-    const observedVia = await waitForVisibleWindow(pid, executable, 25_000);
+    // A cold hosted runner takes noticeably longer than a warm local Mac to
+    // present a first window, and a timeout here costs a whole release run.
+    const observedVia = await waitForVisibleWindow(pid, executable, 60_000);
     return {
       kind,
       visible_window: true,
