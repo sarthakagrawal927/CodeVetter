@@ -1,8 +1,16 @@
 name: Auto-publish release
 
 # When the native app version changes on main:
-#   1. Create a GitHub release with tag v<version>.
-#   2. Dispatch release.yml directly to build + sign + upload artifacts.
+#   1. Create the v<version> tag and a DRAFT GitHub release.
+#   2. Dispatch release.yml directly to build + sign + upload artifacts, which
+#      verifies the asset manifest and only then flips the draft to published.
+#   3. Wait for that run and re-verify the published manifest here.
+#
+# Steps 2 and 3 are the #253 fix. This workflow used to publish the release
+# before any build ran and exit without waiting, so six consecutive releases
+# went public with zero assets while every run reported success. A draft
+# release is invisible to `/releases/latest` and to the download page, so a
+# failed build now leaves nothing user-visible behind.
 #
 # Step 2 is required because workflows triggered by GITHUB_TOKEN (which is
 # how step 1 creates the release) do NOT cascade to other workflows — this
@@ -28,9 +36,10 @@ jobs:
   publish:
     name: Publish release and dispatch build
     runs-on: ubuntu-latest
+    timeout-minutes: 180
     permissions:
-      contents: write # Create the versioned GitHub release.
-      actions: write # Dispatch the separate signed-build workflow.
+      contents: write # Create the tag and the versioned GitHub release.
+      actions: write # Dispatch and watch the separate signed-build workflow.
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -49,6 +58,9 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
+      # Match against the full release list, not `gh release view`: a draft is
+      # not always resolvable by tag, and GitHub happily creates a *second*
+      # draft under a tag that already has one. This keeps the re-run a no-op.
       - name: Check if release already exists
         id: check
         env:
@@ -56,15 +68,33 @@ jobs:
           RELEASE_TAG: ${{ steps.ver.outputs.tag }}
         run: |
           set -euo pipefail
-          if gh release view "$RELEASE_TAG" \
-              --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+          if gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+              --jq '.[].tag_name' | grep -Fxq "$RELEASE_TAG"; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
             echo "Release $RELEASE_TAG already exists — skipping."
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Create GitHub release
+      # A draft release does not create its tag, but release.yml and the
+      # qualification workflow both check out the exact tag. Create the ref
+      # first so the draft and the build agree on one immutable commit.
+      - name: Create release tag
+        if: steps.check.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Tag $RELEASE_TAG already exists — reusing it."
+            exit 0
+          fi
+          gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f "ref=refs/tags/$RELEASE_TAG" \
+            -f "sha=$GITHUB_SHA"
+
+      - name: Create draft GitHub release
         if: steps.check.outputs.exists != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -73,18 +103,54 @@ jobs:
           set -euo pipefail
           gh release create "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
+            --draft \
             --target "$GITHUB_SHA" \
             --title "CodeVetter $RELEASE_TAG" \
             --generate-notes
 
       - name: Dispatch release build workflow
+        id: dispatch
         if: steps.check.outputs.exists != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ steps.ver.outputs.tag }}
         run: |
           set -euo pipefail
+          echo "since=$(date -u -d '-1 minute' +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
           gh workflow run release.yml \
             --repo "$GITHUB_REPOSITORY" \
             --ref main \
             -f tag="$RELEASE_TAG"
+
+      - name: Wait for the signed build to publish assets
+        if: steps.check.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISPATCHED_SINCE: ${{ steps.dispatch.outputs.since }}
+        run: |
+          set -euo pipefail
+          RUN_ID=""
+          for _ in $(seq 1 30); do
+            RUN_ID="$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/workflows/release.yml/runs?event=workflow_dispatch&per_page=20" \
+              --jq "[.workflow_runs[] | select(.created_at >= \"$DISPATCHED_SINCE\")] | first | .id // empty")"
+            if [ -n "$RUN_ID" ]; then break; fi
+            sleep 10
+          done
+          if [ -z "$RUN_ID" ]; then
+            echo "::error::release.yml did not start after the dispatch"
+            exit 1
+          fi
+          echo "Watching release.yml run $RUN_ID"
+          gh run watch "$RUN_ID" --repo "$GITHUB_REPOSITORY" --exit-status --interval 30
+
+      # The draft is published by release.yml only after this same contract
+      # passes there. Re-running it here is what makes a green auto-release run
+      # mean "a downloadable release exists", which is precisely what the six
+      # asset-less releases of #253 falsely reported.
+      - name: Verify the published release asset contract
+        if: steps.check.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.ver.outputs.tag }}
+        run: node scripts/verify-release-manifest.mjs --tag "$RELEASE_TAG"

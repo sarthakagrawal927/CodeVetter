@@ -9,8 +9,10 @@ sidebar:
 
 The release version is `MARKETING_VERSION` in
 `apps/macos/Config/Shared.xcconfig`. A version change merged to `main`
-triggers `auto-release.yml`, which creates the GitHub release and dispatches
-`release.yml`.
+triggers `auto-release.yml`, which creates the tag and a **draft** GitHub
+release, dispatches `release.yml`, and waits for it. The draft is published
+only after the asset manifest verifies — see
+[release-pipeline.md](../release-pipeline.md#asset-gate).
 
 ## Before merge
 
@@ -30,14 +32,18 @@ evidence alone.
 
 After merge, verify:
 
-1. `auto-release.yml` created the expected `v<version>` tag and release.
+1. `auto-release.yml` created the expected `v<version>` tag and draft release.
 2. `release.yml` qualified the same tag.
-3. The published release contains:
+3. The release left draft state and contains exactly:
    - `CodeVetter-<version>-arm64.dmg`;
    - `CodeVetter-<version>-arm64.zip`;
    - `appcast.xml`.
 4. The readiness receipt reports every check passing.
-5. The latest-release appcast URL resolves.
+5. The `release-manifest-verification` artifact reports `qualified: true`.
+6. The latest-release appcast URL resolves.
+
+A release still sitting as a draft means the build failed; read the watched
+`release.yml` run rather than re-running `auto-release.yml`.
 
 The workflow must fail closed if signing, notarization, Sparkle inputs, archive
 identity, Gatekeeper, upgrade, data continuity, or rollback evidence is absent.

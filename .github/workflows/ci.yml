@@ -101,6 +101,7 @@ jobs:
       - name: Test hermetic automation contracts
         run: |
           pnpm test:automation
+          pnpm test:release-manifest
           pnpm test:corpus-contracts
           pnpm test:retrieval
           pnpm test:core-tools

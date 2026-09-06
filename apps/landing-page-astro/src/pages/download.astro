@@ -3,9 +3,16 @@ import Layout from '@/layouts/Layout.astro';
 import Nav from '@/components/Nav.astro';
 import Footer from '@/components/Footer.astro';
 import GitHubIcon from '@/components/GitHubIcon.astro';
-import { currentReleaseUrl } from '@/data/release';
+import {
+  currentReleaseUrl,
+  installerLabel,
+  publishedRelease,
+  updateSummary,
+} from '@/data/release';
 
-// Port of apps/landing-page/app/download/page.tsx.
+// Every claim on this page is read from the GitHub release feed at build time
+// (src/data/release.ts). Do not hardcode a version, a filename, or an
+// auto-update promise here — that is exactly what drifted in #253.
 
 interface Platform {
   name: string;
@@ -14,13 +21,17 @@ interface Platform {
   command?: string;
 }
 
+const install =
+  'Open the .dmg and drag CodeVetter to Applications. Requires macOS 14 or newer. The app is Developer ID signed and notarized.';
+
 const PLATFORMS: Platform[] = [
   {
     name: 'macOS — Apple Silicon',
     arch: 'arm64',
-    asset: 'CodeVetter-<version>-arm64.dmg (or .zip)',
-    command:
-      'Open the .dmg and drag CodeVetter to Applications. Requires macOS 14 or newer. The app is Developer ID signed and notarized; later releases install through the in-app Sparkle updater.',
+    asset: publishedRelease
+      ? `${publishedRelease.installer}${publishedRelease.updateArchive ? ` (or ${publishedRelease.updateArchive})` : ''}`
+      : installerLabel,
+    command: install,
   },
 ];
 ---
@@ -41,9 +52,8 @@ const PLATFORMS: Platform[] = [
       </h1>
       <p class="mt-3 text-sm leading-7 text-stone-400">
         The current public artifact is a signed and notarized Apple-silicon
-        macOS DMG. CodeVetter requires no CodeVetter account; releases are
-        published through GitHub Releases and installed copies update through
-        the in-app Sparkle appcast.
+        macOS DMG, published through GitHub Releases. CodeVetter requires no
+        CodeVetter account. {updateSummary}
       </p>
 
       <a
@@ -52,7 +62,7 @@ const PLATFORMS: Platform[] = [
         rel="noopener noreferrer"
         class="mt-6 inline-block rounded-md bg-amber-500 px-4 py-2 text-sm font-medium text-stone-950 hover:bg-amber-400"
       >
-        Latest release →
+        {publishedRelease ? `Download ${publishedRelease.tag} →` : 'Releases →'}
       </a>
 
       <section class="mt-10 space-y-3" aria-labelledby="available-build">

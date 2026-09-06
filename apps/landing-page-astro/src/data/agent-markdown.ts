@@ -3,7 +3,7 @@ import results from '@/data/benchmark-results.json';
 import examples from '@/data/xray-examples.json';
 import docsIndexSource from '../../../../docs/index.md?raw';
 import { verificationContent } from '@/data/verification-content';
-import { currentReleaseUrl } from '@/data/release';
+import { currentReleaseUrl, publishedRelease, updateSummary } from '@/data/release';
 import { privacyMarkdownBody, privacyPolicy } from '@/data/privacy';
 import {
   optimizationCaseStudies,
@@ -66,11 +66,15 @@ const staticPages: Record<string, string> = {
   download: page(
     'Download CodeVetter',
     '/download',
-    `CodeVetter is distributed as a native SwiftUI/AppKit macOS application through GitHub Releases. It runs locally, requires no CodeVetter account, stores product state in local SQLite, and installed copies update through a signed Sparkle appcast published with each release.
+    `CodeVetter is distributed as a native SwiftUI/AppKit macOS application through GitHub Releases. It runs locally, requires no CodeVetter account, and stores product state in local SQLite. ${updateSummary}
 
 ## Supported release artifacts
 
-- macOS 14 or newer on Apple Silicon: \`CodeVetter-<version>-arm64.dmg\` (drag-to-Applications installer) and \`CodeVetter-<version>-arm64.zip\` (the Sparkle update archive). Both are Developer ID signed and notarized.
+${
+  publishedRelease
+    ? `- macOS 14 or newer on Apple Silicon: \`${publishedRelease.installer}\` (drag-to-Applications installer)${publishedRelease.updateArchive ? ` and \`${publishedRelease.updateArchive}\` (the Sparkle update archive)` : ''}, published on ${publishedRelease.tag}. Developer ID signed and notarized.`
+    : '- macOS 14 or newer on Apple Silicon: the Apple-silicon DMG attached to the newest GitHub release. Developer ID signed and notarized.'
+}
 
 The current public release does not contain Intel macOS, Windows, Linux, or
 Homebrew installers. The repository remains available for source inspection
