@@ -55,6 +55,19 @@ Internal (fleet):
 
 ## Timeline
 
+- **2026-09-06 — One version, enforced in both pipelines:** `MARKETING_VERSION`
+  in `Shared.xcconfig` is now the single source of truth. `pnpm version:sync`
+  derives `CURRENT_PROJECT_VERSION`, the three crate versions, the `=<version>`
+  pins between them, and `Cargo.lock` from it, and `pnpm version:check` fails
+  closed on drift. Cutting a release is again a one-line edit. This drift has
+  bitten three times — 1.13.0 (hand-fixed in `72b6b60b`, cut forward as 1.13.1)
+  and 1.13.4, where #266 bumped the xcconfig alone and left the crates at
+  1.13.3. The check runs in `ci.yml` *and* in the native qualification job,
+  which closes the gap `72b6b60b` recorded and left open: `core:qualify-cli`
+  ran only in CI, so a drifted cut could sign, notarize, and publish an app
+  whose bundled `codevetter` and `codevetter-mcp` reported the previous
+  version. Red CI was the lucky symptom; mismatched companions in a signed
+  build was the real exposure.
 - **2026-09-06 — First release cut through the gated pipeline (1.13.3):** a
   patch bump that carries no product change; its purpose is to exercise the
   release gate landed in #259 end to end, which no run has ever done. The

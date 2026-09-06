@@ -73,6 +73,14 @@ jobs:
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      # Closes the gap `72b6b60b` named and left open: `core:qualify-cli` runs
+      # only in ci.yml, so before this step a drifted cut could sign, notarize,
+      # and publish an app whose bundled codevetter and codevetter-mcp reported
+      # the previous version. Runs before signing so drift costs seconds, not a
+      # full notarization round trip.
+      - name: Require one version across every shipped surface
+        run: pnpm version:check
+
       - name: Require protected production inputs
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
