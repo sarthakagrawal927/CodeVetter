@@ -2,6 +2,7 @@
 import Layout from '@/layouts/Layout.astro';
 import Nav from '@/components/Nav.astro';
 import Footer from '@/components/Footer.astro';
+import GitHubIcon from '@/components/GitHubIcon.astro';
 import { currentReleaseUrl } from '@/data/release';
 
 // Port of apps/landing-page/app/download/page.tsx.
@@ -77,11 +78,13 @@ const PLATFORMS: Platform[] = [
         Building from source? See the{' '}
         <a
           href="https://github.com/Codevetter/codevetter"
+          aria-label="GitHub repository"
+          title="GitHub repository"
           target="_blank"
           rel="noopener noreferrer"
-          class="underline hover:text-amber-400"
+          class="inline-flex items-center align-middle text-stone-400 hover:text-amber-400 transition-colors"
         >
-          repo README
+          <GitHubIcon width={20} height={20} />
         </a>{' '}
       — native SwiftUI/AppKit + Rust, pnpm workspaces.
       </p>

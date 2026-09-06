@@ -2,6 +2,7 @@
 import Layout from '@/layouts/Layout.astro';
 import Nav from '@/components/Nav.astro';
 import Footer from '@/components/Footer.astro';
+import GitHubIcon from '@/components/GitHubIcon.astro';
 import dataset from '@/../public/benchmark/codevetter-benchmark-v1.json';
 import results from '@/data/benchmark-results.json';
 
@@ -291,7 +292,7 @@ npm run bench:public -- --reviewer=raw-claude</code></pre>
       <h2 class="mt-12 text-xl font-semibold text-white">Try CodeVetter</h2>
       <p class="mt-2 text-sm text-[--color-text-dim]">
         <a href="/download" class="text-[--color-accent] hover:underline">Download for macOS</a>
-        · <a href="https://github.com/Codevetter/codevetter" class="text-[--color-accent] hover:underline">GitHub</a>
+        · <a href="https://github.com/Codevetter/codevetter" aria-label="GitHub repository" title="GitHub repository" target="_blank" rel="noopener noreferrer" class="inline-flex items-center text-[--color-accent] hover:text-white transition-colors align-middle"><GitHubIcon width={20} height={20} /></a>
         · <a href="https://github.com/Codevetter/codevetter/issues" class="text-[--color-accent] hover:underline">Contribute a case</a>
       </p>
     </article>

@@ -2,6 +2,7 @@
 import Footer from '@/components/Footer.astro';
 import Nav from '@/components/Nav.astro';
 import Layout from '@/layouts/Layout.astro';
+import GitHubIcon from '@/components/GitHubIcon.astro';
 
 const entries = [
   {
@@ -65,9 +66,13 @@ const entries = [
         </a>
         <a
           href="https://github.com/Codevetter/codevetter"
-          class="border border-[--color-line-2] px-4 py-2.5 text-[--color-text-dim] transition-colors hover:border-[--color-accent] hover:text-white"
+          aria-label="GitHub repository"
+          title="GitHub repository"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center justify-center border border-[--color-line-2] px-4 py-2.5 text-[--color-text-dim] transition-colors hover:border-[--color-accent] hover:text-white"
         >
-          Source ↗
+          <GitHubIcon width={20} height={20} />
         </a>
       </div>
 
