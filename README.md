@@ -150,3 +150,20 @@ future agents do not reopen duplicate UI tasks.
 | 79eff0b9 | CodeVetter: add revalidation checklist after fixes | done — when a finding's re-check status is "fixed", QuickReview renders a checklist derived from the finding's evidence fields (file/line, artifact, level, notes) so the user can tick off concrete revalidation steps; checklist state persists per finding alongside other evidence |
 | 2b9ac8d9 | CodeVetter: add copyable reviewer handoff template | done — QuickReview's "Copy proof" button now emits a full markdown reviewer handoff (heading, score/agent/finding tallies, per-finding evidence with status icons, and a `### Next actions` checkbox list derived from unchecked findings, reproduced findings, and unticked revalidation items for fixed findings) so reviewers can paste proof directly into PRs/Slack |
 <!-- ACTIVE-AI-TASK-LOG:END -->
+
+<!-- portfolio-retained-work:2026-09-07 -->
+## Retained work from the portfolio review
+
+These are unresolved requirements retained at the owner’s request. They are not completed features. Work should follow a concrete need and fresh evidence.
+
+### Download page: latest releases ship no assets, filename pattern is wrong, and the Sparkle update claim is unsubstantiated
+
+Make the public download resolve to real release assets; align filenames, version claims and update behavior with release evidence.
+
+Original requirements and discussion: [#253](https://github.com/Codevetter/codevetter/issues/253).
+
+### Installed-upgrade proof cannot seed data: v1.11.0 incumbent CLI has no `rubrics` command
+
+Qualify installed upgrades against capabilities the incumbent version actually exposes; preserve its data and record the upgrade receipt.
+
+Original requirements and discussion: [#252](https://github.com/Codevetter/codevetter/issues/252).
