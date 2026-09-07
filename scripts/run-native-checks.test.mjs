@@ -66,7 +66,7 @@ test('release automation disables coverage at the workspace command boundary', (
     foregroundApproved: false,
     desktopIdleApproved: false,
   });
-  const [command] = nativeCheckCommands(parsed);
+  const [command] = nativeCheckCommands(parsed, { CODEVETTER_NATIVE_CHANNEL: 'preview' });
   assert.equal(command.backgroundSafe, true);
   assert.deepEqual(command.arguments.slice(0, 3), ['macos', 'build', '--json']);
   const settings = JSON.parse(command.arguments[3]);
