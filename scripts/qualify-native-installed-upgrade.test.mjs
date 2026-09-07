@@ -29,7 +29,7 @@ function input() {
     },
     continuity,
     launches: ['tauri_before', 'native_upgrade', 'native_relaunch', 'tauri_rollback'].map(
-      (kind) => ({ kind, visible_window: true })
+      (kind) => ({ kind, visible_window: true, observed_via: 'system_events_window' })
     ),
     rubricPreserved: true,
     recordedAt: '2026-09-02T00:00:00.000Z',
@@ -47,6 +47,18 @@ test('hosted upgrade proof requires every launch, rubric, and durable identity',
     launches: input().launches.filter((item) => item.kind !== 'native_relaunch'),
   });
   assert.equal(failed.status, 'failed');
+});
+
+test('visible process metadata cannot qualify a visible window', () => {
+  for (const observedVia of ['launch_services_visible_process', undefined, 'unknown']) {
+    const fixture = input();
+    fixture.launches[1].observed_via = observedVia;
+    const proof = buildInstalledUpgradeProof(fixture);
+    assert.equal(proof.status, 'failed');
+    assert.equal(proof.upgrade, false);
+    assert.equal(proof.relaunch, false);
+    assert.equal(proof.rollback, false);
+  }
 });
 
 test('execution is restricted to an explicit GitHub-hosted temporary child', () => {

@@ -81,7 +81,12 @@ export function buildInstalledUpgradeProof({
   if (!archive?.sha256) throw new Error('The native qualification has no ZIP archive identity');
   const requiredLaunches = ['tauri_before', 'native_upgrade', 'native_relaunch', 'tauri_rollback'];
   const launchPassed = requiredLaunches.every((kind) =>
-    launches.some((item) => item.kind === kind && item.visible_window === true)
+    launches.some(
+      (item) =>
+        item.kind === kind &&
+        item.visible_window === true &&
+        item.observed_via === 'system_events_window'
+    )
   );
   const passed =
     nativeInfo.CFBundleIdentifier === productionBundleIdentifier &&
@@ -106,7 +111,7 @@ export function buildInstalledUpgradeProof({
     data_continuity: continuity,
     limitations: [
       'The install, relaunch, and rollback occurred only inside RUNNER_TEMP on an isolated hosted Mac.',
-      'Each launch went through LaunchServices; a visible window is observed through System Events, or, when accessibility never answers, through the LaunchServices visible-process record named in observed_via.',
+      'Each launch went through LaunchServices. Only a System Events window observation qualifies a visible window; a LaunchServices visible-process record is diagnostic evidence and cannot pass this proof.',
       'No application under /Applications and no operator data or credentials were read or changed.',
       'Public release and replacement of the retained Tauri application remain separately authorized actions.',
     ],
@@ -237,7 +242,7 @@ async function launchAndObserve(app, appData, kind) {
     const observedVia = await waitForVisibleWindow(pid, executable, 60_000);
     return {
       kind,
-      visible_window: true,
+      visible_window: observedVia === 'system_events_window',
       observed_via: observedVia,
       bundle_identifier: info.CFBundleIdentifier,
     };
@@ -272,9 +277,8 @@ async function launchThroughLaunchServices(app, info, appData, executable) {
 
 // System Events is polled with backoff because a freshly registered application
 // answers accessibility queries only once its own event loop is running. When it
-// never answers at all, LaunchServices' own record that the application is a
-// visible foreground process stands in, and the receipt names which one proved
-// the launch.
+// no window is observed, retain LaunchServices' visible-process record only as
+// diagnostic evidence. It does not prove a window or pass the upgrade gate.
 async function waitForVisibleWindow(pid, executable, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   let interval = 100;
