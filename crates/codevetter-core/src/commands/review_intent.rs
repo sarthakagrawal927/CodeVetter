@@ -38,6 +38,7 @@ pub struct IntentSignals {
     pub qa_runs: usize,
     pub passed_qa_runs: usize,
     pub failed_qa_runs: usize,
+    pub unqualified_qa_runs: usize,
     pub qa_artifacts: usize,
     pub complete_review_coverage: bool,
 }
@@ -77,9 +78,13 @@ pub fn build_review_intent_diagnostic(
         .count();
     let passed_qa_runs = qa_runs
         .iter()
-        .filter(|run| run.get("pass").and_then(Value::as_bool) == Some(true))
+        .filter(|run| qa_execution_outcome(run) == Some(true))
         .count();
-    let failed_qa_runs = qa_runs.len().saturating_sub(passed_qa_runs);
+    let failed_qa_runs = qa_runs
+        .iter()
+        .filter(|run| qa_execution_outcome(run) == Some(false))
+        .count();
+    let unqualified_qa_runs = qa_runs.len() - passed_qa_runs - failed_qa_runs;
     let qa_artifacts = qa_runs
         .iter()
         .map(|run| {
@@ -118,6 +123,12 @@ pub fn build_review_intent_diagnostic(
         ));
     }
 
+    if unqualified_qa_runs > 0 {
+        gaps.push(format!(
+            "{unqualified_qa_runs} recorded QA run(s) have unqualified execution evidence."
+        ));
+    }
+
     let (closure_status, closure_reason) = if !intent_captured {
         (
             "missing_intent",
@@ -128,10 +139,10 @@ pub fn build_review_intent_diagnostic(
             "evidence_conflict",
             "Recorded review or runtime evidence still conflicts with the stated intent.",
         )
-    } else if qa_runs.is_empty() {
+    } else if qa_runs.is_empty() || unqualified_qa_runs > 0 {
         (
             "insufficient_evidence",
-            "Source review is complete, but no recorded user-flow evidence supports intent closure.",
+            "Source review is complete, but execution evidence is absent or unqualified.",
         )
     } else {
         (
@@ -164,6 +175,7 @@ pub fn build_review_intent_diagnostic(
             qa_runs: qa_runs.len(),
             passed_qa_runs,
             failed_qa_runs,
+            unqualified_qa_runs,
             qa_artifacts,
             complete_review_coverage,
         },
@@ -202,13 +214,13 @@ pub fn build_review_intent_diagnostic(
                     "No recorded user-flow run.".into()
                 } else {
                     format!(
-                        "{} passed, {} failed, {} retained artifact references.",
-                        passed_qa_runs, failed_qa_runs, qa_artifacts
+                        "{} passed, {} failed, {} unqualified, {} retained artifact references.",
+                        passed_qa_runs, failed_qa_runs, unqualified_qa_runs, qa_artifacts
                     )
                 },
                 status: if qa_runs.is_empty() {
                     "missing"
-                } else if failed_qa_runs > 0 {
+                } else if failed_qa_runs > 0 || unqualified_qa_runs > 0 {
                     "warning"
                 } else {
                     "done"
@@ -232,6 +244,17 @@ pub fn build_review_intent_diagnostic(
             "Intent closure is never inferred from review or test output.".into(),
             "Legacy synthetic QA is recorded evidence and is not assumed revision-exact.".into(),
         ],
+    }
+}
+
+// Explicit execution status carries more information than the legacy pass flag.
+// Unknown or non-terminal statuses must never become fabricated failures.
+fn qa_execution_outcome(run: &Value) -> Option<bool> {
+    match run.get("evidence_status") {
+        Some(Value::String(status)) if status == "pass" => Some(true),
+        Some(Value::String(status)) if status == "fail" => Some(false),
+        Some(_) => None,
+        None => run.get("pass").and_then(Value::as_bool),
     }
 }
 
@@ -302,6 +325,60 @@ mod tests {
         assert_eq!(diagnostic.signals.failed_qa_runs, 1);
         assert_eq!(diagnostic.signals.qa_artifacts, 2);
         assert_eq!(diagnostic.changed_surfaces, vec!["runtime", "tests"]);
+    }
+
+    #[test]
+    fn unavailable_performance_is_not_a_failed_execution() {
+        let diagnostic = build_review_intent_diagnostic(
+            "Correct percentage discount calculation",
+            &["discount.mjs".into()],
+            &[],
+            &[
+                json!({"pass": true, "evidence_status": "pass"}),
+                json!({"pass": false, "evidence_status": "no_confidence"}),
+            ],
+            true,
+        );
+        assert_eq!(diagnostic.signals.passed_qa_runs, 1);
+        assert_eq!(diagnostic.signals.failed_qa_runs, 0);
+        assert_eq!(diagnostic.closure.status, "insufficient_evidence");
+        assert!(diagnostic
+            .gaps
+            .iter()
+            .any(|gap| gap.contains("unqualified")));
+    }
+
+    #[test]
+    fn execution_status_preserves_failures_and_unknown_evidence() {
+        for (run, passed, failed, unqualified) in [
+            (json!({"pass": false}), 0, 1, 0),
+            (json!({"pass": true}), 1, 0, 0),
+            (json!({"pass": true, "evidence_status": "fail"}), 0, 1, 0),
+            (
+                json!({"pass": true, "evidence_status": "future_status"}),
+                0,
+                0,
+                1,
+            ),
+            (json!({"evidence_status": null}), 0, 0, 1),
+            (json!({}), 0, 0, 1),
+        ] {
+            let diagnostic =
+                build_review_intent_diagnostic("Keep totals correct", &[], &[], &[run], true);
+            assert_eq!(diagnostic.signals.passed_qa_runs, passed);
+            assert_eq!(diagnostic.signals.failed_qa_runs, failed);
+            assert_eq!(diagnostic.signals.unqualified_qa_runs, unqualified);
+            assert_eq!(
+                diagnostic.closure.status,
+                if failed > 0 {
+                    "evidence_conflict"
+                } else if unqualified > 0 {
+                    "insufficient_evidence"
+                } else {
+                    "ready_for_human_disposition"
+                }
+            );
+        }
     }
 
     #[test]

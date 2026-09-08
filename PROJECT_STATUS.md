@@ -37,9 +37,11 @@ separately approved safety design justify renewed investment.
 
 ## Current verification repair
 
-- #272: the shared check preparation now rejects missing, non-file and repository-escaping runtime targets before preflight readiness or execution. Reproduced in the published v1.13.7 CLI; 15 local-check tests, the shared-service preflight/execution regression, and the rebuilt CLI reproduction pass. This repair is not yet in a signed release.
+- #272: the shared check preparation now rejects missing, non-file and repository-escaping runtime targets before preflight readiness or execution. Reproduced in the published v1.13.7 CLI; 15 local-check tests, the shared-service preflight/execution regression, and the rebuilt CLI reproduction pass. Published v1.13.8 includes the repair; the downloaded signed/notarized package rejects the missing target. Issue #272 is closed.
 
-- Runtime CLI launch-path repair: symlinked and URL-encoded entry paths are normalized before main-module detection; the 18-test runtime suite passes. The published v1.13.7 package still needs this repair in its next signed release.
+- Runtime CLI launch-path repair: symlinked and URL-encoded entry paths are normalized before main-module detection; the 18-test runtime suite passes. Published v1.13.8 passes the same symlink-with-spaces reproduction; issue #273 is closed.
+
+- #276: a real Codex-backed check in published v1.13.8 exposed unavailable performance evidence being counted as failed QA. The source diagnostic now distinguishes passed, failed, and unqualified execution, preserving conservative intent closure. Five focused regression tests pass; release-package verification remains pending.
 
 ## Dependencies
 
