@@ -520,6 +520,10 @@ async fn prepare_local_check(input: &LocalCheckInput) -> Result<PreparedLocalChe
         performance_plan.as_ref().ok(),
     );
 
+    for target in correctness_target.iter().chain(performance_target.iter()) {
+        validate_target_file(&repo_path, target)?;
+    }
+
     Ok(PreparedLocalCheck {
         repo_path,
         repo_text,
@@ -643,6 +647,20 @@ fn validate_target(target: &LocalCheckTarget, performance: bool) -> Result<(), S
                 "testing"
             },
             target.adapter
+        ));
+    }
+    Ok(())
+}
+
+fn validate_target_file(repo: &Path, target: &LocalCheckTarget) -> Result<(), String> {
+    let resolved = repo
+        .join(&target.target)
+        .canonicalize()
+        .map_err(|error| format!("Runtime target `{}` is unavailable: {error}", target.target))?;
+    if !resolved.starts_with(repo) || !resolved.is_file() {
+        return Err(format!(
+            "Runtime target `{}` must resolve to a regular file inside the repository",
+            target.target
         ));
     }
     Ok(())
@@ -1549,6 +1567,33 @@ mod tests {
             apply_spec_confidence(LocalCheckVerdict::Failed, Some(&coverage)),
             LocalCheckVerdict::Failed
         );
+    }
+
+    #[test]
+    fn runtime_target_requires_an_existing_contained_regular_file() {
+        let directory = tempfile::tempdir().expect("repo");
+        let repo = directory.path().canonicalize().expect("canonical repo");
+        let mut target = LocalCheckTarget {
+            adapter: "node-test".into(),
+            target: "absent.test.mjs".into(),
+            name: None,
+            source: "explicit".into(),
+        };
+        assert!(validate_target_file(&repo, &target).is_err());
+        std::fs::write(repo.join("valid.test.mjs"), "").expect("test file");
+        target.target = "valid.test.mjs".into();
+        assert!(validate_target_file(&repo, &target).is_ok());
+        std::fs::create_dir(repo.join("directory.test.mjs")).expect("directory");
+        target.target = "directory.test.mjs".into();
+        assert!(validate_target_file(&repo, &target).is_err());
+        #[cfg(unix)]
+        {
+            let outside = tempfile::NamedTempFile::new().expect("outside");
+            std::os::unix::fs::symlink(outside.path(), repo.join("escape.test.mjs"))
+                .expect("symlink");
+            target.target = "escape.test.mjs".into();
+            assert!(validate_target_file(&repo, &target).is_err());
+        }
     }
 
     #[test]

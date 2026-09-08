@@ -35,6 +35,10 @@ opt-in, authenticated provider comparisons remain claim-closed, and no hosted
 profiling or production-load system should be added until external pull and a
 separately approved safety design justify renewed investment.
 
+## Current verification repair
+
+- #272: the shared check preparation now rejects missing, non-file and repository-escaping runtime targets before preflight readiness or execution. Reproduced in the published v1.13.7 CLI; 15 local-check tests, the shared-service preflight/execution regression, and the rebuilt CLI reproduction pass. This repair is not yet in a signed release.
+
 ## Dependencies
 
 External:

@@ -283,6 +283,32 @@ mod tests {
             },
         )
         .expect("command");
+        for operation in [
+            VerificationOperation::Preflight,
+            VerificationOperation::Execute,
+        ] {
+            let mut invalid = command.clone();
+            invalid.operation = operation;
+            invalid.input.test_target.as_mut().expect("target").target =
+                "test/absent.test.js".into();
+            let error = run_verification_command(invalid, |_| {})
+                .await
+                .expect_err("missing target must stop before runtime or review");
+            assert!(error.contains("test/absent.test.js"));
+            assert!(error.contains("unavailable"));
+        }
+        let mut invalid_performance = command.clone();
+        invalid_performance.input.performance_target = Some(LocalCheckTarget {
+            adapter: "node-script".into(),
+            target: "absent-benchmark.mjs".into(),
+            name: None,
+            source: "explicit".into(),
+        });
+        assert!(run_verification_command(invalid_performance, |_| {})
+            .await
+            .expect_err("missing performance target")
+            .contains("absent-benchmark.mjs"));
+
         let mut progress = Vec::new();
         let result = run_verification_command(command, |event| progress.push(event))
             .await
