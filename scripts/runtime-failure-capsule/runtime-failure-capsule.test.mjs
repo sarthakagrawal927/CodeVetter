@@ -1,7 +1,8 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -541,3 +542,15 @@ function commandCapture(program, args, cwd) {
     child.once('close', (code) => resolvePromise({ code, stdout, stderr }));
   });
 }
+
+test('CLI executes through a symlink path containing spaces', async (context) => {
+  const root = await temporaryRoot(context);
+  const alias = join(root, 'runtime alias.mjs');
+  await symlink(fileURLToPath(new URL('./cli.mjs', import.meta.url)), alias);
+  const result = spawnSync(process.execPath, [alias, 'detect', '--repo', root, '--json'], {
+    encoding: 'utf8',
+    timeout: 10000,
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(JSON.parse(result.stdout).lanes);
+});

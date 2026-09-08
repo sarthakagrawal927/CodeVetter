@@ -39,6 +39,8 @@ separately approved safety design justify renewed investment.
 
 - #272: the shared check preparation now rejects missing, non-file and repository-escaping runtime targets before preflight readiness or execution. Reproduced in the published v1.13.7 CLI; 15 local-check tests, the shared-service preflight/execution regression, and the rebuilt CLI reproduction pass. This repair is not yet in a signed release.
 
+- Runtime CLI launch-path repair: symlinked and URL-encoded entry paths are normalized before main-module detection; the 18-test runtime suite passes. The published v1.13.7 package still needs this repair in its next signed release.
+
 ## Dependencies
 
 External:

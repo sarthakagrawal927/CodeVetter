@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
+import { realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { capsuleFromExecution, capsuleFromReceipt } from './capsule.mjs';
 import {
@@ -410,7 +412,7 @@ function writeJson(value) {
   process.stdout.write(`${JSON.stringify(value)}\n`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   process.stdout.on('error', (error) => {
     if (error.code === 'EPIPE') process.exit(0);
     throw error;
