@@ -75,7 +75,7 @@ in `native-production-qualification.yml`. That incumbent has to satisfy two
 constraints at once:
 
 1. it still carries `CodeVetter_aarch64.app.tar.gz` — only Tauri releases do,
-   and `v1.11.1` is the newest tag with any assets at all; and
+   and `v1.11.1` is the newest retained Tauri tag carrying that archive; and
 2. its bundled `codevetter` CLI understands `rubrics`, because that is how the
    proof seeds the durable record whose survival across upgrade and rollback is
    the thing being proven.
@@ -123,12 +123,16 @@ Exactly these three, and nothing else:
 - `CodeVetter-<version>-arm64.zip`
 - `appcast.xml`
 
-No release has yet published assets under these names — every published asset
-is still Tauri-shaped (`CodeVetter_<version>_aarch64.dmg`), and `v1.11.1` is
-the newest release carrying any. The download page therefore states the
-filename, tag, and update mechanism it reads from the release feed at build
-time rather than this contract; it will name these files as soon as a release
-publishes them. See `apps/landing-page-astro/src/data/release.ts`.
+The published v1.13.7 release carries these three contract assets. Its
+qualified ZIP digest matches the public asset, and hosted evidence confirms
+upgrade from Tauri v1.11.1, relaunch, rollback, and custom-rubric preservation.
+The download page reads the filename and tag from the release feed at build
+time; redeploy it after publishing a new release. See
+`apps/landing-page-astro/src/data/release.ts`.
+
+Appcast signature verification and manual installed-upgrade qualification do
+not exercise an in-app Sparkle update. That remaining behavior is tracked in
+[issue #253](https://github.com/Codevetter/codevetter/issues/253).
 
 ## Key files
 
