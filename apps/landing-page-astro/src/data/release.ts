@@ -81,13 +81,8 @@ export const publishedRelease = await resolvePublishedRelease();
 /** Where "Download" and "Latest release" point. Never a release with no build. */
 export const currentReleaseUrl = publishedRelease?.url ?? RELEASES_URL;
 
-/**
- * Sparkle only updates installed copies once a release publishes the signed
- * appcast the updater reads. Until then the page must say updates are manual:
- * the app itself refuses to update without an HTTPS feed and an EdDSA key
- * (`NativeUpdaterConfiguration.ready`).
- */
-const automaticUpdates = Boolean(publishedRelease?.appcastUrl);
+/** A published feed proves update availability, not installed updater behavior. */
+const signedUpdateFeedAvailable = Boolean(publishedRelease?.appcastUrl);
 
 /** Installer filename claim. Only ever a name the release feed actually lists. */
 export const installerLabel = publishedRelease
@@ -95,6 +90,6 @@ export const installerLabel = publishedRelease
   : 'the Apple-silicon macOS DMG attached to the newest release';
 
 /** Update mechanism claim, shared verbatim by /download and /download.md. */
-export const updateSummary = automaticUpdates
-  ? 'Installed copies update in place through the signed Sparkle appcast published with each release.'
+export const updateSummary = signedUpdateFeedAvailable
+  ? 'A signed Sparkle update feed is available. In-app installation and relaunch are still being verified. To update manually, quit CodeVetter, download the latest DMG, and replace CodeVetter.app in Applications; keep your existing application data.'
   : 'Installed copies do not update themselves yet: no published release carries the signed Sparkle appcast the in-app updater requires, so update by downloading the newest release.';

@@ -37,7 +37,7 @@ The product should prefer narrow, evidence-backed loops over broad "code intelli
 
 | Concern | Service |
 |---------|---------|
-| Desktop app | GitHub Releases — signed and notarized native macOS app with Sparkle updates (`appcast.xml`) |
+| Desktop app | GitHub Releases — signed and notarized native macOS app with a signed update feed (`appcast.xml`) |
 | Landing page | Cloudflare Pages (`codevetter`, codevetter.com) — static Astro export |
 | Database | Local SQLite via Rust `rusqlite` (desktop only, no server) |
 | Auth | None — LLM provider API keys stored in user settings |
@@ -54,7 +54,7 @@ Give your coding agent this prompt:
 Install CodeVetter from the latest GitHub release:
 https://github.com/Codevetter/codevetter/releases/latest
 
-Confirm this is an Apple-silicon Mac on macOS 14 or newer, download CodeVetter-<version>-arm64.dmg, verify the release asset hash when available, install CodeVetter.app into /Applications, and launch it once to verify it starts. The app is Developer ID signed and notarized, so no quarantine workaround is needed; later releases arrive through the in-app updater.
+Confirm this is an Apple-silicon Mac on macOS 14 or newer, download CodeVetter-<version>-arm64.dmg, verify the release asset hash when available, install CodeVetter.app into /Applications, and launch it once to verify it starts. The app is Developer ID signed and notarized, so no quarantine workaround is needed; to update, quit CodeVetter and replace the app using the latest DMG. Keep existing application data. The signed update feed is available, but actual in-app download/install/relaunch remains under verification in #253.
 ```
 
 Use the signed, notarized DMG for a first install; the matching ZIP is the Sparkle update archive.
