@@ -37,7 +37,7 @@ The product should prefer narrow, evidence-backed loops over broad "code intelli
 
 | Concern | Service |
 |---------|---------|
-| Desktop app | GitHub Releases — signed and notarized native macOS app with Sparkle updates (`appcast.xml`) |
+| Desktop app | GitHub Releases — signed and notarized native macOS app with a signed update feed (`appcast.xml`) |
 | Landing page | Cloudflare Pages (`codevetter`, codevetter.com) — static Astro export |
 | Database | Local SQLite via Rust `rusqlite` (desktop only, no server) |
 | Auth | None — LLM provider API keys stored in user settings |
@@ -54,7 +54,7 @@ Give your coding agent this prompt:
 Install CodeVetter from the latest GitHub release:
 https://github.com/Codevetter/codevetter/releases/latest
 
-Confirm this is an Apple-silicon Mac on macOS 14 or newer, download CodeVetter-<version>-arm64.dmg, verify the release asset hash when available, install CodeVetter.app into /Applications, and launch it once to verify it starts. The app is Developer ID signed and notarized, so no quarantine workaround is needed; later releases arrive through the in-app updater.
+Confirm this is an Apple-silicon Mac on macOS 14 or newer, download CodeVetter-<version>-arm64.dmg, verify the release asset hash when available, install CodeVetter.app into /Applications, and launch it once to verify it starts. The app is Developer ID signed and notarized, so no quarantine workaround is needed; to update, quit CodeVetter and replace the app using the latest DMG. Keep existing application data. The signed update feed is available, but actual in-app download/install/relaunch remains under verification in #253.
 ```
 
 Use the signed, notarized DMG for a first install; the matching ZIP is the Sparkle update archive.
@@ -140,8 +140,7 @@ future agents do not reopen duplicate UI tasks.
 
 - Business lane: Core/status context
 - Rule: do not create another broad "improve the UI" task unless the acceptance criteria differ materially from the tasks listed here.
-- Source of truth for new task status: this repository's GitHub issues or
-  OpenSpec changes. README entries are durable historical context only.
+- Source of truth for new task status: this repository's GitHub issues. README entries are durable historical context only.
 
 | Task ID | Title | Status |
 |---|---|---|
@@ -156,14 +155,14 @@ future agents do not reopen duplicate UI tasks.
 
 These are unresolved requirements retained at the owner’s request. They are not completed features. Work should follow a concrete need and fresh evidence.
 
-### Download page: latest releases ship no assets, filename pattern is wrong, and the Sparkle update claim is unsubstantiated
+### Verify installed Sparkle updates
 
-Make the public download resolve to real release assets; align filenames, version claims and update behavior with release evidence.
+Published downloads and filenames are repaired. The signed appcast is available, but the actual in-app download/install/relaunch path remains unqualified. Use the documented manual update path until this behavior is verified. Manual hosted app replacement is not proof of a Sparkle installation.
 
-Original requirements and discussion: [#253](https://github.com/Codevetter/codevetter/issues/253).
+Remaining verification and original requirements: [#253](https://github.com/Codevetter/codevetter/issues/253).
 
-### Installed-upgrade proof cannot seed data: v1.11.0 incumbent CLI has no `rubrics` command
+### Completed release verification
 
-Qualify installed upgrades against capabilities the incumbent version actually exposes; preserve its data and record the upgrade receipt.
+The published 1.13.9 package passes the real Codex-backed QA reproduction: correctness passes, unavailable performance remains unqualified, and no failed execution is invented. The persisted result preserves that distinction. Public asset digest, signature and notarization checks also pass; [#276](https://github.com/Codevetter/codevetter/issues/276#issuecomment-5596487413) records the verification evidence.
 
-Original requirements and discussion: [#252](https://github.com/Codevetter/codevetter/issues/252).
+The incumbent CLI and installed-upgrade seeding problem in [#252](https://github.com/Codevetter/codevetter/issues/252) is resolved. Hosted qualification verifies upgrade, relaunch, rollback and custom-rubric preservation. The missing-target and symlinked-runtime defects in #272 and #273 are also resolved and verified in published 1.13.8.
