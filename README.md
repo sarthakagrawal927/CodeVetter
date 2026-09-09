@@ -161,8 +161,8 @@ Published downloads and filenames are repaired. The signed appcast is available,
 
 Remaining verification and original requirements: [#253](https://github.com/Codevetter/codevetter/issues/253).
 
-### Verify the published QA evidence correction
+### Completed release verification
 
-The source fix distinguishes failed execution from unavailable performance evidence. Focused tests and the signed 1.13.9 candidate pass the real Codex-backed reproduction; verify the public package after the release pipeline publishes it before closing [#276](https://github.com/Codevetter/codevetter/issues/276).
+The published 1.13.9 package passes the real Codex-backed QA reproduction: correctness passes, unavailable performance remains unqualified, and no failed execution is invented. The persisted result preserves that distinction. Public asset digest, signature and notarization checks also pass; [#276](https://github.com/Codevetter/codevetter/issues/276#issuecomment-5596487413) records the verification evidence.
 
 The incumbent CLI and installed-upgrade seeding problem in [#252](https://github.com/Codevetter/codevetter/issues/252) is resolved. Hosted qualification verifies upgrade, relaunch, rollback and custom-rubric preservation. The missing-target and symlinked-runtime defects in #272 and #273 are also resolved and verified in published 1.13.8.
