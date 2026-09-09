@@ -140,8 +140,7 @@ future agents do not reopen duplicate UI tasks.
 
 - Business lane: Core/status context
 - Rule: do not create another broad "improve the UI" task unless the acceptance criteria differ materially from the tasks listed here.
-- Source of truth for new task status: this repository's GitHub issues or
-  OpenSpec changes. README entries are durable historical context only.
+- Source of truth for new task status: this repository's GitHub issues. README entries are durable historical context only.
 
 | Task ID | Title | Status |
 |---|---|---|
@@ -156,14 +155,14 @@ future agents do not reopen duplicate UI tasks.
 
 These are unresolved requirements retained at the owner’s request. They are not completed features. Work should follow a concrete need and fresh evidence.
 
-### Download page: latest releases ship no assets, filename pattern is wrong, and the Sparkle update claim is unsubstantiated
+### Verify installed Sparkle updates
 
-Make the public download resolve to real release assets; align filenames, version claims and update behavior with release evidence.
+Published downloads and filenames are repaired. The signed appcast is available, but the actual in-app download/install/relaunch path remains unqualified. Use the documented manual update path until this behavior is verified. Manual hosted app replacement is not proof of a Sparkle installation.
 
-Original requirements and discussion: [#253](https://github.com/Codevetter/codevetter/issues/253).
+Remaining verification and original requirements: [#253](https://github.com/Codevetter/codevetter/issues/253).
 
-### Installed-upgrade proof cannot seed data: v1.11.0 incumbent CLI has no `rubrics` command
+### Verify the published QA evidence correction
 
-Qualify installed upgrades against capabilities the incumbent version actually exposes; preserve its data and record the upgrade receipt.
+The source fix distinguishes failed execution from unavailable performance evidence. Focused tests and the signed 1.13.9 candidate pass the real Codex-backed reproduction; verify the public package after the release pipeline publishes it before closing [#276](https://github.com/Codevetter/codevetter/issues/276).
 
-Original requirements and discussion: [#252](https://github.com/Codevetter/codevetter/issues/252).
+The incumbent CLI and installed-upgrade seeding problem in [#252](https://github.com/Codevetter/codevetter/issues/252) is resolved. Hosted qualification verifies upgrade, relaunch, rollback and custom-rubric preservation. The missing-target and symlinked-runtime defects in #272 and #273 are also resolved and verified in published 1.13.8.
